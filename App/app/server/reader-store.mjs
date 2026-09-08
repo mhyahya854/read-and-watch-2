@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { realpathSync, statSync } from 'node:fs';
 import {
   basename,
   dirname,
@@ -9,6 +9,7 @@ import {
   relative,
   resolve,
 } from 'node:path';
+import { createLibraryStore } from './library-store.mjs';
 
 const ITEM_ID_PATTERN = /^(read|watch)-[0-9a-f]{32}$/;
 const SUPPORTED_SUFFIXES = new Map([
@@ -105,11 +106,16 @@ function fileReady(path) {
 
 export function createReaderStore({
   libraryRoot,
-  catalogPath,
+  libraryDatabasePath,
   readerExecutable,
   launchReader = defaultLaunchReader,
 }) {
-  const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
+  const libraryStore = createLibraryStore({
+    databasePath: libraryDatabasePath,
+    readOnly: true,
+  });
+  const catalog = libraryStore.getCatalog();
+  libraryStore.close();
   const itemsById = new Map(catalog.items.map((item) => [item.id, item]));
   const canonicalLibraryRoot = realpathSync(libraryRoot);
 

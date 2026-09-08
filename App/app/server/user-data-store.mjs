@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { createLibraryStore } from './library-store.mjs';
 
 const TYPES = new Set(['thoughts', 'notes']);
 const ITEM_ID_RE = /^(read|watch)-[0-9a-f]{32}$/;
@@ -22,21 +23,14 @@ function readJsonOrNull(file) {
   }
 }
 
-function readFileOrNull(file) {
-  try {
-    return readFileSync(file, 'utf8');
-  } catch {
-    return null;
-  }
-}
-
 export function createUserDataStore({
   userDataRoot,
-  catalogPath,
+  libraryDatabasePath,
   historyLimit = DEFAULT_HISTORY_LIMIT,
 }) {
-  const catalog = readJsonOrNull(catalogPath);
-  const validIds = new Set((catalog?.items ?? []).map((item) => item.id));
+  const libraryStore = createLibraryStore({
+    databasePath: libraryDatabasePath,
+  });
   const root = resolve(userDataRoot);
 
   function assertValid(type, itemId) {
@@ -46,7 +40,7 @@ export function createUserDataStore({
     if (typeof itemId !== 'string' || !ITEM_ID_RE.test(itemId)) {
       throw new Error('Invalid item ID');
     }
-    if (!validIds.has(itemId)) {
+    if (!libraryStore.itemExists(itemId)) {
       throw new Error('Unknown item ID');
     }
   }
@@ -58,10 +52,6 @@ export function createUserDataStore({
       throw new Error('Unsafe user-data path');
     }
     return file;
-  }
-
-  function revisionOf(file) {
-    return existsSync(file) ? String(statSync(file).mtimeMs) : null;
   }
 
   function writeAtomic(target, content) {
@@ -100,8 +90,12 @@ export function createUserDataStore({
         const hasThoughts = existsSync(thoughts);
         const hasNotes = existsSync(notes);
         if (!hasThoughts && !hasNotes) continue;
-        const thoughtsModified = hasThoughts ? statSync(thoughts).mtime.toISOString() : null;
-        const notesModified = hasNotes ? statSync(notes).mtime.toISOString() : null;
+        const thoughtsModified = hasThoughts
+          ? statSync(thoughts).mtime.toISOString()
+          : null;
+        const notesModified = hasNotes
+          ? statSync(notes).mtime.toISOString()
+          : null;
         items[entry.name] = {
           id: entry.name,
           collection: entry.name.startsWith('read-') ? 'read' : 'watch',
@@ -116,7 +110,7 @@ export function createUserDataStore({
               ? thoughtsModified > notesModified
                 ? thoughtsModified
                 : notesModified
-              : thoughtsModified ?? notesModified,
+              : (thoughtsModified ?? notesModified),
         };
       }
     }
@@ -129,8 +123,7 @@ export function createUserDataStore({
   return {
     load(type, itemId) {
       assertValid(type, itemId);
-      const file = itemFile(type, itemId);
-      return { content: readFileOrNull(file), revision: revisionOf(file) };
+      return libraryStore.loadNote(type, itemId);
     },
 
     save(type, itemId, content, baseRevision) {
@@ -139,15 +132,8 @@ export function createUserDataStore({
         throw new Error('User-data content must be a string');
       }
       const file = itemFile(type, itemId);
-      const currentRevision = revisionOf(file);
-      if (currentRevision !== null && baseRevision !== currentRevision) {
-        return {
-          ok: false,
-          conflict: true,
-          content: readFileOrNull(file),
-          revision: currentRevision,
-        };
-      }
+      const result = libraryStore.saveNote(type, itemId, content, baseRevision);
+      if (!result.ok) return result;
 
       if (!content.trim()) {
         if (existsSync(file)) {
@@ -155,17 +141,26 @@ export function createUserDataStore({
           rmSync(file);
         }
         updateIndex();
-        return { ok: true, content: '', revision: null, exists: false };
+        return result;
       }
 
       archive(file, type, itemId);
       writeAtomic(file, content);
       updateIndex();
-      return { ok: true, content, revision: revisionOf(file), exists: true };
+      return result;
     },
 
     getIndex() {
-      return readJsonOrNull(join(root, 'index.json')) ?? { schemaVersion: 1, items: {} };
+      return (
+        readJsonOrNull(join(root, 'index.json')) ?? {
+          schemaVersion: 1,
+          items: {},
+        }
+      );
+    },
+
+    close() {
+      libraryStore.close();
     },
   };
 }

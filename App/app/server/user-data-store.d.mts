@@ -20,10 +20,11 @@ export type UserDataStore = {
     baseRevision: string | null,
   ): SaveResult;
   getIndex(): Record<string, unknown>;
+  close(): void;
 };
 
 export declare function createUserDataStore(options: {
   userDataRoot: string;
-  catalogPath: string;
+  libraryDatabasePath: string;
   historyLimit?: number;
 }): UserDataStore;

@@ -3,6 +3,7 @@ export type DataPaths = {
   dataAppRoot: string;
   libraryRoot: string;
   catalogPath: string;
+  libraryDatabasePath: string;
   userDataRoot: string;
   readerExecutable: string;
 };

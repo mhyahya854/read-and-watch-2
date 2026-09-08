@@ -5,21 +5,21 @@
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
   "current_phase_id": "PHASE-02",
-  "current_phase_status": "NOT_STARTED",
-  "current_task_id": "P02-T001",
+  "current_phase_status": "IN_PROGRESS",
+  "current_task_id": "P02-G004",
   "last_completed_phase_id": "PHASE-01",
   "last_verified_local_head": "b83cf89780b6f9c7e023f3374752c49a34022d40",
   "last_verified_remote_head": "b83cf89780b6f9c7e023f3374752c49a34022d40",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 01 architecture query; 326 nodes, 402 edges, 22 communities; integrity clean",
-  "last_ponytail_status": "PASS: Phase 01 design kept minimal; speculative frameworks and premature tables deferred",
+  "last_graphify_status": "PASS: Phase 02 code refresh; 355 nodes, 465 edges, 21 communities; integrity clean",
+  "last_ponytail_status": "PASS: Phase 02 whole-repo audit; no new dependency or repository framework; four deferred cleanup candidates recorded",
   "active_blockers": [],
   "known_limitations": [
-    "One user-added provenance record retains a stale pre-separation historical path; exact current source/copy hash evidence is external and Phase 02 must resolve it before live migration.",
+    "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
     "A project-level license choice is required before new third-party source adoption or external distribution."
   ],
   "phase_01_content_commit": "b83cf89780b6f9c7e023f3374752c49a34022d40",
   "phase_01_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "exact_next_action": "In a fresh invocation, start P02-T001 by implementing checksummed schema migrations and an isolated test-only SQLite harness from the accepted Phase 01 designs."
+  "exact_next_action": "Complete P02-G004 by committing and pushing the verified Phase 02 implementation, verifying GitHub containment, then write the Phase 02 closure commit and stop."
 }

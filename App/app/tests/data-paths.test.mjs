@@ -13,7 +13,14 @@ test('external data paths derive from one configured root', () => {
     environment: { READ_WATCH_DATA_ROOT: dataRoot },
   });
   assert.equal(paths.dataRoot, dataRoot);
-  assert.equal(paths.catalogPath, resolve(dataRoot, 'App/library/catalog.json'));
+  assert.equal(
+    paths.catalogPath,
+    resolve(dataRoot, 'App/library/catalog.json'),
+  );
+  assert.equal(
+    paths.libraryDatabasePath,
+    resolve(dataRoot, 'App/state/read-watch.sqlite3'),
+  );
   assert.equal(paths.userDataRoot, resolve(dataRoot, 'App/user-data'));
   assert.equal(
     paths.readerExecutable,

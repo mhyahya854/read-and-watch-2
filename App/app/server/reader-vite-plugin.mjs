@@ -23,10 +23,14 @@ async function readJson(request) {
   return body ? JSON.parse(body) : {};
 }
 
-export function readerPlugin({ libraryRoot, catalogPath, readerExecutable }) {
+export function readerPlugin({
+  libraryRoot,
+  libraryDatabasePath,
+  readerExecutable,
+}) {
   const store = createReaderStore({
     libraryRoot,
-    catalogPath,
+    libraryDatabasePath,
     readerExecutable,
   });
 

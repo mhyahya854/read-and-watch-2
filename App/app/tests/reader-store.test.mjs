@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 
 import { createReaderStore } from '../server/reader-store.mjs';
+import { writeTestDatabase } from './test-database.mjs';
 
 const READ_ID = 'read-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SECOND_READ_ID = 'read-cccccccccccccccccccccccccccccccc';
@@ -37,30 +38,27 @@ function makeItem({
 function setup(t, { items, files = {}, launchReader } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'rw-reader-'));
   const libraryRoot = join(root, 'library');
-  const catalogPath = join(libraryRoot, 'catalog.json');
+  const libraryDatabasePath = join(root, 'library.sqlite3');
   const readerExecutable = join(root, 'runtime', 'readest.exe');
   mkdirSync(libraryRoot, { recursive: true });
-  writeFileSync(
-    catalogPath,
-    JSON.stringify({
-      schemaVersion: 1,
-      items: items ?? [
-        makeItem({
-          media: [
-            {
-              name: 'test.epub',
-              path: 'Read/Test-Book/media/test.epub',
-              extension: '.epub',
-            },
-          ],
-        }),
-        makeItem({
-          id: WATCH_ID,
-          collection: 'watch',
-          itemPath: 'Watch/Test/item.md',
-        }),
-      ],
-    }),
+  writeTestDatabase(
+    libraryDatabasePath,
+    items ?? [
+      makeItem({
+        media: [
+          {
+            name: 'test.epub',
+            path: 'Read/Test-Book/media/test.epub',
+            extension: '.epub',
+          },
+        ],
+      }),
+      makeItem({
+        id: WATCH_ID,
+        collection: 'watch',
+        itemPath: 'Watch/Test/item.md',
+      }),
+    ],
   );
   for (const [relativePath, content] of Object.entries(files)) {
     writeRelative(libraryRoot, relativePath, content);
@@ -69,7 +67,7 @@ function setup(t, { items, files = {}, launchReader } = {}) {
   const launches = [];
   const store = createReaderStore({
     libraryRoot,
-    catalogPath,
+    libraryDatabasePath,
     readerExecutable,
     launchReader:
       launchReader ??

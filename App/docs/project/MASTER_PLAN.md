@@ -197,7 +197,7 @@ Stop after Phase 01 is pushed and verified. Do not start Phase 02.
 
 ## PHASE-02 - CALIBRE-CLASS READ & WATCH LIBRARY MANAGER FOUNDATION
 
-Status: `NOT_STARTED`
+Status: `IN_PROGRESS`
 
 ### Objective
 
@@ -217,20 +217,20 @@ No Calibre database/GUI, metadata fetching requirement, reader engine, source mu
 
 ### Checklist
 
-- [ ] P02-T001 Establish schema migrations and a test-only database harness.
-- [ ] P02-T002 Implement repositories/transactions for common, Read-specific, Watch-specific, format, property, provenance, and relationship data.
-- [ ] P02-T003 Implement deterministic dry-run migration preserving all stable IDs and Notion-derived properties.
-- [ ] P02-T004 Implement file-first export/rebuild, backup, restore, and rollback.
-- [ ] P02-T005 Implement multi-format logical books, inventory, collision-safe duplicate detection, and source-hash records.
-- [ ] P02-T006 Implement manual metadata, custom properties, status/tags/rating, sort/filter/search, categories, and virtual views.
-- [ ] P02-T007 Migrate the current catalog only after dry-run and protected-state gates pass.
-- [ ] P02-T008 Verify Watch-specific semantics independently from Read/book semantics.
+- [x] P02-T001 Establish schema migrations and a test-only database harness.
+- [x] P02-T002 Implement repositories/transactions for common, Read-specific, Watch-specific, format, property, provenance, and relationship data.
+- [x] P02-T003 Implement deterministic dry-run migration preserving all stable IDs and Notion-derived properties.
+- [x] P02-T004 Implement file-first export/rebuild, backup, restore, and rollback.
+- [x] P02-T005 Implement multi-format logical books, inventory, collision-safe duplicate detection, and source-hash records.
+- [x] P02-T006 Implement manual metadata, custom properties, status/tags/rating, sort/filter/search, categories, and virtual views.
+- [x] P02-T007 Migrate the current catalog only after dry-run and protected-state gates pass.
+- [x] P02-T008 Verify Watch-specific semantics independently from Read/book semantics.
 
 ### Verification gates
 
-- [ ] P02-G001 Record/field/count/stable-ID parity and provenance are exact; no source or backup drift.
-- [ ] P02-G002 Transaction failure, rerun, rollback, restore, and rebuild tests pass.
-- [ ] P02-G003 Search/filter/duplicate/multi-format behavior passes focused and real-catalog tests.
+- [x] P02-G001 Record/field/count/stable-ID parity and provenance are exact; no source or backup drift.
+- [x] P02-G002 Transaction failure, rerun, rollback, restore, and rebuild tests pass.
+- [x] P02-G003 Search/filter/duplicate/multi-format behavior passes focused and real-catalog tests.
 - [ ] P02-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports

@@ -230,3 +230,9 @@ PDF and reflowable engines will expose a minimal `DocumentAdapter` contract for 
 Status: Provisional - user/legal decision required before direct adoption or distribution
 
 The public repository has no project-level license, so no permission is inferred. Existing Readest AGPL notices and provenance remain preserved. Before new third-party source is adopted, or Read & Watch is distributed for external reuse, the user must select a project license and obtain appropriate review for copyleft interactions. Phase 01 added no package or upstream source.
+
+## D-038 - Standard-library SQLite is the Phase 02 persistence implementation
+
+Status: Accepted
+
+The canonical local database is implemented with SQLite through Python's standard library for migration/recovery operations and Node's built-in `node:sqlite` for application runtime access. Read & Watch uses one concrete store and explicit transactions rather than a generic repository framework or ORM. Deterministic file-first snapshots remain immutable recovery artifacts, not a second writable master. This decision adds no production dependency and does not constrain later desktop-shell evaluation.

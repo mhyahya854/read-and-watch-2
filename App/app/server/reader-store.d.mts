@@ -32,7 +32,7 @@ export type ReaderStore = {
 
 export declare function createReaderStore(options: {
   libraryRoot: string;
-  catalogPath: string;
+  libraryDatabasePath: string;
   readerExecutable: string;
   launchReader?: (executable: string, source: string) => void | Promise<void>;
 }): ReaderStore;

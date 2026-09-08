@@ -12,29 +12,33 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { createUserDataStore } from '../server/user-data-store.mjs';
+import { writeTestDatabase } from './test-database.mjs';
 
 const READ_ID = 'read-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const WATCH_ID = 'watch-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 function setup(t) {
   const dir = mkdtempSync(join(tmpdir(), 'rw-user-data-'));
-  const catalogPath = join(dir, 'catalog.json');
-  writeFileSync(
-    catalogPath,
-    JSON.stringify({
-      schemaVersion: 1,
-      items: [{ id: READ_ID }, { id: WATCH_ID }],
-    }),
-  );
+  const libraryDatabasePath = join(dir, 'library.sqlite3');
+  writeTestDatabase(libraryDatabasePath, [
+    { id: READ_ID, collection: 'read', itemPath: 'Read/Test/item.md' },
+    { id: WATCH_ID, collection: 'watch', itemPath: 'Watch/Test/item.md' },
+  ]);
   const userDataRoot = join(dir, 'user-data');
-  const store = createUserDataStore({ userDataRoot, catalogPath });
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const store = createUserDataStore({ userDataRoot, libraryDatabasePath });
+  t.after(() => {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
   return { store, userDataRoot };
 }
 
 test('load thoughts when none exists', (t) => {
   const { store } = setup(t);
-  assert.deepEqual(store.load('thoughts', READ_ID), { content: null, revision: null });
+  assert.deepEqual(store.load('thoughts', READ_ID), {
+    content: null,
+    revision: null,
+  });
 });
 
 test('save new thoughts', (t) => {
@@ -67,8 +71,8 @@ test('edit existing thoughts and history is bounded', (t) => {
     revision = result.revision;
   }
   assert.equal(store.load('thoughts', READ_ID).content, 'Version 7');
-  const history = readdirSync(join(userDataRoot, '.history', READ_ID)).filter((name) =>
-    name.startsWith('thoughts-'),
+  const history = readdirSync(join(userDataRoot, '.history', READ_ID)).filter(
+    (name) => name.startsWith('thoughts-'),
   );
   assert.equal(history.length, 5);
 });
@@ -80,8 +84,14 @@ test('save notes independently of thoughts', (t) => {
   assert.equal(result.ok, true);
   assert.equal(store.load('thoughts', READ_ID).content, 'Thought content.');
   assert.equal(store.load('notes', READ_ID).content, 'Note content.');
-  assert.equal(existsSync(join(userDataRoot, 'items', READ_ID, 'thoughts.md')), true);
-  assert.equal(existsSync(join(userDataRoot, 'items', READ_ID, 'notes.md')), true);
+  assert.equal(
+    existsSync(join(userDataRoot, 'items', READ_ID, 'thoughts.md')),
+    true,
+  );
+  assert.equal(
+    existsSync(join(userDataRoot, 'items', READ_ID, 'notes.md')),
+    true,
+  );
 });
 
 test('switching items preserves correct association', (t) => {
@@ -100,10 +110,19 @@ test('item IDs cannot escape the user-data path', (t) => {
     '..\\..\\outside',
     'read-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\..\\x',
   ]) {
-    assert.throws(() => store.save('thoughts', badId, 'x', null), /Invalid item ID/);
+    assert.throws(
+      () => store.save('thoughts', badId, 'x', null),
+      /Invalid item ID/,
+    );
   }
   assert.throws(
-    () => store.save('thoughts', 'watch-cccccccccccccccccccccccccccccccc', 'x', null),
+    () =>
+      store.save(
+        'thoughts',
+        'watch-cccccccccccccccccccccccccccccccc',
+        'x',
+        null,
+      ),
     /Unknown item ID/,
   );
 });
@@ -121,31 +140,48 @@ test('invalid item IDs rejected', (t) => {
     undefined,
     42,
   ]) {
-    assert.throws(() => store.save('thoughts', badId, 'x', null), /Invalid item ID/);
+    assert.throws(
+      () => store.save('thoughts', badId, 'x', null),
+      /Invalid item ID/,
+    );
   }
-  assert.throws(() => store.save('diary', READ_ID, 'x', null), /Invalid user-data type/);
+  assert.throws(
+    () => store.save('diary', READ_ID, 'x', null),
+    /Invalid user-data type/,
+  );
 });
 
 test('atomic persistence behavior where testable', (t) => {
   const { store, userDataRoot } = setup(t);
   store.save('thoughts', READ_ID, 'Atomic content.', null);
   const itemDir = join(userDataRoot, 'items', READ_ID);
-  const leftovers = readdirSync(itemDir).filter((name) => name.includes('.tmp-'));
+  const leftovers = readdirSync(itemDir).filter((name) =>
+    name.includes('.tmp-'),
+  );
   assert.equal(leftovers.length, 0);
   writeFileSync(join(itemDir, '.thoughts.md.tmp-999-1'), 'stray temp');
   assert.equal(store.load('thoughts', READ_ID).content, 'Atomic content.');
 });
 
 test('conflict detection', (t) => {
-  const { store, userDataRoot } = setup(t);
+  const { store } = setup(t);
   const first = store.save('thoughts', READ_ID, 'Original.', null);
-  writeFileSync(join(userDataRoot, 'items', READ_ID, 'thoughts.md'), 'Changed elsewhere.');
+  const changed = store.save(
+    'thoughts',
+    READ_ID,
+    'Changed elsewhere.',
+    first.revision,
+  );
   const conflict = store.save('thoughts', READ_ID, 'My edit.', first.revision);
   assert.equal(conflict.ok, false);
   assert.equal(conflict.conflict, true);
   assert.equal(conflict.content, 'Changed elsewhere.');
-  const fresh = store.load('thoughts', READ_ID);
-  const resolved = store.save('thoughts', READ_ID, 'My edit.', fresh.revision);
+  const resolved = store.save(
+    'thoughts',
+    READ_ID,
+    'My edit.',
+    changed.revision,
+  );
   assert.equal(resolved.ok, true);
   assert.equal(store.load('thoughts', READ_ID).content, 'My edit.');
 });
@@ -159,17 +195,23 @@ test('user-data index updates and contains no note bodies', (t) => {
   assert.equal(index.schemaVersion, 1);
   assert.equal(index.items[READ_ID].hasThoughts, true);
   assert.equal(index.items[READ_ID].hasNotes, false);
-  assert.equal(index.items[READ_ID].thoughtsPath, `items/${READ_ID}/thoughts.md`);
+  assert.equal(
+    index.items[READ_ID].thoughtsPath,
+    `items/${READ_ID}/thoughts.md`,
+  );
   assert.ok(index.items[READ_ID].thoughtsLastModifiedUtc);
   store.save('notes', READ_ID, 'Note body.', null);
-  const updated = JSON.parse(readFileSync(join(userDataRoot, 'index.json'), 'utf8'));
+  const updated = JSON.parse(
+    readFileSync(join(userDataRoot, 'index.json'), 'utf8'),
+  );
   assert.equal(updated.items[READ_ID].hasNotes, true);
   assert.equal(updated.items[READ_ID].notesPath, `items/${READ_ID}/notes.md`);
 });
 
 test('Markdown Unicode text round-trips exactly', (t) => {
   const { store } = setup(t);
-  const text = '# أفكاري 🎬\n\n**bold** و *مائل* وقائمة:\n- بند واحد\n`code` نهاية';
+  const text =
+    '# أفكاري 🎬\n\n**bold** و *مائل* وقائمة:\n- بند واحد\n`code` نهاية';
   const result = store.save('thoughts', READ_ID, text, null);
   assert.equal(store.load('thoughts', READ_ID).content, text);
   assert.equal(result.content, text);
@@ -180,13 +222,21 @@ test('empty note handling', (t) => {
   const empty = store.save('thoughts', READ_ID, '   ', null);
   assert.equal(empty.ok, true);
   assert.equal(empty.exists, false);
-  assert.equal(existsSync(join(userDataRoot, 'items', READ_ID, 'thoughts.md')), false);
-  const indexAfterEmpty = JSON.parse(readFileSync(join(userDataRoot, 'index.json'), 'utf8'));
+  assert.equal(
+    existsSync(join(userDataRoot, 'items', READ_ID, 'thoughts.md')),
+    false,
+  );
+  const indexAfterEmpty = JSON.parse(
+    readFileSync(join(userDataRoot, 'index.json'), 'utf8'),
+  );
   assert.equal(indexAfterEmpty.items[READ_ID] ?? null, null);
 
   store.save('thoughts', READ_ID, 'Temporary.', null);
   store.save('thoughts', READ_ID, '', store.load('thoughts', READ_ID).revision);
-  assert.equal(existsSync(join(userDataRoot, 'items', READ_ID, 'thoughts.md')), false);
+  assert.equal(
+    existsSync(join(userDataRoot, 'items', READ_ID, 'thoughts.md')),
+    false,
+  );
   assert.ok(readdirSync(join(userDataRoot, '.history', READ_ID)).length >= 1);
 });
 

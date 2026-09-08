@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-08 - Phase 02 library manager foundation
+
+- Added the Read & Watch-owned SQLite schema, deterministic migration, canonical runtime store, and file-first recovery pipeline without adding a dependency.
+- Preserved all 91 stable records, exact Read/Watch semantics, Notion properties, media, hashes, provenance, and the verified personal-book source binding.
+- Added backend operations for manual metadata, properties, people/authors, Read series, tags, status, rating, search, sorting, filtering, saved views, relationships, duplicate detection, and format inventory.
+- Migrated Thoughts and Notes to canonical SQLite persistence while retaining atomic Markdown recovery mirrors and bounded history.
+- Proved dry-run/apply fingerprint equality, interruption recovery, resumable rerun, export/rebuild equivalence, online backup, restore, tamper detection, and rollback behavior.
+- Updated the unchanged application UI, asset build, user-data bridge, and legacy reader bridge to consume SQLite.
+- Refreshed Graphify and completed the Ponytail complexity audit; no Phase 03 UI work or later product phase started.
+
 ## 2026-09-08 - Phase 01 architecture and data-model design
 
 - Specified the common Item model with separate Read and Watch extensions and preserved all 91 existing stable IDs.

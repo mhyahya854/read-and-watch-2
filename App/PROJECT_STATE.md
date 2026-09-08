@@ -6,9 +6,20 @@ Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
 Last completed phase: `PHASE-01` - Master Architecture and Data-Model Design.
 
-Current actionable phase: `PHASE-02` - Calibre-Class Read & Watch Library Manager Foundation (`NOT_STARTED`).
+Current actionable phase: `PHASE-02` - Calibre-Class Read & Watch Library Manager Foundation (`IN_PROGRESS`, Git closure pending).
 
-Exact next task: `P02-T001` - implement checksummed schema migrations and an isolated test-only SQLite harness from the accepted Phase 01 designs.
+Exact next task: `P02-G004` - commit, push, verify GitHub containment, then close Phase 02.
+
+Phase 02 implementation results:
+
+- The external Read & Watch SQLite database is now the canonical runtime store; the existing UI and certified legacy reader consume its exact catalog projection.
+- All 91 stable IDs, 20 Read records, 71 Watch records, 90 Notion-derived records, one personal book, 75 media references, exact property bags, and provenance records passed migration parity.
+- The stale historical personal-book path was retained while its current logical source was uniquely resolved by exact size and SHA-256 under the approved external root.
+- Deterministic dry-run/apply, resumable transactions, snapshots, rebuild, online backup, restore, rollback, query, duplicate, multi-format, and Watch-specific tests pass.
+- Graphify: PASS - 355 nodes, 465 edges, 21 communities, integrity clean.
+- Ponytail: PASS - no new dependency/framework; four deferred cleanup candidates recorded without unrelated changes.
+- Python database tests 9/9, Node tests 33/33, existing backup/import/hygiene tests 8/8, lint, TypeScript, production build, zero-vulnerability audit, backup verification, library verification, and SQLite integrity checks pass.
+- No Phase 03 UI redesign or other later-phase work started.
 
 Phase 01 results:
 

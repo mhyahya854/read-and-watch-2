@@ -9,6 +9,7 @@ import { defineConfig, type Plugin } from 'vite';
 
 import hostingConfig from './.openai/hosting.json' with { type: 'json' };
 import { resolveDataPaths } from './server/data-paths.mjs';
+import { createLibraryStore } from './server/library-store.mjs';
 import { readerPlugin } from './server/reader-vite-plugin.mjs';
 import { userDataPlugin } from './server/user-data-vite-plugin.mjs';
 
@@ -21,7 +22,7 @@ const appRoot = fileURLToPath(new URL('.', import.meta.url));
 const {
   dataAppRoot,
   libraryRoot,
-  catalogPath,
+  libraryDatabasePath,
   userDataRoot,
   readerExecutable,
 } = resolveDataPaths({ appRoot });
@@ -73,9 +74,14 @@ function libraryAssets(): Plugin {
     generateBundle() {
       if (this.environment.name !== 'client') return;
 
-      const catalog = JSON.parse(readFileSync(catalogPath, 'utf8')) as {
+      const store = createLibraryStore({
+        databasePath: libraryDatabasePath,
+        readOnly: true,
+      });
+      const catalog = store.getCatalog() as {
         items: Array<{ media: Array<{ path: string }> }>;
       };
+      store.close();
       const paths = new Set(
         catalog.items.flatMap((item) => item.media.map((media) => media.path)),
       );
@@ -130,8 +136,8 @@ export default defineConfig(async () => {
     },
     plugins: [
       libraryAssets(),
-      userDataPlugin({ userDataRoot, catalogPath }),
-      readerPlugin({ libraryRoot, catalogPath, readerExecutable }),
+      userDataPlugin({ userDataRoot, libraryDatabasePath }),
+      readerPlugin({ libraryRoot, libraryDatabasePath, readerExecutable }),
       vinext(),
       sites(),
       cloudflare({
