@@ -43,4 +43,9 @@ Local HEAD equals GitHub `master`; no divergence existed before bootstrap edits.
 
 ## Closure
 
-Final content and closure commits are recorded in `BOOTSTRAP_FINAL_REPORT.md`. The final response reports the actual verified remote HEAD; the closure commit does not embed its own hash to avoid a self-referential commit loop.
+- Governance content commit: `2da6719180af350a5efe311d0728a4c4b85b1db5`
+- Normal push: PASS
+- GitHub `master` and remote refs resolved to the same content commit after push.
+- `MASTER_PLAN.md`, `RUN_STATE.json`, and this report area were fetched through the GitHub API at that commit.
+
+The final response reports the actual verified closure HEAD; the closure commit does not embed its own hash to avoid a self-referential commit loop.

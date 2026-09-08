@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
+  "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phases": [
     {"phase_id":"PHASE-00","title":"CERTIFIED HISTORICAL FOUNDATION","status":"COMPLETE","dependencies":[],"first_incomplete_task_id":null,"report_path":"docs/project/reports/HISTORICAL_CERTIFICATION.md","completion_commit":"c065f0c81f2e5b8f652371db062c56d9c0000e06"},
     {"phase_id":"PHASE-01","title":"MASTER ARCHITECTURE AND DATA-MODEL DESIGN","status":"NOT_STARTED","dependencies":["PHASE-00"],"first_incomplete_task_id":"P01-T001","report_path":"docs/project/reports/PHASE_01_REPORT.md","completion_commit":null},
