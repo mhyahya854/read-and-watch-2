@@ -4,11 +4,11 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-01` - Master Architecture and Data-Model Design.
+Last completed phase: `PHASE-02` - Calibre-Class Read & Watch Library Manager Foundation.
 
-Current actionable phase: `PHASE-02` - Calibre-Class Read & Watch Library Manager Foundation (`IN_PROGRESS`, Git closure pending).
+Current actionable phase: `PHASE-03` - Unified Design System and Library UI (`NOT_STARTED`).
 
-Exact next task: `P02-G004` - commit, push, verify GitHub containment, then close Phase 02.
+Exact next task: `P03-T001` - audit the current UI against the fixed design constitution and define the minimal reusable token/component foundation.
 
 Phase 02 implementation results:
 
@@ -20,6 +20,9 @@ Phase 02 implementation results:
 - Ponytail: PASS - no new dependency/framework; four deferred cleanup candidates recorded without unrelated changes.
 - Python database tests 9/9, Node tests 33/33, existing backup/import/hygiene tests 8/8, lint, TypeScript, production build, zero-vulnerability audit, backup verification, library verification, and SQLite integrity checks pass.
 - No Phase 03 UI redesign or other later-phase work started.
+- Phase 02 content commit `f57dc4089df1404fbe2aeef6df3bb552e8fac825` was pushed and verified on GitHub; the closure commit records that remote gate.
+
+Starting Phase 02 local/remote HEAD: `bc9232475395092b935f592b54cd7861c59d71e7`.
 
 Phase 01 results:
 

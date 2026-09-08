@@ -4,12 +4,12 @@
   "canonical_remote": "mhyahya854/read-and-watch-2",
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
-  "current_phase_id": "PHASE-02",
-  "current_phase_status": "IN_PROGRESS",
-  "current_task_id": "P02-G004",
-  "last_completed_phase_id": "PHASE-01",
-  "last_verified_local_head": "b83cf89780b6f9c7e023f3374752c49a34022d40",
-  "last_verified_remote_head": "b83cf89780b6f9c7e023f3374752c49a34022d40",
+  "current_phase_id": "PHASE-03",
+  "current_phase_status": "NOT_STARTED",
+  "current_task_id": "P03-T001",
+  "last_completed_phase_id": "PHASE-02",
+  "last_verified_local_head": "f57dc4089df1404fbe2aeef6df3bb552e8fac825",
+  "last_verified_remote_head": "f57dc4089df1404fbe2aeef6df3bb552e8fac825",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "last_graphify_status": "PASS: Phase 02 code refresh; 355 nodes, 465 edges, 21 communities; integrity clean",
@@ -21,5 +21,7 @@
   ],
   "phase_01_content_commit": "b83cf89780b6f9c7e023f3374752c49a34022d40",
   "phase_01_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "exact_next_action": "Complete P02-G004 by committing and pushing the verified Phase 02 implementation, verifying GitHub containment, then write the Phase 02 closure commit and stop."
+  "phase_02_content_commit": "f57dc4089df1404fbe2aeef6df3bb552e8fac825",
+  "phase_02_closure_commit": "SEE_LIVE_GIT_HEAD",
+  "exact_next_action": "In a fresh invocation, start P03-T001 by auditing the current UI against DESIGN_CONSTITUTION.md and defining the minimal reusable token/component foundation without changing reader architecture."
 }

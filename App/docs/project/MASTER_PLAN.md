@@ -197,7 +197,7 @@ Stop after Phase 01 is pushed and verified. Do not start Phase 02.
 
 ## PHASE-02 - CALIBRE-CLASS READ & WATCH LIBRARY MANAGER FOUNDATION
 
-Status: `IN_PROGRESS`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -231,7 +231,7 @@ No Calibre database/GUI, metadata fetching requirement, reader engine, source mu
 - [x] P02-G001 Record/field/count/stable-ID parity and provenance are exact; no source or backup drift.
 - [x] P02-G002 Transaction failure, rerun, rollback, restore, and rebuild tests pass.
 - [x] P02-G003 Search/filter/duplicate/multi-format behavior passes focused and real-catalog tests.
-- [ ] P02-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P02-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 
