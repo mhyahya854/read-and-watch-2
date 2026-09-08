@@ -4,7 +4,7 @@ Verified against official upstream repository metadata on 2026-09-08. License co
 
 | Project | Intended relationship | Official upstream | License observed | Source present now | Adoption policy |
 | --- | --- | --- | --- | --- | --- |
-| Read & Watch | Canonical application | `https://github.com/mhyahya854/read-and-watch-2` | **UNRESOLVED:** no project-level license file | Yes | Decide distribution license before external reuse or release; do not infer a grant |
+| Read & Watch | Canonical application | `https://github.com/mhyahya854/read-and-watch-2` | **FORMALLY DEFERRED:** no project-level license file | Yes | Phase 01 confirms no grant may be inferred; user/legal decision required before direct adoption or external distribution |
 | Readest | Certified legacy fallback/reference | `https://github.com/readest/readest` | GNU AGPL-3.0, local notice says v3.0 or later | Yes, vendored and pinned | Preserve notices/provenance; keep separate fallback; legal review before changed distribution |
 | Foliate-JS | Reflowable engine / possible pinned fork | `https://github.com/johnfactotum/foliate-js` | MIT | No deferred clone | Research capability and pin exact commit in Phase 05 |
 | PDF.js | PDF runtime engine | `https://github.com/mozilla/pdf.js` | Apache-2.0 | No direct source; no planned bootstrap install | Pin package/source and notices in Phase 06 |

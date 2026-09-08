@@ -167,9 +167,9 @@ Read & Watch will reproduce evidence-supported Calibre-class library concepts in
 
 ## D-027 - SQLite plus file-first recoverability
 
-Status: Provisional - validate in Phase 01
+Status: Accepted
 
-The likely target is a Read & Watch-owned SQLite database paired with durable file-first export and recovery. Phase 01 must prove schema, transaction, migration, compatibility, backup, and recovery details before migration begins.
+The target is a Read & Watch-owned SQLite database paired with deterministic file-first snapshots that can rebuild it. SQLite is the canonical writable runtime store; exports are immutable recovery artifacts, not a second writable master. Phase 01 specified schema, transaction, migration, compatibility, backup, restore, and rebuild contracts. Phase 02 must prove them with executable tests and a real-catalog dry run before promotion.
 
 ## D-028 - Source-book immutability and derived export
 
@@ -200,3 +200,33 @@ The finished product requires real Privacy Policy and Terms & Conditions pages. 
 Status: Provisional - evaluate in Phase 14
 
 React remains the UI. Tauri is the current desktop-shell candidate, but Phase 14 must verify security, packaging, file associations, persistence bridging, update strategy, licensing, and alternatives before adoption. A Rust UI is not planned.
+
+## D-033 - Common item with collection-specific extensions
+
+Status: Accepted
+
+Read and Watch share one library identity, metadata, properties, tags, assets, provenance, relationships, notes, and search layer. Read-specific and Watch-specific data live in separate extension tables. Watch is never forced through book format, page, CFI, or series semantics.
+
+## D-034 - Existing stable IDs and unknown data survive migration unchanged
+
+Status: Accepted
+
+All 91 current stable IDs remain byte-for-byte authoritative. Exact Notion property names, case, values, source payloads, item paths, provenance, media, and user-added fields are mapped explicitly. Any value that cannot be normalized safely is retained as versioned raw JSON and a namespaced `unknown` property rather than discarded or guessed.
+
+## D-035 - Migration uses new targets and verified promotion
+
+Status: Accepted
+
+Migration begins with a source fingerprint and a new external dry-run database. It is deterministic by stable ID, one-item transactional, restartable, idempotent, conflict-refusing, and followed by parity, export/rebuild, backup, restore, and rollback checks. Live promotion is an explicit gated operation; no dry run or failure modifies existing source, backup, books, imported evidence, or user data.
+
+## D-036 - Document adapters are capability boundaries
+
+Status: Accepted
+
+PDF and reflowable engines will expose a minimal `DocumentAdapter` contract for lifecycle, metadata, TOC, location, navigation, search, selection, anchors, cancellation, errors, and capabilities. Engine-native locations remain inside versioned, source-hash-bound envelopes. A registry or factory is not implemented until at least two real consumers justify it.
+
+## D-037 - Project license remains formally deferred
+
+Status: Provisional - user/legal decision required before direct adoption or distribution
+
+The public repository has no project-level license, so no permission is inferred. Existing Readest AGPL notices and provenance remain preserved. Before new third-party source is adopted, or Read & Watch is distributed for external reuse, the user must select a project license and obtain appropriate review for copyleft interactions. Phase 01 added no package or upstream source.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-08 - Phase 01 architecture and data-model design
+
+- Specified the common Item model with separate Read and Watch extensions and preserved all 91 existing stable IDs.
+- Accepted a Read & Watch-owned SQLite runtime with deterministic file-first recovery; no database or migration was created.
+- Added schema, transaction, migration, backup, restore, rebuild, document-adapter, ownership, and threat-model contracts.
+- Mapped every current catalog, import, provenance, user-added, media, and Notion-property field to a normalized or retained-unknown path.
+- Formally deferred the project-level license decision before direct third-party adoption or external distribution.
+- Ran Graphify and Ponytail against the architecture and kept speculative frameworks, sync, event sourcing, graph databases, and premature abstractions out of the design.
+- No application behavior, reader, UI, upstream dependency, source data, or OCR feature changed.
+
 ## 2026-09-08 - One-time governance and planning bootstrap
 
 - Added the canonical master-plan, run-state, phase-index, verification, blocker, architecture, design, technology, licensing, data-safety, and execution-governance system under `docs/project/`.

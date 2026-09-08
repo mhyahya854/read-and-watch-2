@@ -132,7 +132,7 @@ Stop after bootstrap closure. Do not start Phase 01.
 
 ## PHASE-01 - MASTER ARCHITECTURE AND DATA-MODEL DESIGN
 
-Status: `NOT_STARTED`
+Status: `IN_PROGRESS`
 
 ### Objective
 
@@ -152,23 +152,23 @@ No schema migration, reader integration, UI redesign, upstream clone, OCR, or pr
 
 ### Checklist
 
-- [ ] P01-T001 Capture the live Git/GitHub/protected-state baseline and Phase 01 fingerprint.
-- [ ] P01-T002 Inventory current catalog, file-first records, mutable user data, reader bridge, and stable-ID contracts.
-- [ ] P01-T003 Specify common Item plus Read-specific and Watch-specific entities without forcing Watch into a book schema.
-- [ ] P01-T004 Design SQLite tables, keys, constraints, indexes, transaction boundaries, and schema-version strategy.
-- [ ] P01-T005 Design file-first export, backup, restore, disaster recovery, and database rebuild contracts.
-- [ ] P01-T006 Map all existing Notion-derived properties, 90 imported records, and user-added-book records losslessly.
-- [ ] P01-T007 Specify `DocumentAdapter`, capabilities, lifecycle, errors, location, search, selection, and anchor contracts.
-- [ ] P01-T008 Specify canonical annotation, canvas, relationship, reading-position, and source-hash ownership.
-- [ ] P01-T009 Design deterministic migration, dry-run, rollback, idempotency, and failure-recovery protocol.
-- [ ] P01-T010 Resolve or formally defer project licensing and direct third-party adoption constraints.
-- [ ] P01-T011 Record architecture decisions and implementation slices without a massive rewrite.
+- [x] P01-T001 Capture the live Git/GitHub/protected-state baseline and Phase 01 fingerprint.
+- [x] P01-T002 Inventory current catalog, file-first records, mutable user data, reader bridge, and stable-ID contracts.
+- [x] P01-T003 Specify common Item plus Read-specific and Watch-specific entities without forcing Watch into a book schema.
+- [x] P01-T004 Design SQLite tables, keys, constraints, indexes, transaction boundaries, and schema-version strategy.
+- [x] P01-T005 Design file-first export, backup, restore, disaster recovery, and database rebuild contracts.
+- [x] P01-T006 Map all existing Notion-derived properties, 90 imported records, and user-added-book records losslessly.
+- [x] P01-T007 Specify `DocumentAdapter`, capabilities, lifecycle, errors, location, search, selection, and anchor contracts.
+- [x] P01-T008 Specify canonical annotation, canvas, relationship, reading-position, and source-hash ownership.
+- [x] P01-T009 Design deterministic migration, dry-run, rollback, idempotency, and failure-recovery protocol.
+- [x] P01-T010 Resolve or formally defer project licensing and direct third-party adoption constraints.
+- [x] P01-T011 Record architecture decisions and implementation slices without a massive rewrite.
 
 ### Verification gates
 
-- [ ] P01-G001 Every existing field and stable identity has a documented target or explicit retained-unknown path.
-- [ ] P01-G002 Schema and recovery design survive representative migration and restore walkthroughs without writes.
-- [ ] P01-G003 Threat model covers paths, sources, transactions, conflicts, engine isolation, and canonical ownership.
+- [x] P01-G001 Every existing field and stable identity has a documented target or explicit retained-unknown path.
+- [x] P01-G002 Schema and recovery design survive representative migration and restore walkthroughs without writes.
+- [x] P01-G003 Threat model covers paths, sources, transactions, conflicts, engine isolation, and canonical ownership.
 - [ ] P01-G004 Graphify, Ponytail, governance validator, hygiene, app regressions, commit, push, and GitHub verification pass.
 
 ### Evidence and reports

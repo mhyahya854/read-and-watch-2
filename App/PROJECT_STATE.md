@@ -1,27 +1,27 @@
 # Project State
 
-Bootstrap: COMPLETE - governance content committed, pushed, and verified on GitHub; closure commit records that verification.
+Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
-Historical baseline: CERTIFIED - repository separation plus Tasks 1, 2, and 3 pass current evidence and live checks.
+Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Master plan: `docs/project/MASTER_PLAN.md`
+Current phase: `PHASE-01` - Master Architecture and Data-Model Design (`IN_PROGRESS`).
 
-Legacy Task 4: SUPERSEDED - DO NOT EXECUTE
+Current gate: `P01-G004` - commit, push, and verify the completed architecture-only phase work.
 
-Current actionable phase: `PHASE-01` - Master Architecture and Data-Model Design
+Phase 01 results:
 
-Exact next task: `P01-T001` - capture the Phase 01 live baseline and protected-state fingerprint.
+- Common Item plus separate Read/Watch extensions specified.
+- SQLite canonical runtime plus deterministic file-first recovery accepted.
+- Existing 91 stable IDs and all current source fields mapped losslessly.
+- Migration, transaction, backup, restore, rebuild, adapter, ownership, and threat-model contracts specified.
+- Project-level license formally deferred pending user/legal decision before direct adoption or distribution.
+- Graphify: PASS - Phase 01 architecture query, 326 nodes, 402 edges, 22 communities, integrity clean.
+- Ponytail: PASS - speculative frameworks and premature tables deferred; no unrelated cleanup applied.
+- App regressions: 28/28 Node tests, 6/6 import tests, 2/2 hygiene tests, lint, TypeScript, build, and zero-vulnerability audit PASS.
+- Immutable backup and 91-item library verification PASS. One stale historical user-added source path is retained with exact current source/copy hash evidence; no source was changed.
 
-Latest verification:
+Starting local/remote HEAD: `4b3037025e069851e1ccf73bbf1beb5b3285807d`.
 
-- Starting local and remote HEAD: `c065f0c81f2e5b8f652371db062c56d9c0000e06`
-- Parent app: 28/28 tests, lint, TypeScript, production build, and npm audit PASS
-- Repository hygiene, backup verification, and 91-item library verification PASS
-- Graphify: PASS - 326 nodes, 402 edges, 22 communities; integrity diagnostics clean
-- Ponytail: PASS - four bounded simplification opportunities recorded; no cleanup applied
-- Verified bootstrap content local/remote HEAD: `2da6719180af350a5efe311d0728a4c4b85b1db5`
-- Final closure local/remote HEAD: use live repository `HEAD`; intentionally not embedded in its own commit
+Active blockers: none.
 
-Active blockers: none. Project-level licensing remains an explicit future decision before distribution or third-party code adoption.
-
-Scope boundary: No Phase 01 implementation or new product feature was started during this bootstrap.
+Scope boundary: No migration, product feature, UI redesign, reader integration, upstream acquisition, dependency addition, or OCR work occurred.
