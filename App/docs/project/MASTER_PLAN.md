@@ -132,7 +132,7 @@ Stop after bootstrap closure. Do not start Phase 01.
 
 ## PHASE-01 - MASTER ARCHITECTURE AND DATA-MODEL DESIGN
 
-Status: `IN_PROGRESS`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -169,7 +169,7 @@ No schema migration, reader integration, UI redesign, upstream clone, OCR, or pr
 - [x] P01-G001 Every existing field and stable identity has a documented target or explicit retained-unknown path.
 - [x] P01-G002 Schema and recovery design survive representative migration and restore walkthroughs without writes.
 - [x] P01-G003 Threat model covers paths, sources, transactions, conflicts, engine isolation, and canonical ownership.
-- [ ] P01-G004 Graphify, Ponytail, governance validator, hygiene, app regressions, commit, push, and GitHub verification pass.
+- [x] P01-G004 Graphify, Ponytail, governance validator, hygiene, app regressions, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

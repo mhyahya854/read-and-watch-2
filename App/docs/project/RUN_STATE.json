@@ -4,16 +4,22 @@
   "canonical_remote": "mhyahya854/read-and-watch-2",
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
-  "current_phase_id": "PHASE-01",
-  "current_phase_status": "IN_PROGRESS",
-  "current_task_id": "P01-G004",
-  "last_completed_phase_id": "PHASE-00",
-  "last_verified_local_head": "4b3037025e069851e1ccf73bbf1beb5b3285807d",
-  "last_verified_remote_head": "4b3037025e069851e1ccf73bbf1beb5b3285807d",
+  "current_phase_id": "PHASE-02",
+  "current_phase_status": "NOT_STARTED",
+  "current_task_id": "P02-T001",
+  "last_completed_phase_id": "PHASE-01",
+  "last_verified_local_head": "b83cf89780b6f9c7e023f3374752c49a34022d40",
+  "last_verified_remote_head": "b83cf89780b6f9c7e023f3374752c49a34022d40",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "last_graphify_status": "PASS: Phase 01 architecture query; 326 nodes, 402 edges, 22 communities; integrity clean",
   "last_ponytail_status": "PASS: Phase 01 design kept minimal; speculative frameworks and premature tables deferred",
   "active_blockers": [],
-  "exact_next_action": "Complete P01-G004 by committing and pushing the architecture-only Phase 01 content, verify GitHub, then record bounded phase closure without starting Phase 02."
+  "known_limitations": [
+    "One user-added provenance record retains a stale pre-separation historical path; exact current source/copy hash evidence is external and Phase 02 must resolve it before live migration.",
+    "A project-level license choice is required before new third-party source adoption or external distribution."
+  ],
+  "phase_01_content_commit": "b83cf89780b6f9c7e023f3374752c49a34022d40",
+  "phase_01_closure_commit": "SEE_LIVE_GIT_HEAD",
+  "exact_next_action": "In a fresh invocation, start P02-T001 by implementing checksummed schema migrations and an isolated test-only SQLite harness from the accepted Phase 01 designs."
 }
