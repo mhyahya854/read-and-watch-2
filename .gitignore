@@ -1,0 +1,42 @@
+# Personal/source data must remain in the sibling external data root.
+/Read/
+/Watch/
+/App/backup/
+/App/library/
+/App/user-data/
+/App/runtime/
+/App/logs/
+/App/reports/
+/App/graphify-out/
+/App/tmp/
+/App/config/source-paths.json
+/App/import/manifests/
+/App/import/checkpoints/
+/App/import/staging/
+
+# First-party generated output.
+/App/app/node_modules/
+/App/app/dist/
+/App/app/.vite/
+/App/app/.vinext/
+/App/app/.wrangler/
+/App/app/coverage/
+/App/app/graphify-out/
+/App/app/tsconfig.tsbuildinfo
+/App/import/scripts/__pycache__/
+
+# Local configuration and recovery material.
+.env
+.env.*
+!.env.example
+*.bundle
+/migration/
+/generated/
+
+# OS/editor noise.
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+__pycache__/
+*.py[cod]

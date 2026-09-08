@@ -1,0 +1,34 @@
+# External machine-specific and private data (defence in depth)
+config/source-paths.json
+backup/
+library/
+import/staging/**
+import/checkpoints/**
+import/manifests/**
+logs/
+reports/
+runtime/
+tmp/
+
+# Application build output and dependencies
+app/node_modules/
+app/dist/
+app/.vite/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+
+# Graphify working output
+graphify-out/
+
+# Personal user data (Task 2) - never commit
+user-data/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
