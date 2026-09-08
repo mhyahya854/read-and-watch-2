@@ -2,9 +2,9 @@
 
 A local-first personal media and knowledge application with a human-readable library and a Notion-inspired interface.
 
-Task 1 is complete: it establishes a verified, non-destructive Notion import pipeline and a React/TypeScript browsing blueprint. Readest, Mermaid, Mermaid Live Editor, local AI, annotations, embeddings, and recommendations remain outside Task 1.
+The certified historical foundation contains the non-destructive Notion import pipeline, local persistent notes, the current React/TypeScript library, and a verified legacy Readest fallback. Future work is governed by `docs/project/MASTER_PLAN.md`.
 
-Start or resume work by reading `AGENTS.md`, `PROJECT_STATE.md`, and `TASKS.md`.
+Start or resume work by reading `AGENTS.md`, `docs/project/RUN_STATE.json`, `docs/project/MASTER_PLAN.md`, `PROJECT_STATE.md`, and `DECISIONS.md` in that order.
 
 To run the local interface:
 
@@ -14,4 +14,4 @@ npm install
 npm run dev
 ```
 
-The final evidence and limitations are recorded in `reports/TASK_1_FINAL_REPORT.md`.
+Sanitized governance evidence is under `docs/project/reports/`; detailed private operational evidence remains under the external data root.

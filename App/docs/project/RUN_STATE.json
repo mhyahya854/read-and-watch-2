@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "project": "Read & Watch",
+  "canonical_remote": "mhyahya854/read-and-watch-2",
+  "default_branch": "master",
+  "bootstrap_status": "IN_PROGRESS",
+  "current_phase_id": "PHASE-01",
+  "current_phase_status": "NOT_STARTED",
+  "current_task_id": "P01-T001",
+  "last_completed_phase_id": "PHASE-00",
+  "last_verified_local_head": "c065f0c81f2e5b8f652371db062c56d9c0000e06",
+  "last_verified_remote_head": "c065f0c81f2e5b8f652371db062c56d9c0000e06",
+  "last_graphify_status": "PASS: 326 nodes, 402 edges, 22 communities; integrity clean",
+  "last_ponytail_status": "PASS: four non-blocking simplification opportunities; no cleanup applied",
+  "active_blockers": [],
+  "exact_next_action": "Start P01-T001 in a fresh invocation by verifying live local, GitHub, and protected-data state; do not implement Phase 01 during bootstrap closure."
+}

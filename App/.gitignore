@@ -5,8 +5,8 @@ library/
 import/staging/**
 import/checkpoints/**
 import/manifests/**
-logs/
-reports/
+/logs/
+/reports/
 runtime/
 tmp/
 

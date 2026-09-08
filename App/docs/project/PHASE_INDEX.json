@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "phases": [
+    {"phase_id":"PHASE-00","title":"CERTIFIED HISTORICAL FOUNDATION","status":"COMPLETE","dependencies":[],"first_incomplete_task_id":null,"report_path":"docs/project/reports/HISTORICAL_CERTIFICATION.md","completion_commit":"c065f0c81f2e5b8f652371db062c56d9c0000e06"},
+    {"phase_id":"PHASE-01","title":"MASTER ARCHITECTURE AND DATA-MODEL DESIGN","status":"NOT_STARTED","dependencies":["PHASE-00"],"first_incomplete_task_id":"P01-T001","report_path":"docs/project/reports/PHASE_01_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-02","title":"CALIBRE-CLASS READ & WATCH LIBRARY MANAGER FOUNDATION","status":"NOT_STARTED","dependencies":["PHASE-01"],"first_incomplete_task_id":"P02-T001","report_path":"docs/project/reports/PHASE_02_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-03","title":"UNIFIED DESIGN SYSTEM AND LIBRARY UI","status":"NOT_STARTED","dependencies":["PHASE-02"],"first_incomplete_task_id":"P03-T001","report_path":"docs/project/reports/PHASE_03_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-04","title":"DOCUMENT ADAPTER FOUNDATION","status":"NOT_STARTED","dependencies":["PHASE-03"],"first_incomplete_task_id":"P04-T001","report_path":"docs/project/reports/PHASE_04_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-05","title":"REFLOWABLE BOOK ENGINE","status":"NOT_STARTED","dependencies":["PHASE-04"],"first_incomplete_task_id":"P05-T001","report_path":"docs/project/reports/PHASE_05_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-06","title":"PDF ENGINE","status":"NOT_STARTED","dependencies":["PHASE-05"],"first_incomplete_task_id":"P06-T001","report_path":"docs/project/reports/PHASE_06_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-07","title":"UNIFIED READER EXPERIENCE","status":"NOT_STARTED","dependencies":["PHASE-06"],"first_incomplete_task_id":"P07-T001","report_path":"docs/project/reports/PHASE_07_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-08","title":"LEGACY READEST PARITY AND RETIREMENT","status":"NOT_STARTED","dependencies":["PHASE-07"],"first_incomplete_task_id":"P08-T001","report_path":"docs/project/reports/PHASE_08_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-09","title":"UNIFIED ANNOTATION FOUNDATION","status":"NOT_STARTED","dependencies":["PHASE-08"],"first_incomplete_task_id":"P09-T001","report_path":"docs/project/reports/PHASE_09_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-10","title":"BOOK-LINKED EXCALIDRAW NOTES","status":"NOT_STARTED","dependencies":["PHASE-09"],"first_incomplete_task_id":"P10-T001","report_path":"docs/project/reports/PHASE_10_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-11","title":"SEARCH, ANNOTATION BROWSER, AND STUDY WORKFLOW","status":"NOT_STARTED","dependencies":["PHASE-10"],"first_incomplete_task_id":"P11-T001","report_path":"docs/project/reports/PHASE_11_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-12","title":"EXPORT AND PORTABILITY","status":"NOT_STARTED","dependencies":["PHASE-11"],"first_incomplete_task_id":"P12-T001","report_path":"docs/project/reports/PHASE_12_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-13","title":"KNOWLEDGE AND DIAGRAM SYSTEM","status":"NOT_STARTED","dependencies":["PHASE-12"],"first_incomplete_task_id":"P13-T001","report_path":"docs/project/reports/PHASE_13_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-14","title":"DESKTOP NATIVE INTEGRATION","status":"NOT_STARTED","dependencies":["PHASE-13"],"first_incomplete_task_id":"P14-T001","report_path":"docs/project/reports/PHASE_14_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-15","title":"PRIVACY, TERMS, SETTINGS, AND PRODUCT POLISH","status":"NOT_STARTED","dependencies":["PHASE-14"],"first_incomplete_task_id":"P15-T001","report_path":"docs/project/reports/PHASE_15_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-16","title":"PERFORMANCE, SECURITY, AND RELIABILITY HARDENING","status":"NOT_STARTED","dependencies":["PHASE-15"],"first_incomplete_task_id":"P16-T001","report_path":"docs/project/reports/PHASE_16_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-17","title":"OCR FOUNDATION - LATE PHASE","status":"NOT_STARTED","dependencies":["PHASE-16"],"first_incomplete_task_id":"P17-T001","report_path":"docs/project/reports/PHASE_17_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-18","title":"OCR VERIFICATION AND URDU/NASTALIQ SPECIALIZATION","status":"NOT_STARTED","dependencies":["PHASE-17"],"first_incomplete_task_id":"P18-T001","report_path":"docs/project/reports/PHASE_18_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-19","title":"OPTIONAL INTELLIGENCE LAYER","status":"NOT_STARTED","dependencies":["PHASE-18"],"first_incomplete_task_id":"P19-T001","report_path":"docs/project/reports/PHASE_19_REPORT.md","completion_commit":null},
+    {"phase_id":"PHASE-20","title":"FINAL RELEASE CERTIFICATION","status":"NOT_STARTED","dependencies":["PHASE-18"],"first_incomplete_task_id":"P20-T001","report_path":"docs/project/reports/PHASE_20_FINAL_CERTIFICATION.md","completion_commit":null}
+  ]
+}

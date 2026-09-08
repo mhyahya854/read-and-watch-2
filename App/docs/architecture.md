@@ -1,4 +1,6 @@
-# Architecture
+# Historical Architecture
+
+This diagram describes the certified import and browsing foundation. The canonical target architecture is `docs/project/ARCHITECTURE_TARGET.md`.
 
 ```text
 Original Notion exports (immutable)
@@ -16,4 +18,4 @@ library/ (normalized personal data)
 app/ (local React/TypeScript UI)
 ```
 
-Future Readest and Mermaid integrations remain isolated under `forks/` and are outside Task 1.
+Readest is now a certified legacy fallback. Its unfinished Readest-centric Task 4 is superseded by `docs/project/MASTER_PLAN.md`.

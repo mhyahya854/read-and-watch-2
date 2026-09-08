@@ -180,6 +180,10 @@
 
 # Task 4 Checklist - Reader annotations, drawing, and export foundation
 
+> **SUPERSEDED - DO NOT EXECUTE**
+>
+> The user replaced this unfinished Readest-centric architecture with the unified native Read & Watch roadmap in `docs/project/MASTER_PLAN.md`. The unchecked items below remain unchanged as historical evidence and are not complete.
+
 ## Phase 0 - Baseline gate
 
 - [x] Re-certify Task 3

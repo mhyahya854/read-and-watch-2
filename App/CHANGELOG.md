@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-08 - One-time governance and planning bootstrap
+
+- Added the canonical master-plan, run-state, phase-index, verification, blocker, architecture, design, technology, licensing, data-safety, and execution-governance system under `docs/project/`.
+- Certified the sanitized historical foundation for repository separation and Tasks 1-3 against live local, external-data, and GitHub evidence.
+- Classified Readest as the certified legacy fallback and superseded the unfinished legacy Task 4 without marking its work complete.
+- Established the unified native reader direction: Read & Watch-owned experience and data, Foliate-JS for reflowable formats, PDF.js for PDF, and late OCR.
+- Refreshed Graphify and ran the Ponytail whole-repository complexity audit; committed summaries contain no private library content.
+- Added dependency-free master-plan/state validation.
+- No reader, library redesign, annotation, canvas, graph, desktop, OCR, AI, or other new product feature was implemented.
+
 ## 2026-09-08 - Repository separation
 
 - Moved all personal, backup, runtime, generated, and operational evidence out of the Git repository into a verified sibling local-data root.

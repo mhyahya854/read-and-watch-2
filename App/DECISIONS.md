@@ -128,3 +128,75 @@ The pinned Readest checkout and its initialized submodules are flattened into `f
 Status: Accepted
 
 Because the existing public remote is disposable and has no collaboration or automation state, it is deleted and recreated only after local data, build, hygiene, secret, and history gates pass. The replacement begins with one clean commit and no LFS objects or private historical blobs.
+
+## D-021 - Master-plan authority replaces legacy task authority
+
+Status: Accepted
+
+`docs/project/MASTER_PLAN.md` and `docs/project/RUN_STATE.json` are the durable execution authorities below explicit current user instructions. `TASKS.md` remains historical; its unfinished Task 4 is superseded and must not be executed.
+
+## D-022 - Read & Watch owns the product experience and canonical data
+
+Status: Accepted
+
+Engines provide capabilities. Read & Watch owns the UI, navigation, library, metadata, stable identity, storage, annotations, bookmarks, notes, positions, drawings, canvases, OCR orchestration, diagrams, relationships, search UX, settings, privacy/legal UX, export, and future intelligence. No third-party engine becomes the canonical owner of user data.
+
+## D-023 - Reader engine targets and legacy fallback
+
+Status: Accepted
+
+Readest is a `CERTIFIED LEGACY FALLBACK + FEATURE/ARCHITECTURE REFERENCE`, not the future application shell. Foliate-JS is the target reflowable-book engine and PDF.js is the target PDF renderer, subject to phase-specific provenance, capability, license, and integration verification. Visible engine UI and engine-owned canonical storage are rejected.
+
+## D-024 - Read & Watch-owned annotations and canvases
+
+Status: Accepted
+
+Read & Watch will own one annotation universe across formats. Excalidraw is the target book-linked handwritten and drawn notes engine, with Read & Watch-owned persistence and deep links. It is not the text-highlight engine, document renderer, application shell, or cloud-storage authority.
+
+## D-025 - Structured graphs and text-defined diagrams are selective tools
+
+Status: Accepted
+
+React Flow / xyflow is used only where semantic node-edge topology has real meaning. Mermaid is used only for text-defined diagrams. Neither is forced into ordinary notes, handwriting, page annotation, or every diagram.
+
+## D-026 - Calibre concepts without Calibre ownership
+
+Status: Accepted
+
+Read & Watch will reproduce evidence-supported Calibre-class library concepts in its own system. Calibre's GUI, visual design, `metadata.db`, server, device stack, editor, conversion-first workflow, and wholesale GPL application embedding are not adopted.
+
+## D-027 - SQLite plus file-first recoverability
+
+Status: Provisional - validate in Phase 01
+
+The likely target is a Read & Watch-owned SQLite database paired with durable file-first export and recovery. Phase 01 must prove schema, transaction, migration, compatibility, backup, and recovery details before migration begins.
+
+## D-028 - Source-book immutability and derived export
+
+Status: Accepted
+
+Original books are never overwritten by default. PDF-lib may be used later only for new annotated or exported derivatives where suitable; it is not a renderer. Any portable export preserves source hashes and records provenance.
+
+## D-029 - OCR is a late optional extension
+
+Status: Accepted
+
+OCR starts only in Phase 17 after usable-text detection. Text PDFs use PDF.js text layers without OCR. PaddleOCR-VL, Tesseract, and Urdu/Nastaliq specialists require real-book benchmarks, provenance, uncertainty handling, and human review. OCR never mutates the original scan.
+
+## D-030 - Fixed design constitution and anti-vibe rules
+
+Status: Accepted
+
+`docs/project/DESIGN_CONSTITUTION.md` is binding. The product uses the approved warm-neutral, charcoal, muted-deep-teal editorial desktop language and permanently rejects the listed fake-content, generic startup, decorative-gradient, pill-everywhere, glassmorphism, neon, stock-human, and gratuitous-motion patterns.
+
+## D-031 - Privacy Policy and Terms reflect implemented reality
+
+Status: Accepted
+
+The finished product requires real Privacy Policy and Terms & Conditions pages. Final legal claims must match the architecture then implemented and must not invent accounts, cloud processing, sharing, or services.
+
+## D-032 - Desktop shell remains provisional
+
+Status: Provisional - evaluate in Phase 14
+
+React remains the UI. Tauri is the current desktop-shell candidate, but Phase 14 must verify security, packaging, file associations, persistence bridging, update strategy, licensing, and alternatives before adoption. A Rust UI is not planned.
