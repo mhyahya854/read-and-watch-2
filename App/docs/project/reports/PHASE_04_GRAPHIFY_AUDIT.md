@@ -33,4 +33,4 @@ The updated graph reveals the new Phase 04 core abstractions cleanly integrated 
 
 1. **Zero Engine-Native Leakage**: No PDF.js, Foliate, or third-party DOM references appear anywhere in the graph.
 2. **Strict Reader Isolation**: Reader UI communicates with the document layer via `ReaderSession` capabilities and versioned envelopes. The format-branching enforcement test (`format-branching-enforcement.test.mjs`) verified zero format-conditional branching across presentation components.
-3. **Clean Storage Separation**: All generated Graphify artifacts (`graph.json`, `graph.html`, `manifest.json`, `GRAPH_REPORT.md`) reside strictly in the external local data root (`C:\Users\mhyah\OneDrive\Desktop\Read and Watch - Local Data\App\graphify-out`) and are excluded from Git.
+3. **Clean Storage Separation**: All generated Graphify artifacts (`graph.json`, `graph.html`, `manifest.json`, `GRAPH_REPORT.md`) reside strictly in the external local data root (`READ_WATCH_DATA_ROOT/App/graphify-out`) and are excluded from Git.

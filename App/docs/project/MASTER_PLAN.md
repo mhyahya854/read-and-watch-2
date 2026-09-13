@@ -320,7 +320,7 @@ Stop after Phase 03. Do not start the reader adapter.
 
 ## PHASE-04 - DOCUMENT ADAPTER FOUNDATION
 
-Status: `IN_PROGRESS`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -352,7 +352,7 @@ No Foliate-JS/PDF.js integration, reader chrome, OCR, or format-specific conditi
 - [x] P04-G001 Contract covers both target engine families without leaking engine-owned data.
 - [x] P04-G002 Lifecycle, error, cancellation, unsupported capability, and anchor-version tests pass.
 - [x] P04-G003 No production engine or source mutation was introduced.
-- [ ] P04-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P04-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 
 ### Evidence and reports

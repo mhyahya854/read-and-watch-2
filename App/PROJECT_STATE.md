@@ -4,11 +4,11 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-03` - Unified Design System and Library UI.
+Last completed phase: `PHASE-04` - Document Adapter Foundation.
 
-Current actionable phase: `PHASE-04` - Document Adapter Foundation (`IN_PROGRESS`).
+Current actionable phase: `PHASE-05` - Reflowable Book Engine (`NOT_STARTED`).
 
-Exact next task: `P04-G004` - commit and push verified Phase 04 implementation, verify GitHub containment, and complete Phase 04 closure.
+Exact next task: `P05-T001` - acquire and isolate the reflowable Foliate-JS engine foundation without modifying existing components.
 
 Phase 04 implementation results:
 
@@ -25,6 +25,7 @@ Phase 04 implementation results:
 - Graphify: PASS - 569 nodes, 1048 edges, 34 communities, 0 import cycles.
 - Ponytail: PASS - zero new runtime dependencies, pure TypeScript implementation with native Node 24 ESM execution.
 - Scope boundary verified: zero third-party rendering engines integrated; legacy Readest bridge preserved.
+- Phase 04 content commit `fc807ebe52ee01d7c9b7af26bffe6123b21cb1a2` was pushed and verified on GitHub; the closure commit records that remote gate.
 
 Starting Phase 04 local/remote HEAD: `3d550f3315d8885206531f8d07d07f94913e1f4e`.
 

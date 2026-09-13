@@ -4,12 +4,12 @@
   "canonical_remote": "mhyahya854/read-and-watch-2",
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
-  "current_phase_id": "PHASE-04",
-  "current_phase_status": "IN_PROGRESS",
-  "current_task_id": "P04-G004",
-  "last_completed_phase_id": "PHASE-03",
-  "last_verified_local_head": "e5de157c03d524ee8cb4a2c09d968e3f18cebf33",
-  "last_verified_remote_head": "e5de157c03d524ee8cb4a2c09d968e3f18cebf33",
+  "current_phase_id": "PHASE-05",
+  "current_phase_status": "NOT_STARTED",
+  "current_task_id": "P05-T001",
+  "last_completed_phase_id": "PHASE-04",
+  "last_verified_local_head": "fc807ebe52ee01d7c9b7af26bffe6123b21cb1a2",
+  "last_verified_remote_head": "fc807ebe52ee01d7c9b7af26bffe6123b21cb1a2",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "last_graphify_status": "PASS: Phase 04 adapter foundation refresh; 569 nodes, 1048 edges, 34 communities, 0 import cycles; integrity clean",
@@ -25,5 +25,7 @@
   "phase_02_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_03_content_commit": "e5de157c03d524ee8cb4a2c09d968e3f18cebf33",
   "phase_03_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "exact_next_action": "Complete P04-G004 by committing and pushing the verified Phase 04 implementation, verifying GitHub containment, then write the Phase 04 closure commit and stop."
+  "phase_04_content_commit": "fc807ebe52ee01d7c9b7af26bffe6123b21cb1a2",
+  "phase_04_closure_commit": "SEE_LIVE_GIT_HEAD",
+  "exact_next_action": "In a fresh invocation, start P05-T001 by acquiring and isolating the reflowable Foliate-JS engine foundation without modifying existing components."
 }

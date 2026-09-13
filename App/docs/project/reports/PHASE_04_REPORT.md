@@ -120,5 +120,5 @@ Five dedicated test suites were implemented under `App/app/tests/`:
 
 ## 6. Commit Verification
 
-- Phase 04 Content Commit: `<PENDING_CONTENT_COMMIT>`
-- Phase 04 Closure Commit: `<PENDING_CLOSURE_COMMIT>`
+- Phase 04 Content Commit: `fc807ebe52ee01d7c9b7af26bffe6123b21cb1a2`
+- Phase 04 Closure Commit: `SEE_LIVE_GIT_HEAD (Closure commit pushed to origin/master)`
