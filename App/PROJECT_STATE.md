@@ -4,11 +4,11 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-02` - Calibre-Class Read & Watch Library Manager Foundation.
+Last completed phase: `PHASE-03` - Unified Design System and Library UI.
 
-Current actionable phase: `PHASE-03` - Unified Design System and Library UI (`IN_PROGRESS`).
+Current actionable phase: `PHASE-04` - Document Adapter Foundation (`NOT_STARTED`).
 
-Exact next task: `P03-G004` - complete common gates, Graphify, Ponytail, commit, push, and GitHub verification.
+Exact next task: `P04-T001` - finalize adapter types, capability vocabulary, lifecycle, cancellation, and errors without starting reader integration.
 
 Phase 03 implementation results:
 
@@ -23,6 +23,7 @@ Phase 03 implementation results:
 - Graphify: PASS - 390 nodes, 564 edges, 22 communities, 0 import cycles.
 - Ponytail: PASS - zero new dependencies, semantic HTML components, zero dead CSS.
 - Phase 04 ("Document Adapter Foundation") has not been started.
+- Phase 03 content commit `e5de157c03d524ee8cb4a2c09d968e3f18cebf33` was pushed and verified on GitHub; the closure commit records that remote gate.
 
 Starting Phase 03 local/remote HEAD: `a58da7ce50ee0641a01f47cb8f49cca122b0f0be`.
 

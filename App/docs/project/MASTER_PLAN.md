@@ -259,7 +259,7 @@ Stop after Phase 02 completion. Do not start Phase 03.
 
 ## PHASE-03 - UNIFIED DESIGN SYSTEM AND LIBRARY UI
 
-Status: `IN_PROGRESS`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -292,7 +292,7 @@ No reader engine, annotation implementation, fake content, generic SaaS redesign
 - [x] P03-G001 Design constitution and anti-vibe audit pass.
 - [x] P03-G002 Desktop, constrained-width, keyboard, accessibility, and console checks pass.
 - [x] P03-G003 Data edits persist safely and never alter imported/source evidence.
-- [ ] P03-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P03-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 
