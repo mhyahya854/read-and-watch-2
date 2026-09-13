@@ -10,6 +10,7 @@ import { defineConfig, type Plugin } from 'vite';
 import hostingConfig from './.openai/hosting.json' with { type: 'json' };
 import { resolveDataPaths } from './server/data-paths.mjs';
 import { createLibraryStore } from './server/library-store.mjs';
+import { libraryPlugin } from './server/library-vite-plugin.mjs';
 import { readerPlugin } from './server/reader-vite-plugin.mjs';
 import { userDataPlugin } from './server/user-data-vite-plugin.mjs';
 
@@ -136,6 +137,7 @@ export default defineConfig(async () => {
     },
     plugins: [
       libraryAssets(),
+      libraryPlugin({ libraryDatabasePath }),
       userDataPlugin({ userDataRoot, libraryDatabasePath }),
       readerPlugin({ libraryRoot, libraryDatabasePath, readerExecutable }),
       vinext(),

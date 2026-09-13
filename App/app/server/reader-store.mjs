@@ -196,7 +196,7 @@ export function createReaderStore({
     if (!candidate) fail('Unknown book candidate', 400);
     if (!fileReady(readerExecutable))
       fail('Readest runtime is not installed', 503);
-    await launchReader(realpathSync(readerExecutable), candidate.source);
+    launchReader(realpathSync(readerExecutable), candidate.source);
     return { ok: true, name: candidate.name, format: candidate.format };
   }
 

@@ -259,7 +259,7 @@ Stop after Phase 02 completion. Do not start Phase 03.
 
 ## PHASE-03 - UNIFIED DESIGN SYSTEM AND LIBRARY UI
 
-Status: `NOT_STARTED`
+Status: `IN_PROGRESS`
 
 ### Objective
 
@@ -279,19 +279,19 @@ No reader engine, annotation implementation, fake content, generic SaaS redesign
 
 ### Checklist
 
-- [ ] P03-T001 Turn the design constitution into tokens, typography, spacing, icon, control, and state primitives.
-- [ ] P03-T002 Implement the unified shell and navigation with Read, Watch, Highlights, Canvas Notes, Settings, Privacy, and Terms routes.
-- [ ] P03-T003 Implement library table/database interactions: search, filters, sorts, columns, and valuable saved views.
-- [ ] P03-T004 Implement manual metadata and custom-property editing with conflicts/recovery.
-- [ ] P03-T005 Implement item detail/peek, provenance, progress, notes, highlights, and canvas entry points.
-- [ ] P03-T006 Implement responsive, keyboard, focus, empty, error, loading, and first-run states.
-- [ ] P03-T007 Remove mock/fake presentation content and verify all displayed data provenance.
+- [x] P03-T001 Turn the design constitution into tokens, typography, spacing, icon, control, and state primitives.
+- [x] P03-T002 Implement the unified shell and navigation with Read, Watch, Highlights, Canvas Notes, Settings, Privacy, and Terms routes.
+- [x] P03-T003 Implement library table/database interactions: search, filters, sorts, columns, and valuable saved views.
+- [x] P03-T004 Implement manual metadata and custom-property editing with conflicts/recovery.
+- [x] P03-T005 Implement item detail/peek, provenance, progress, notes, highlights, and canvas entry points.
+- [x] P03-T006 Implement responsive, keyboard, focus, empty, error, loading, and first-run states.
+- [x] P03-T007 Remove mock/fake presentation content and verify all displayed data provenance.
 
 ### Verification gates
 
-- [ ] P03-G001 Design constitution and anti-vibe audit pass.
-- [ ] P03-G002 Desktop, constrained-width, keyboard, accessibility, and console checks pass.
-- [ ] P03-G003 Data edits persist safely and never alter imported/source evidence.
+- [x] P03-G001 Design constitution and anti-vibe audit pass.
+- [x] P03-G002 Desktop, constrained-width, keyboard, accessibility, and console checks pass.
+- [x] P03-G003 Data edits persist safely and never alter imported/source evidence.
 - [ ] P03-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports

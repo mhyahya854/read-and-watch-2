@@ -21,6 +21,14 @@ export type LibraryItem = {
   notionProperties: Record<string, string>;
   media: CatalogMedia[];
   relationshipIds: string[];
+  rating: number | null;
+  revision: number;
+  provenanceKind: 'notion' | 'personal_book' | 'manual' | 'unknown';
+  updatedAt: string;
+  authors: string[];
+  creators: string[];
+  series: { name: string; position: string } | null;
+  customProperties: Record<string, string>;
 };
 
 export type LibraryCatalog = {

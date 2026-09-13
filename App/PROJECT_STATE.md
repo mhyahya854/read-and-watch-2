@@ -6,23 +6,25 @@ Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
 Last completed phase: `PHASE-02` - Calibre-Class Read & Watch Library Manager Foundation.
 
-Current actionable phase: `PHASE-03` - Unified Design System and Library UI (`NOT_STARTED`).
+Current actionable phase: `PHASE-03` - Unified Design System and Library UI (`IN_PROGRESS`).
 
-Exact next task: `P03-T001` - audit the current UI against the fixed design constitution and define the minimal reusable token/component foundation.
+Exact next task: `P03-G004` - complete common gates, Graphify, Ponytail, commit, push, and GitHub verification.
 
-Phase 02 implementation results:
+Phase 03 implementation results:
 
-- The external Read & Watch SQLite database is now the canonical runtime store; the existing UI and certified legacy reader consume its exact catalog projection.
-- All 91 stable IDs, 20 Read records, 71 Watch records, 90 Notion-derived records, one personal book, 75 media references, exact property bags, and provenance records passed migration parity.
-- The stale historical personal-book path was retained while its current logical source was uniquely resolved by exact size and SHA-256 under the approved external root.
-- Deterministic dry-run/apply, resumable transactions, snapshots, rebuild, online backup, restore, rollback, query, duplicate, multi-format, and Watch-specific tests pass.
-- Graphify: PASS - 355 nodes, 465 edges, 21 communities, integrity clean.
-- Ponytail: PASS - no new dependency/framework; four deferred cleanup candidates recorded without unrelated changes.
-- Python database tests 9/9, Node tests 33/33, existing backup/import/hygiene tests 8/8, lint, TypeScript, production build, zero-vulnerability audit, backup verification, library verification, and SQLite integrity checks pass.
-- No Phase 03 UI redesign or other later-phase work started.
-- Phase 02 content commit `f57dc4089df1404fbe2aeef6df3bb552e8fac825` was pushed and verified on GitHub; the closure commit records that remote gate.
+- Unified design system implemented adhering strictly to `DESIGN_CONSTITUTION.md` (warm ivory `#fbfbfa`, charcoal text `#1c1c1a`, deep muted teal accent `#244b4c`, editorial serif headings, clean UI sans, rectangular controls, 6px radii, compact desktop table density, no purple, no gradients).
+- Unified shell and navigation supporting `/` (Library browser), `/highlights` (Phase 09 interim preview), `/canvas-notes` (Phase 10 interim preview), `/settings` (functional local settings categories), `/privacy` (local-first disclosure), and `/terms` (local-first software terms).
+- Calibre-class library table with real-time search (`/` keyboard shortcut), faceted filters (type, status, tags), multi-column sorts, column visibility toggles, 6 pre-configured saved views, and arrow-key row navigation.
+- Item detail peek pane with 8 functional tabs: Overview, Thoughts, Notes, Metadata, Media (with lightbox preview), Links, Highlights, and Canvas.
+- Manual metadata editing with optimistic revisions, strict client-side validation, conflict detection, reload server copy action, and safe SQLite persistence via `PUT /api/library/items/:id`.
+- Data truthfulness: all 91 items rendered with genuine provenance; zero fake ratings, books, reviews, or progress bars.
+- Visual certification: 24 baseline screenshots captured in `before/` and 82 final review screenshots captured across `after/`, `states/`, and `breakpoints/` under `READ_WATCH_DATA_ROOT/visual-review/phase-03/` with full `manifest.json` and `REVIEW_INDEX.md`. No screenshots committed to Git.
+- Node tests 35/35, Python tests 15/15, hygiene tests 2/2, library verification, lint, TypeScript, production build, and zero-vulnerability audit PASS.
+- Graphify: PASS - 390 nodes, 564 edges, 22 communities, 0 import cycles.
+- Ponytail: PASS - zero new dependencies, semantic HTML components, zero dead CSS.
+- Phase 04 ("Document Adapter Foundation") has not been started.
 
-Starting Phase 02 local/remote HEAD: `bc9232475395092b935f592b54cd7861c59d71e7`.
+Starting Phase 03 local/remote HEAD: `a58da7ce50ee0641a01f47cb8f49cca122b0f0be`.
 
 Phase 01 results:
 

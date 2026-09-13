@@ -12,7 +12,7 @@ import {
 } from '@/lib/reader';
 
 function statusMessage(status: ReaderStatus | null) {
-  if (!status) return 'Checking for a local book…';
+  if (!status) return 'Checking for a local book...';
   if (status.state === 'unsupported') {
     const formats = [
       ...new Set(status.unsupported.map(({ format }) => format)),
@@ -23,9 +23,9 @@ function statusMessage(status: ReaderStatus | null) {
     return 'No readable local book attached. The catalog file is missing.';
   if (status.state === 'no-readable-file')
     return 'No readable local book attached.';
-  if (!status.readerReady) return 'Readest runtime is not installed.';
+  if (!status.readerReady) return 'The local reader is not installed.';
   if (status.state === 'multiple') return 'Choose which local book to open.';
-  return 'Opens in a separate Readest window. Close it to return to this library.';
+  return 'Opens in a separate local reader window.';
 }
 
 export function ReaderControl({ itemId }: { itemId: string }) {
@@ -56,11 +56,11 @@ export function ReaderControl({ itemId }: { itemId: string }) {
     try {
       const result = await openInReader(itemId, candidate?.id);
       setMessage(
-        `${result.name} opened in Readest. Close that window to return here.`,
+        `${result.name} opened in the local reader.`,
       );
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : 'Could not open Readest',
+        caught instanceof Error ? caught.message : 'Could not open the reader',
       );
     } finally {
       setOpeningId(null);
@@ -85,7 +85,7 @@ export function ReaderControl({ itemId }: { itemId: string }) {
             >
               <BookOpen />
               {openingId === candidate.id
-                ? 'Opening…'
+                ? 'Opening...'
                 : `Open ${candidate.name} (${candidate.format})`}
             </Button>
           ))}
@@ -99,7 +99,7 @@ export function ReaderControl({ itemId }: { itemId: string }) {
           onClick={() => open()}
         >
           <BookOpen />
-          {openingId ? 'Opening…' : 'Open in Reader'}
+          {openingId ? 'Opening...' : 'Open in Reader'}
         </Button>
       )}
       <p

@@ -201,9 +201,9 @@ export function UserDataEditor({
 
   const statusText =
     status === 'loading'
-      ? 'Loading…'
+      ? 'Loading...'
       : status === 'saving'
-        ? 'Saving…'
+        ? 'Saving...'
         : status === 'saved' || (!dirty && status !== 'error' && status !== 'conflict')
           ? 'Saved'
           : dirty
@@ -242,13 +242,13 @@ export function UserDataEditor({
           onChange={(event) => setContent(event.target.value)}
           onKeyDown={handleKeyDown}
           aria-label={title}
-          placeholder={`Write your ${title.toLowerCase()} as Markdown…`}
-          className="min-h-[180px] w-full resize-y rounded-md border border-white/10 bg-black/20 px-3 py-2 font-mono text-sm leading-6 text-foreground/90 outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          placeholder={`Write your ${title.toLowerCase()} as Markdown...`}
+          className="min-h-[180px] w-full resize-y rounded-md border border-input bg-surface px-3 py-2 font-mono text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
         />
       ) : (
         <div
           aria-label={`${title} preview`}
-          className="markdown-preview min-h-[180px] w-full overflow-auto rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm"
+          className="markdown-preview min-h-[180px] w-full overflow-auto rounded-md border border-border bg-surface px-3 py-2 text-sm"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
         />
       )}
@@ -258,8 +258,8 @@ export function UserDataEditor({
       </p>
       {status === 'error' && <p className="text-[11px] text-destructive">{error}</p>}
       {status === 'conflict' && (
-        <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-          <p className="text-[11px] text-amber-200">{error}</p>
+        <div className="space-y-2 rounded-md border border-warning/40 bg-surface-muted px-3 py-2">
+          <p className="text-xs text-foreground">{error}</p>
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={() => void reloadFromDisk()}>
               Load on-disk version

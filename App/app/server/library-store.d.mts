@@ -3,6 +3,12 @@ export function createLibraryStore(options: {
   readOnly?: boolean;
 }): {
   getCatalog(): unknown;
+  getUiCatalog(): unknown;
+  updateItem(
+    itemId: string,
+    patch: Record<string, unknown>,
+    expectedRevision: number,
+  ): unknown;
   itemExists(itemId: string): boolean;
   queryItems(query?: Record<string, string>): unknown[];
   updateMetadata(

@@ -100,6 +100,208 @@ export function createLibraryStore({ databasePath, readOnly = false }) {
     };
   }
 
+  function getUiCatalog() {
+    const catalog = getCatalog();
+    const itemStatement = database.prepare(
+      'SELECT rating,revision,provenance_kind,updated_at_utc FROM items WHERE id=?',
+    );
+    const peopleStatement = database.prepare(
+      `SELECT ip.role,p.display_name FROM item_people ip
+       JOIN people p ON p.id=ip.person_id
+       WHERE ip.item_id=? ORDER BY ip.role,ip.position`,
+    );
+    const seriesStatement = database.prepare(
+      `SELECT s.name,rs.position FROM read_series rs
+       JOIN series s ON s.id=rs.series_id WHERE rs.item_id=?`,
+    );
+    const customStatement = database.prepare(
+      `SELECT namespace,property_key,value_json FROM item_properties
+       WHERE item_id=? AND namespace NOT IN ('catalog_internal','notion')
+       ORDER BY namespace,source_order,property_key`,
+    );
+
+    return {
+      ...catalog,
+      items: catalog.items.map((item) => {
+        const row = itemStatement.get(item.id);
+        const people = peopleStatement.all(item.id);
+        const series = seriesStatement.get(item.id) ?? null;
+        const customProperties = Object.fromEntries(
+          customStatement
+            .all(item.id)
+            .map(({ property_key, value_json }) => [property_key, parse(value_json)]),
+        );
+        return {
+          ...item,
+          rating: row.rating,
+          revision: row.revision,
+          provenanceKind: row.provenance_kind,
+          updatedAt: row.updated_at_utc,
+          authors: people
+            .filter(({ role }) => role === 'author')
+            .map(({ display_name }) => display_name),
+          creators: people
+            .filter(({ role }) => role === 'creator')
+            .map(({ display_name }) => display_name),
+          series: series ? { name: series.name, position: series.position } : null,
+          customProperties,
+        };
+      }),
+    };
+  }
+
+  function updateItem(itemId, patch, expectedRevision) {
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      fail('Invalid metadata revision');
+    }
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+      fail('Invalid metadata changes');
+    }
+    const allowed = new Set([
+      'title',
+      'type',
+      'status',
+      'summary',
+      'rating',
+      'tags',
+      'people',
+      'series',
+      'customProperties',
+    ]);
+    if (
+      !Object.keys(patch).length ||
+      Object.keys(patch).some((key) => !allowed.has(key))
+    ) {
+      fail('No valid metadata changes');
+    }
+    for (const key of ['title', 'type', 'status', 'summary']) {
+      if (key in patch && typeof patch[key] !== 'string') {
+        fail(`${key} must be a string`);
+      }
+    }
+    if ('title' in patch && !patch.title.trim()) fail('Title is required');
+    if (
+      'rating' in patch &&
+      patch.rating !== null &&
+      (typeof patch.rating !== 'number' || patch.rating < 0 || patch.rating > 5)
+    ) {
+      fail('Rating must be between 0 and 5');
+    }
+    for (const key of ['tags', 'people']) {
+      if (
+        key in patch &&
+        (!Array.isArray(patch[key]) ||
+          patch[key].some((value) => typeof value !== 'string'))
+      ) {
+        fail(`${key} must be a list of strings`);
+      }
+    }
+    if (
+      'series' in patch &&
+      patch.series !== null &&
+      (typeof patch.series !== 'object' ||
+        typeof patch.series.name !== 'string' ||
+        typeof patch.series.position !== 'string')
+    ) {
+      fail('Invalid series');
+    }
+    if (
+      'customProperties' in patch &&
+      (!patch.customProperties ||
+        typeof patch.customProperties !== 'object' ||
+        Array.isArray(patch.customProperties) ||
+        Object.entries(patch.customProperties).some(
+          ([key, value]) => !key.trim() || typeof value !== 'string',
+        ))
+    ) {
+      fail('Invalid custom properties');
+    }
+
+    const normalizeList = (values) => [
+      ...new Set(values.map((value) => value.trim()).filter(Boolean)),
+    ];
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      const current = database
+        .prepare('SELECT revision,collection FROM items WHERE id=?')
+        .get(itemId);
+      if (!current) fail('Unknown item ID', 404);
+      if (current.revision !== expectedRevision) fail('Metadata conflict', 409);
+      if ('series' in patch && current.collection !== 'read') {
+        fail('Series is Read-specific');
+      }
+
+      const columns = new Map([
+        ['title', 'title'],
+        ['type', 'item_type'],
+        ['status', 'status'],
+        ['summary', 'summary'],
+        ['rating', 'rating'],
+      ]);
+      const metadata = Object.entries(patch).filter(([key]) => columns.has(key));
+      if (metadata.length) {
+        database
+          .prepare(
+            `UPDATE items SET ${metadata.map(([key]) => `${columns.get(key)}=?`).join(',')} WHERE id=?`,
+          )
+          .run(...metadata.map(([, value]) => value), itemId);
+      }
+
+      if ('tags' in patch) {
+        database.prepare('DELETE FROM item_tags WHERE item_id=?').run(itemId);
+        normalizeList(patch.tags).forEach((tag, position) => {
+          const tagId = id('tag', tag.toLocaleLowerCase());
+          database.prepare('INSERT OR IGNORE INTO tags VALUES(?,?)').run(tagId, tag);
+          database.prepare('INSERT INTO item_tags VALUES(?,?,?)').run(itemId, tagId, position);
+        });
+      }
+
+      if ('people' in patch) {
+        const role = current.collection === 'read' ? 'author' : 'creator';
+        database.prepare('DELETE FROM item_people WHERE item_id=? AND role=?').run(itemId, role);
+        normalizeList(patch.people).forEach((name, position) => {
+          const personId = id('person', name.toLocaleLowerCase());
+          database.prepare('INSERT OR IGNORE INTO people VALUES(?,?,?)').run(personId, name, name);
+          database.prepare('INSERT INTO item_people VALUES(?,?,?,?)').run(itemId, personId, role, position);
+        });
+      }
+
+      if ('series' in patch) {
+        database.prepare('DELETE FROM read_series WHERE item_id=?').run(itemId);
+        if (patch.series?.name.trim()) {
+          const name = patch.series.name.trim();
+          const seriesId = id('series', name.toLocaleLowerCase());
+          database.prepare('INSERT OR IGNORE INTO series VALUES(?,?,?)').run(seriesId, name, name);
+          database.prepare('INSERT INTO read_series VALUES(?,?,?)').run(
+            itemId,
+            seriesId,
+            patch.series.position.trim(),
+          );
+        }
+      }
+
+      if ('customProperties' in patch) {
+        database
+          .prepare("DELETE FROM item_properties WHERE item_id=? AND namespace='manual'")
+          .run(itemId);
+        Object.entries(patch.customProperties).forEach(([key, value], sourceOrder) => {
+          database
+            .prepare('INSERT INTO item_properties VALUES(?,?,?,?,?,?)')
+            .run(itemId, 'manual', key.trim(), 'string', JSON.stringify(value), sourceOrder);
+        });
+      }
+
+      database
+        .prepare('UPDATE items SET revision=revision+1,updated_at_utc=? WHERE id=?')
+        .run(new Date().toISOString(), itemId);
+      database.exec('COMMIT');
+      return getUiCatalog().items.find(({ id: candidateId }) => candidateId === itemId);
+    } catch (error) {
+      database.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   function queryItems({
     collection,
     status,
@@ -490,6 +692,8 @@ export function createLibraryStore({ databasePath, readOnly = false }) {
   return {
     database,
     getCatalog,
+    getUiCatalog,
+    updateItem,
     itemExists,
     queryItems,
     updateMetadata,

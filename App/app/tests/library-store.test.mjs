@@ -122,3 +122,59 @@ test('Read series, people, relationships, and saved views stay explicit', (t) =>
     status: 'reading',
   });
 });
+
+test('UI catalog exposes editable state without changing the legacy projection', (t) => {
+  const store = setup(t);
+  const legacy = store.getCatalog();
+  const ui = store.getUiCatalog();
+  assert.equal(legacy.items[0].revision, undefined);
+  assert.equal(ui.items[0].revision, 1);
+  assert.deepEqual(ui.items[0].authors, []);
+  assert.deepEqual(ui.items[1].creators, []);
+  assert.deepEqual(ui.items[0].customProperties, {});
+});
+
+test('combined metadata save is atomic, collection-aware, and conflict-refusing', (t) => {
+  const store = setup(t);
+  const updated = store.updateItem(
+    READ_ID,
+    {
+      title: 'Edited title',
+      status: 'reading',
+      rating: 4.5,
+      people: ['First Author', 'Second Author'],
+      tags: ['Study', 'Local'],
+      series: { name: 'A Series', position: '2' },
+      customProperties: { Language: 'English' },
+    },
+    1,
+  );
+  assert.equal(updated.revision, 2);
+  assert.equal(updated.title, 'Edited title');
+  assert.equal(updated.rating, 4.5);
+  assert.deepEqual(updated.authors, ['First Author', 'Second Author']);
+  assert.deepEqual(updated.tags, ['Study', 'Local']);
+  assert.deepEqual(updated.series, { name: 'A Series', position: '2' });
+  assert.deepEqual(updated.customProperties, { Language: 'English' });
+  assert.throws(
+    () => store.updateItem(READ_ID, { title: 'Stale' }, 1),
+    /conflict/,
+  );
+
+  assert.throws(
+    () =>
+      store.updateItem(
+        WATCH_ID,
+        {
+          title: 'Must not persist',
+          series: { name: 'Wrong domain', position: '1' },
+        },
+        1,
+      ),
+    /Read-specific/,
+  );
+  assert.equal(
+    store.getUiCatalog().items.find(({ id }) => id === WATCH_ID).title,
+    'Shared title',
+  );
+});

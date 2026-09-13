@@ -5,7 +5,7 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
     <input
       type={type}
       data-slot="input"
-      className={`h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 md:text-sm dark:bg-input/30 ${className ?? ''}`}
+      className={`h-9 w-full min-w-0 rounded-md border border-input bg-surface px-3 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 md:text-sm ${className ?? ''}`}
       {...props}
     />
   );

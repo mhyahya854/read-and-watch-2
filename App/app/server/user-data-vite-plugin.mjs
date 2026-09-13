@@ -29,7 +29,7 @@ export function userDataPlugin({ userDataRoot, libraryDatabasePath }) {
     configureServer(server) {
       server.middlewares.use(
         '/api/user-data',
-        async (request, response, next) => {
+        async (request, response) => {
           try {
             const url = new URL(request.url ?? '', 'http://localhost');
             let parts = url.pathname.split('/').filter(Boolean);

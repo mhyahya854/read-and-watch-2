@@ -236,3 +236,10 @@ The public repository has no project-level license, so no permission is inferred
 Status: Accepted
 
 The canonical local database is implemented with SQLite through Python's standard library for migration/recovery operations and Node's built-in `node:sqlite` for application runtime access. Read & Watch uses one concrete store and explicit transactions rather than a generic repository framework or ORM. Deterministic file-first snapshots remain immutable recovery artifacts, not a second writable master. This decision adds no production dependency and does not constrain later desktop-shell evaluation.
+
+## D-039 - Phase 03 unified design system and library UI implementation
+
+Status: Accepted
+
+The design constitution is fully implemented using token variables in `globals.css`, semantic HTML5 elements (`<dialog>`, `<output>`, `<section>`, `<kbd>`), and custom React 19 primitives with zero third-party component libraries. All 91 authentic items are rendered from the canonical SQLite database projection. Manual metadata editing uses optimistic concurrency detection against item `updated_at`, strict client-side validation, and safe local persistence via `PUT /api/library/items/:id` without touching immutable source exports or backup archives.
+

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-13 - Phase 03 unified design system and library UI
+
+- Implemented the complete token, typography, and component foundation adhering strictly to `DESIGN_CONSTITUTION.md` (warm ivory canvas, charcoal text, deep muted teal accent, editorial serif headings, clean UI sans, 6px radii, and compact desktop density).
+- Built custom accessible UI primitives using native HTML semantics (`Button`, `Input`, `Table`, `Badge`, `Kbd`, `Skeleton`, `Tooltip`, `Dialog`, `DropdownMenu`, `ToastProvider`) with zero external component libraries.
+- Implemented the unified application shell and navigation across `/` (Library browser), `/highlights`, `/canvas-notes`, `/settings`, `/privacy`, and `/terms`.
+- Built the Calibre-class library table with real-time search (`/` shortcut), faceted filters (type, status, tags), multi-column sorts, column visibility customization, saved views, and keyboard navigation.
+- Built the item detail peek pane with 8 functional tabs: Overview, Thoughts, Notes, Metadata, Media (with lightbox preview), Links, Highlights, and Canvas.
+- Implemented manual metadata editing with optimistic concurrency detection, validation, conflict detection, reload actions, and safe local persistence.
+- Verified data truthfulness with all 91 authentic items rendered from canonical SQLite without fake ratings, placeholder books, or mock reviews.
+- Captured 24 baseline screenshots and 82 final certification screenshots stored externally under `READ_WATCH_DATA_ROOT/visual-review/phase-03/`.
+- Refreshed Graphify (390 nodes, 564 edges, 22 communities, 0 import cycles) and completed Ponytail audit with zero new dependencies.
+
 ## 2026-09-08 - Phase 02 library manager foundation
 
 - Added the Read & Watch-owned SQLite schema, deterministic migration, canonical runtime store, and file-first recovery pipeline without adding a dependency.
