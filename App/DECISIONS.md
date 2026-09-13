@@ -243,3 +243,18 @@ Status: Accepted
 
 The design constitution is fully implemented using token variables in `globals.css`, semantic HTML5 elements (`<dialog>`, `<output>`, `<section>`, `<kbd>`), and custom React 19 primitives with zero third-party component libraries. All 91 authentic items are rendered from the canonical SQLite database projection. Manual metadata editing uses optimistic concurrency detection against item `updated_at`, strict client-side validation, and safe local persistence via `PUT /api/library/items/:id` without touching immutable source exports or backup archives.
 
+## D-040 - Phase 04 Document Adapter Contract, Envelope, and Registry Implementation
+
+Status: Accepted
+
+The format-independent document adapter foundation is implemented under `App/app/lib/document/` using standard TypeScript and Node 24 native ESM execution with zero new runtime dependencies. The foundation establishes:
+1. `DocumentAdapter` canonical interface enforcing complete lifecycle states (`created`, `opening`, `open`, `closing`, `closed`, `failed`), capability queries, TOC, navigation, search, selection, and anchor round-trips with `AbortSignal` cancellation support.
+2. Normalized `DocumentError` taxonomy with 15 discrete error codes and sanitized, path-safe error messaging.
+3. Versioned outer envelopes (`DocumentLocation`, `TextAnchor`) using `schemaVersion: 1` and immutable `sourceHash` verification, supporting fixed-layout (`pageNumber`, zoom, bounding rects) and reflowable (`cfi`, `progression`, ranges) tagged payloads.
+4. Minimal `DocumentAdapterRegistry` supporting format factory registration, case-insensitive format normalization, and strict duplicate collision rejection policies.
+5. Capability-driven `ReaderSession` controller that exposes UI capability flags (`canZoom`, `canAdjustFont`, `canSearch`, `canContinuousScroll`), eliminating format conditionals from reader components.
+6. Universal conformance suite passed by concrete `FakePdfAdapter` and `FakeReflowableAdapter` test doubles.
+7. Format-branching enforcement test verifying zero format-conditional branching exists across all presentation components.
+Zero production rendering engines (no Foliate-JS, no PDF.js) were integrated in Phase 04; legacy Readest bridge remains fully preserved.
+
+

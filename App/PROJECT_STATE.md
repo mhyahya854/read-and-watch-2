@@ -6,11 +6,30 @@ Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
 Last completed phase: `PHASE-03` - Unified Design System and Library UI.
 
-Current actionable phase: `PHASE-04` - Document Adapter Foundation (`NOT_STARTED`).
+Current actionable phase: `PHASE-04` - Document Adapter Foundation (`IN_PROGRESS`).
 
-Exact next task: `P04-T001` - finalize adapter types, capability vocabulary, lifecycle, cancellation, and errors without starting reader integration.
+Exact next task: `P04-G004` - commit and push verified Phase 04 implementation, verify GitHub containment, and complete Phase 04 closure.
+
+Phase 04 implementation results:
+
+- Implemented canonical `DocumentAdapter` contract under `App/app/lib/document/` with full lifecycle states, TOC, navigation, search, selection, and anchor round-trips with `AbortSignal` cancellation.
+- Implemented normalized `DocumentError` taxonomy with 15 discrete error codes and sanitized, path-safe error messaging.
+- Implemented `DocumentCapabilities` boolean contract and standard capability profiles (`STANDARD_PDF_CAPABILITIES`, `STANDARD_REFLOWABLE_CAPABILITIES`).
+- Implemented versioned outer envelopes (`DocumentLocation`, `TextAnchor`) with `schemaVersion: 1`, tagged union payloads (`page`, `semantic`, `progression`; `pdf-geometry`, `reflowable-range`), and SHA-256 source-hash verification.
+- Built minimal `DocumentAdapterRegistry` with duplicate collision rejection and format factory lookup.
+- Implemented `ReaderSession` capability-driven session controller with snapshot state subscriptions, eliminating format conditionals from UI components.
+- Created concrete fixed-layout (`FakePdfAdapter`) and reflowable (`FakeReflowableAdapter`) test doubles.
+- Universal 18-point conformance suite passed by both test doubles.
+- Format-branching enforcement test suite passing with 0 violations across all presentation components and routes.
+- Node tests 53/53, TypeScript 0 errors, oxlint 0 errors/warnings, production build passing, zero vulnerability audit passing.
+- Graphify: PASS - 569 nodes, 1048 edges, 34 communities, 0 import cycles.
+- Ponytail: PASS - zero new runtime dependencies, pure TypeScript implementation with native Node 24 ESM execution.
+- Scope boundary verified: zero third-party rendering engines integrated; legacy Readest bridge preserved.
+
+Starting Phase 04 local/remote HEAD: `3d550f3315d8885206531f8d07d07f94913e1f4e`.
 
 Phase 03 implementation results:
+
 
 - Unified design system implemented adhering strictly to `DESIGN_CONSTITUTION.md` (warm ivory `#fbfbfa`, charcoal text `#1c1c1a`, deep muted teal accent `#244b4c`, editorial serif headings, clean UI sans, rectangular controls, 6px radii, compact desktop table density, no purple, no gradients).
 - Unified shell and navigation supporting `/` (Library browser), `/highlights` (Phase 09 interim preview), `/canvas-notes` (Phase 10 interim preview), `/settings` (functional local settings categories), `/privacy` (local-first disclosure), and `/terms` (local-first software terms).

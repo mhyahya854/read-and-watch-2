@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-13 - Phase 04 document adapter foundation
+
+- Implemented the format-independent document adapter foundation under `App/app/lib/document/` with zero new runtime dependencies.
+- Established the canonical `DocumentAdapter` contract with full lifecycle state machine (`created`, `opening`, `open`, `closing`, `closed`, `failed`), navigation, search, selection, and anchor resolution with `AbortSignal` cancellation support.
+- Defined normalized `DocumentError` taxonomy covering 15 error codes with path-sanitized, client-safe error messages.
+- Implemented `DocumentCapabilities` boolean contract (`toc`, `textSearch`, `textSelection`, `textAnchors`, `pageNavigation`, `semanticLocationNavigation`, `pagination`, `continuousLayout`, `zoom`, `fontControls`, `themeControls`, `spreadLayout`, `bookmarks`, `textExtraction`) and standard capability profiles.
+- Implemented versioned outer envelopes (`DocumentLocation`, `TextAnchor`) with `schemaVersion: 1`, tagged union payloads, and SHA-256 source-hash verification.
+- Built minimal `DocumentAdapterRegistry` with duplicate collision rejection and format factory lookup.
+- Implemented `ReaderSession` capability-driven session controller with snapshot state subscriptions.
+- Created fixed-layout (`FakePdfAdapter`) and reflowable (`FakeReflowableAdapter`) test doubles.
+- Implemented universal 18-point conformance suite passed by both test doubles.
+- Created format-branching enforcement test suite verifying zero format-conditional branching across presentation components and routes.
+- Executed Graphify audit (569 nodes, 1048 edges, 34 communities, 0 import cycles) and Ponytail complexity audit.
+- Preserved legacy Readest bridge and certified fallback; zero third-party rendering engines integrated.
+
 ## 2026-09-13 - Phase 03 unified design system and library UI
 
 - Implemented the complete token, typography, and component foundation adhering strictly to `DESIGN_CONSTITUTION.md` (warm ivory canvas, charcoal text, deep muted teal accent, editorial serif headings, clean UI sans, 6px radii, and compact desktop density).

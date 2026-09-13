@@ -5,15 +5,15 @@
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
   "current_phase_id": "PHASE-04",
-  "current_phase_status": "NOT_STARTED",
-  "current_task_id": "P04-T001",
+  "current_phase_status": "IN_PROGRESS",
+  "current_task_id": "P04-G004",
   "last_completed_phase_id": "PHASE-03",
   "last_verified_local_head": "e5de157c03d524ee8cb4a2c09d968e3f18cebf33",
   "last_verified_remote_head": "e5de157c03d524ee8cb4a2c09d968e3f18cebf33",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 03 UI & design system refresh; 390 nodes, 564 edges, 22 communities, 0 import cycles; integrity clean",
-  "last_ponytail_status": "PASS: Phase 03 component minimalism audit; zero new external dependencies; semantic HTML components; zero dead CSS",
+  "last_graphify_status": "PASS: Phase 04 adapter foundation refresh; 569 nodes, 1048 edges, 34 communities, 0 import cycles; integrity clean",
+  "last_ponytail_status": "PASS: Phase 04 adapter foundation complexity audit; zero new runtime dependencies; pure TypeScript with Node 24 native ESM",
   "active_blockers": [],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
@@ -25,5 +25,5 @@
   "phase_02_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_03_content_commit": "e5de157c03d524ee8cb4a2c09d968e3f18cebf33",
   "phase_03_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "exact_next_action": "In a fresh invocation, start P04-T001 by finalizing adapter types, capability vocabulary, lifecycle, cancellation, and errors without starting reader integration."
+  "exact_next_action": "Complete P04-G004 by committing and pushing the verified Phase 04 implementation, verifying GitHub containment, then write the Phase 04 closure commit and stop."
 }

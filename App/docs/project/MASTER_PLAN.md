@@ -320,7 +320,7 @@ Stop after Phase 03. Do not start the reader adapter.
 
 ## PHASE-04 - DOCUMENT ADAPTER FOUNDATION
 
-Status: `NOT_STARTED`
+Status: `IN_PROGRESS`
 
 ### Objective
 
@@ -340,19 +340,20 @@ No Foliate-JS/PDF.js integration, reader chrome, OCR, or format-specific conditi
 
 ### Checklist
 
-- [ ] P04-T001 Finalize adapter types, capability vocabulary, lifecycle, cancellation, and errors.
-- [ ] P04-T002 Define location and anchor envelopes with schema versions and source hashes.
-- [ ] P04-T003 Build a minimal adapter registry/factory justified by at least PDF and reflowable consumers.
-- [ ] P04-T004 Implement contract fixtures/test doubles and conformance tests.
-- [ ] P04-T005 Wire capability-driven reader state without rendering a production document engine.
-- [ ] P04-T006 Audit unrelated components for format branching and define enforcement.
+- [x] P04-T001 Finalize adapter types, capability vocabulary, lifecycle, cancellation, and errors.
+- [x] P04-T002 Define location and anchor envelopes with schema versions and source hashes.
+- [x] P04-T003 Build a minimal adapter registry/factory justified by at least PDF and reflowable consumers.
+- [x] P04-T004 Implement contract fixtures/test doubles and conformance tests.
+- [x] P04-T005 Wire capability-driven reader state without rendering a production document engine.
+- [x] P04-T006 Audit unrelated components for format branching and define enforcement.
 
 ### Verification gates
 
-- [ ] P04-G001 Contract covers both target engine families without leaking engine-owned data.
-- [ ] P04-G002 Lifecycle, error, cancellation, unsupported capability, and anchor-version tests pass.
-- [ ] P04-G003 No production engine or source mutation was introduced.
+- [x] P04-G001 Contract covers both target engine families without leaking engine-owned data.
+- [x] P04-G002 Lifecycle, error, cancellation, unsupported capability, and anchor-version tests pass.
+- [x] P04-G003 No production engine or source mutation was introduced.
 - [ ] P04-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+
 
 ### Evidence and reports
 
