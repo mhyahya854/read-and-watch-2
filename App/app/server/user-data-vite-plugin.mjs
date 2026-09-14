@@ -21,8 +21,8 @@ async function readBody(request) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-export function userDataPlugin({ userDataRoot, libraryDatabasePath }) {
-  const store = createUserDataStore({ userDataRoot, libraryDatabasePath });
+export function userDataPlugin({ userDataRoot, libraryDatabasePath, searchStore = null }) {
+  const store = createUserDataStore({ userDataRoot, libraryDatabasePath, searchStore });
 
   return {
     name: 'local-user-data',

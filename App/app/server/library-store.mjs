@@ -15,7 +15,7 @@ function fail(message, status = 400) {
   throw Object.assign(new Error(message), { status });
 }
 
-export function createLibraryStore({ databasePath, readOnly = false }) {
+export function createLibraryStore({ databasePath, readOnly = false, searchStore = null }) {
   const database = new DatabaseSync(databasePath, {
     readOnly,
     allowExtension: false,
@@ -295,7 +295,12 @@ export function createLibraryStore({ databasePath, readOnly = false }) {
         .prepare('UPDATE items SET revision=revision+1,updated_at_utc=? WHERE id=?')
         .run(new Date().toISOString(), itemId);
       database.exec('COMMIT');
-      return getUiCatalog().items.find(({ id: candidateId }) => candidateId === itemId);
+
+      const updated = getUiCatalog().items.find(({ id: candidateId }) => candidateId === itemId);
+      if (searchStore && updated) {
+        try { searchStore.indexItem(updated); } catch {}
+      }
+      return updated;
     } catch (error) {
       database.exec('ROLLBACK');
       throw error;

@@ -12,6 +12,7 @@ import { ChevronLeft, ChevronRight, BookOpen, AlertCircle, RotateCcw } from 'luc
 import { Button } from '@/components/ui/button';
 import { useReader } from './reader-context';
 import { createPageLocation, createProgressionLocation } from '@/lib/document';
+import { ReaderSelectionMenu } from './reader-selection-menu';
 
 export function ReaderViewport() {
   const {
@@ -149,6 +150,10 @@ export function ReaderViewport() {
           </button>
         </>
       )}
+
+      {/* 5. Selection Study Actions Menu */}
+      {snapshot.isOpen && <ReaderSelectionMenu />}
     </main>
   );
 }
+

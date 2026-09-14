@@ -13,6 +13,8 @@ import { createLibraryStore } from './server/library-store.mjs';
 import { libraryPlugin } from './server/library-vite-plugin.mjs';
 import { readerPlugin } from './server/reader-vite-plugin.mjs';
 import { userDataPlugin } from './server/user-data-vite-plugin.mjs';
+import { searchPlugin } from './server/search-vite-plugin.mjs';
+import { createSearchStore } from './server/search-store.mjs';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
@@ -26,6 +28,11 @@ const {
   libraryDatabasePath,
   userDataRoot,
 } = resolveDataPaths({ appRoot });
+
+const searchStore = createSearchStore({
+  databasePath: libraryDatabasePath,
+  userDataRoot,
+});
 
 const contentTypes: Record<string, string> = {
   '.avif': 'image/avif',
@@ -151,13 +158,15 @@ export default defineConfig(async () => {
         },
       },
       libraryAssets(),
-      libraryPlugin({ libraryDatabasePath }),
-      userDataPlugin({ userDataRoot, libraryDatabasePath }),
+      libraryPlugin({ libraryDatabasePath, searchStore }),
+      userDataPlugin({ userDataRoot, libraryDatabasePath, searchStore }),
       readerPlugin({
         libraryRoot,
         libraryDatabasePath,
         userDataRoot,
+        searchStore,
       }),
+      searchPlugin({ searchStore }),
       vinext(),
       sites(),
       cloudflare({

@@ -5,5 +5,6 @@ export declare function readerPlugin(options: {
   libraryDatabasePath: string;
   readerExecutable?: string | null;
   userDataRoot?: string;
+  searchStore?: unknown;
 }): Plugin;
 

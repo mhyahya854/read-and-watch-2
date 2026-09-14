@@ -48,22 +48,26 @@ export function readerPlugin({
   libraryDatabasePath,
   readerExecutable = null,
   userDataRoot,
+  searchStore = null,
 } = {}) {
   const store = createReaderStore({
     libraryRoot,
     libraryDatabasePath,
     readerExecutable,
     userDataRoot,
+    searchStore,
   });
 
   const annotationStore = createAnnotationStore({
     databasePath: libraryDatabasePath,
     userDataRoot,
+    searchStore,
   });
 
   const canvasStore = createCanvasStore({
     databasePath: libraryDatabasePath,
     userDataRoot,
+    searchStore,
   });
 
   return {
@@ -294,6 +298,22 @@ export function readerPlugin({
             const itemId = decodeURIComponent(parts[1]);
             const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
             return sendJson(response, 200, annotationStore.getAnnotations(itemId, { includeDeleted }));
+          }
+
+          // -------------------------------------------------------------------
+          // Annotations — GET single
+          // GET /api/reader/items/:id/annotations/:annotationId
+          // -------------------------------------------------------------------
+          if (
+            parts.length === 4 &&
+            parts[0] === 'items' &&
+            parts[2] === 'annotations' &&
+            request.method === 'GET'
+          ) {
+            const annotationId = decodeURIComponent(parts[3]);
+            const ann = annotationStore.getAnnotation(annotationId);
+            if (!ann) return sendJson(response, 404, { error: 'Annotation not found' });
+            return sendJson(response, 200, ann);
           }
 
           // -------------------------------------------------------------------

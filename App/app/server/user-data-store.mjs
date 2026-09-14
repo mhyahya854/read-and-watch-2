@@ -27,6 +27,7 @@ export function createUserDataStore({
   userDataRoot,
   libraryDatabasePath,
   historyLimit = DEFAULT_HISTORY_LIMIT,
+  searchStore = null,
 }) {
   const libraryStore = createLibraryStore({
     databasePath: libraryDatabasePath,
@@ -141,12 +142,18 @@ export function createUserDataStore({
           rmSync(file);
         }
         updateIndex();
+        if (searchStore) {
+          try { searchStore.removeNote(itemId, type); } catch {}
+        }
         return result;
       }
 
       archive(file, type, itemId);
       writeAtomic(file, content);
       updateIndex();
+      if (searchStore) {
+        try { searchStore.indexNote(itemId, type, content); } catch {}
+      }
       return result;
     },
 

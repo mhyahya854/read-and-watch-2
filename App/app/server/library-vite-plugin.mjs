@@ -23,8 +23,8 @@ async function readJson(request) {
   return body ? JSON.parse(body) : {};
 }
 
-export function libraryPlugin({ libraryDatabasePath }) {
-  const store = createLibraryStore({ databasePath: libraryDatabasePath });
+export function libraryPlugin({ libraryDatabasePath, searchStore = null }) {
+  const store = createLibraryStore({ databasePath: libraryDatabasePath, searchStore });
 
   return {
     name: 'local-library-data',

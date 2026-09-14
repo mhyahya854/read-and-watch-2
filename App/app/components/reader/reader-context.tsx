@@ -24,6 +24,9 @@ import {
   type ReaderPreferences,
   createBookmark,
   areDocumentLocationsEqual,
+  createPageLocation,
+  createSemanticLocation,
+  validateDocumentLocation,
 } from '@/lib/document';
 import {
   getReaderStatus,
@@ -36,6 +39,9 @@ import {
   saveReaderSettings,
   type ReaderStatus,
 } from '@/lib/reader';
+import { getAnnotation } from '@/lib/annotation';
+import { useToast } from '@/components/ui/toast';
+
 
 export type SidebarTab = 'contents' | 'search' | 'bookmarks' | null;
 
@@ -106,6 +112,7 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
   const [mobileViewTab, setMobileViewTab] = useState<'reader' | 'canvas'>('reader');
   const [readerStatus, setReaderStatus] = useState<ReaderStatus | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toast = useToast();
 
   // Subscribe to session snapshot updates
   useEffect(() => {
@@ -149,17 +156,59 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
     const savedState = await getReaderState(itemId);
     const initialLocation = savedState?.location;
 
+    // Check for direct jump query parameters (?location= or ?annotationId=)
+    let targetLocation: DocumentLocation | undefined = undefined;
+
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const targetLocParam = urlParams.get('location');
+      const targetAnnId = urlParams.get('annotationId');
+
+      if (targetLocParam) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(targetLocParam));
+          targetLocation = validateDocumentLocation(parsed);
+        } catch {
+          toast.error('Invalid navigation target location');
+        }
+      } else if (targetAnnId) {
+        try {
+          const ann = await getAnnotation(itemId, targetAnnId);
+          if (ann) {
+            if (ann.sourceHash && ann.sourceHash !== source.sourceHash) {
+              toast.info('Document version changed since annotation was created');
+            }
+            if (ann.anchor.kind === 'pdf-text' || ann.anchor.kind === 'pdf-drawing') {
+              targetLocation = createPageLocation(source.sourceHash, ann.anchor.pageNumber);
+            } else if (ann.anchor.kind === 'reflowable-text') {
+              targetLocation = createSemanticLocation(source.sourceHash, {
+                cfi: ann.anchor.startCfi,
+                spineIndex: ann.anchor.spineIndex,
+              });
+            }
+          } else {
+            toast.info('Unable to locate annotation in document');
+          }
+        } catch {
+          toast.info('Unable to locate annotation in document');
+        }
+      }
+    }
+
+    const effectiveLocation = targetLocation || (
+      initialLocation && initialLocation.sourceHash === source.sourceHash
+        ? initialLocation
+        : undefined
+    );
+
     // Open session with container mount
     if (containerRef.current) {
       await session.open(source, {
         container: containerRef.current,
-        initialLocation:
-          initialLocation && initialLocation.sourceHash === source.sourceHash
-            ? initialLocation
-            : undefined,
+        initialLocation: effectiveLocation,
       });
     }
-  }, [itemId, source, session]);
+  }, [itemId, source, session, toast]);
 
   // Initialize session once container is attached
   useEffect(() => {

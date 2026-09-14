@@ -71,7 +71,7 @@ function nowUtc() {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createAnnotationStore({ databasePath, userDataRoot }) {
+export function createAnnotationStore({ databasePath, userDataRoot, searchStore = null }) {
   const db = new DatabaseSync(databasePath, { readOnly: false, allowExtension: false });
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(DDL_ANNOTATIONS);
@@ -172,6 +172,9 @@ export function createAnnotationStore({ databasePath, userDataRoot }) {
     }
 
     exportRecoveryFile(itemId);
+    if (searchStore) {
+      try { searchStore.indexAnnotation(created); } catch {}
+    }
     return created;
   }
 
@@ -211,6 +214,9 @@ export function createAnnotationStore({ databasePath, userDataRoot }) {
     }
 
     exportRecoveryFile(updated.itemId);
+    if (searchStore) {
+      try { searchStore.indexAnnotation(updated); } catch {}
+    }
     return updated;
   }
 
@@ -241,6 +247,9 @@ export function createAnnotationStore({ databasePath, userDataRoot }) {
     }
 
     exportRecoveryFile(itemId);
+    if (searchStore) {
+      try { searchStore.removeAnnotation(id); } catch {}
+    }
     return { ok: true };
   }
 
@@ -270,6 +279,9 @@ export function createAnnotationStore({ databasePath, userDataRoot }) {
     }
 
     exportRecoveryFile(restored.itemId);
+    if (searchStore) {
+      try { searchStore.indexAnnotation(restored); } catch {}
+    }
     return restored;
   }
 
@@ -306,6 +318,15 @@ export function createAnnotationStore({ databasePath, userDataRoot }) {
     // Export per unique itemId
     const itemIds = [...new Set(items.map((p) => p.itemId))];
     for (const iid of itemIds) exportRecoveryFile(iid);
+
+    if (searchStore) {
+      for (const id of created) {
+        try {
+          const row = db.prepare('SELECT * FROM annotations WHERE id=?').get(id);
+          if (row) searchStore.indexAnnotation(rowToAnnotation(row));
+        } catch {}
+      }
+    }
 
     return { ok: true, count: created.length, ids: created };
   }

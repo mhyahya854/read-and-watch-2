@@ -119,7 +119,7 @@ function sha256Buffer(buffer) {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createCanvasStore({ databasePath, userDataRoot }) {
+export function createCanvasStore({ databasePath, userDataRoot, searchStore = null }) {
   const db = new DatabaseSync(databasePath, { readOnly: false, allowExtension: false });
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(DDL_CANVASES);
@@ -351,6 +351,9 @@ export function createCanvasStore({ databasePath, userDataRoot }) {
     };
 
     saveDocumentFile(doc);
+    if (searchStore) {
+      try { searchStore.indexCanvas(doc.canvasId); } catch {}
+    }
     return doc;
   }
 
@@ -430,6 +433,9 @@ export function createCanvasStore({ databasePath, userDataRoot }) {
     };
 
     saveDocumentFile(doc);
+    if (searchStore) {
+      try { searchStore.indexCanvas(doc.canvasId); } catch {}
+    }
     return doc;
   }
 
@@ -471,6 +477,10 @@ export function createCanvasStore({ databasePath, userDataRoot }) {
       doc.revision = updatedMeta.revision;
       doc.updatedAt = updatedMeta.updatedAt;
       saveDocumentFile(doc);
+    }
+
+    if (searchStore) {
+      try { searchStore.indexCanvas(canvasId); } catch {}
     }
 
     return updatedMeta;
@@ -515,6 +525,10 @@ export function createCanvasStore({ databasePath, userDataRoot }) {
       saveDocumentFile(doc);
     }
 
+    if (searchStore) {
+      try { searchStore.removeCanvas(canvasId); } catch {}
+    }
+
     return { ok: true, metadata: updatedMeta };
   }
 
@@ -554,6 +568,10 @@ export function createCanvasStore({ databasePath, userDataRoot }) {
       doc.revision = updatedMeta.revision;
       doc.updatedAt = now;
       saveDocumentFile(doc);
+    }
+
+    if (searchStore) {
+      try { searchStore.indexCanvas(canvasId); } catch {}
     }
 
     return updatedMeta;

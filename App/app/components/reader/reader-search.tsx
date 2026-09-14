@@ -129,7 +129,10 @@ export function ReaderSearch() {
         </div>
 
         {hasSearched && !isSearching && (
-          <div className="flex items-center justify-between mt-2 px-1 text-[11px] text-muted-foreground">
+          <output
+            className="flex items-center justify-between mt-2 px-1 text-[11px] text-muted-foreground"
+            aria-live="polite"
+          >
             <span>
               {results.length === 1 ? '1 match found' : `${results.length} matches found`}
             </span>
@@ -138,12 +141,12 @@ export function ReaderSearch() {
                 {results.length}
               </Badge>
             )}
-          </div>
+          </output>
         )}
       </form>
 
       {/* Results List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <section className="flex-1 overflow-y-auto p-2 space-y-1" aria-label="Search results">
         {isSearching && (
           <div className="p-6 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
             <Loader2 size={16} className="animate-spin text-primary" />
@@ -161,27 +164,53 @@ export function ReaderSearch() {
         )}
 
         {!isSearching &&
-          results.map((result, index) => (
-            <button
-              type="button"
-              key={result.id || `res-${index}`}
-              onClick={() => handleSelectResult(result)}
-              className="w-full text-left p-2.5 text-xs rounded border border-transparent hover:border-border hover:bg-surface-muted transition-all group"
-            >
-              <div className="flex items-center justify-between text-[11px] font-medium text-foreground/90 group-hover:text-primary mb-1">
-                <span>Result {index + 1}</span>
-                {result.location.kind === 'page' && (
-                  <span className="text-[10px] font-mono text-muted-foreground">
-                    Page {(result.location.payload as { pageNumber: number }).pageNumber}
-                  </span>
-                )}
-              </div>
-              <p className="text-muted-foreground line-clamp-2 italic text-[11px] leading-relaxed">
-                {result.snippet}
-              </p>
-            </button>
-          ))}
-      </div>
+          results.map((result, index) => {
+            const pageNum = result.location.kind === 'page'
+              ? (result.location.payload as { pageNumber?: number }).pageNumber
+              : undefined;
+            const semanticPayload = result.location.kind === 'semantic'
+              ? (result.location.payload as { title?: string; spineIndex?: number })
+              : undefined;
+            const progPayload = result.location.kind === 'progression'
+              ? (result.location.payload as { label?: string; fraction?: number })
+              : undefined;
+
+            return (
+              <button
+                type="button"
+                key={result.id || `res-${index}`}
+                onClick={() => handleSelectResult(result)}
+                className="w-full text-left p-2.5 text-xs rounded border border-transparent hover:border-border hover:bg-surface-muted transition-all group"
+              >
+                <div className="flex items-center justify-between text-[11px] font-medium text-foreground/90 group-hover:text-primary mb-1">
+                  <span>Result {index + 1}</span>
+                  {pageNum !== undefined && (
+                    <span className="text-[10px] font-mono text-muted-foreground">
+                      Page {pageNum}
+                    </span>
+                  )}
+                  {semanticPayload && (
+                    <span className="text-[10px] font-mono text-muted-foreground">
+                      {semanticPayload.title ||
+                        (semanticPayload.spineIndex !== undefined
+                          ? `Section ${semanticPayload.spineIndex + 1}`
+                          : 'Section')}
+                    </span>
+                  )}
+                  {progPayload && (
+                    <span className="text-[10px] font-mono text-muted-foreground">
+                      {progPayload.label ||
+                        `${Math.round((progPayload.fraction ?? 0) * 100)}%`}
+                    </span>
+                  )}
+                </div>
+                <p className="text-muted-foreground line-clamp-2 italic text-[11px] leading-relaxed">
+                  {result.snippet}
+                </p>
+              </button>
+            );
+          })}
+      </section>
     </div>
   );
 }

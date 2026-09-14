@@ -13,3 +13,4 @@ export * from './reader-settings-dialog';
 export * from './reader-viewport';
 export * from './reader-status';
 export * from './reader-shell';
+export * from './reader-selection-menu';

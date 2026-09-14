@@ -127,6 +127,7 @@ export function createReaderStore({
   readerExecutable: _readerExecutable,
   userDataRoot,
   launchReader: _launchReader = () => {},
+  searchStore = null,
 }) {
   const userRoot = userDataRoot
     ? resolve(userDataRoot)
@@ -304,6 +305,9 @@ export function createReaderStore({
     };
     const updated = [newBookmark, ...list.filter((b) => b.id !== id)];
     writeAtomic(target, JSON.stringify(updated, null, 2));
+    if (searchStore) {
+      try { searchStore.indexBookmark(itemId, newBookmark); } catch {}
+    }
     return newBookmark;
   }
 
@@ -316,6 +320,9 @@ export function createReaderStore({
     const list = getBookmarks(itemId);
     const updated = list.filter((b) => b.id !== bookmarkId);
     writeAtomic(target, JSON.stringify(updated, null, 2));
+    if (searchStore) {
+      try { searchStore.removeBookmark(itemId, bookmarkId); } catch {}
+    }
     return { ok: true, count: updated.length };
   }
 

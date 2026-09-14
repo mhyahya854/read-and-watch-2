@@ -6,3 +6,4 @@
 export * from './types.ts';
 export * from './validation.ts';
 export * from './history.ts';
+export * from './client.ts';
