@@ -71,6 +71,21 @@ PaddleOCR-VL is the primary candidate; Tesseract is a validator; Urdu/Nastaliq s
 
 ## Tauri
 
-Relationship: `PROVISIONAL FUTURE DESKTOP CANDIDATE`
+Relationship: `EVALUATED - NOT ADOPTED (DESKTOP SHELL CANDIDATE)`
 
-Phase 14 evaluates Windows packaging, secure chooser and filesystem bridge, associations, open-with behavior, local processes, persistence, installation/update, and alternatives. React remains the UI; no Rust UI is planned.
+Evaluated extensively in Phase 14 (`docs/project/DESKTOP_SHELL_EVALUATION.md`) against Electron, Neutralinojs, Wails, and NW.js across 33 architectural criteria. Rejected because Read & Watch's architecture relies on 8 Node.js ESM server stores (`node:sqlite` with FTS5, file-first atomic mirrors, `pdf-lib`). Adopting Tauri would have mandated either rewriting all 8 server stores into Rust (violating prompt constraints) or running a separate Node.js child-process daemon (re-introducing child process failure modes).
+
+## Electron
+
+Relationship: `ADOPTED DESKTOP SHELL (PINNED PACKAGE)`
+
+Pinned exact package: `electron@35.7.5` (MIT). Bundled with Node.js 22.16.0 LTS (matching project Node >=22.13.0) and Chromium 134. Official upstream: `https://github.com/electron/electron`.
+Capabilities: Native Windows desktop integration, single-instance lock (`app.requestSingleInstanceLock`), file associations, OS file/directory pickers, secure sandboxed context bridge (`contextIsolation: true`, `nodeIntegration: false`), loopback HTTP service.
+Zero child processes or sidecar daemons: Node.js server stores run directly inside the privileged Electron main process.
+
+## electron-builder
+
+Relationship: `ADOPTED DESKTOP PACKAGING TOOL (PINNED PACKAGE)`
+
+Pinned exact package: `electron-builder@26.15.3` (MIT). Official upstream: `https://github.com/electron-userland/electron-builder`.
+Capabilities: Produces NSIS per-user Windows installer (`Read & Watch Setup 0.1.0.exe`) and standalone portable executable (`Read & Watch 0.1.0.exe`). Configured with `deleteAppDataOnUninstall: false` for strict data preservation across reinstall cycles. Builds strictly to Git-ignored `dist-electron/`.

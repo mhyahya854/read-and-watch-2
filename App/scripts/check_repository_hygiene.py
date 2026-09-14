@@ -24,6 +24,7 @@ FORBIDDEN_PREFIXES = (
     "App/import/staging/",
     "App/app/node_modules/",
     "App/app/dist/",
+    "App/app/dist-electron/",
     "App/app/.vite/",
     "App/app/.vinext/",
     "App/app/.wrangler/",

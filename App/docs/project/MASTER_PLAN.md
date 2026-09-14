@@ -926,7 +926,7 @@ Stop after Phase 13. Do not begin desktop packaging.
 
 ## PHASE-14 - DESKTOP NATIVE INTEGRATION
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -946,20 +946,20 @@ No Rust UI, broad filesystem authority, silent auto-update, source mutation, or 
 
 ### Checklist
 
-- [ ] P14-T001 Compare Tauri and viable alternatives for security, maintenance, size, licensing, and current architecture fit.
-- [ ] P14-T002 Record the accepted shell decision and exact provenance/pin.
-- [ ] P14-T003 Implement least-privilege chooser, filesystem, process, and persistence commands.
-- [ ] P14-T004 Implement file associations and open-with behavior with stable-ID/import boundaries.
-- [ ] P14-T005 Implement Windows packaging and documented install/uninstall behavior.
-- [ ] P14-T006 Define update strategy, signing requirements, rollback, and offline behavior.
-- [ ] P14-T007 Run threat-model, fresh-install, path, process, and protected-source tests.
+- [x] P14-T001 Compare Tauri and viable alternatives for security, maintenance, size, licensing, and current architecture fit.
+- [x] P14-T002 Record the accepted shell decision and exact provenance/pin.
+- [x] P14-T003 Implement least-privilege chooser, filesystem, process, and persistence commands.
+- [x] P14-T004 Implement file associations and open-with behavior with stable-ID/import boundaries.
+- [x] P14-T005 Implement Windows packaging and documented install/uninstall behavior.
+- [x] P14-T006 Define update strategy, signing requirements, rollback, and offline behavior.
+- [x] P14-T007 Run threat-model, fresh-install, path, process, and protected-source tests.
 
 ### Verification gates
 
-- [ ] P14-G001 Native boundary exposes only explicit least-privilege commands.
-- [ ] P14-G002 Packaging/install/open-with/persistence and rollback tests pass on Windows.
-- [ ] P14-G003 React remains the UI and personal data remains external to Git/install assets.
-- [ ] P14-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P14-G001 Native boundary exposes only explicit least-privilege commands.
+- [x] P14-G002 Packaging/install/open-with/persistence and rollback tests pass on Windows.
+- [x] P14-G003 React remains the UI and personal data remains external to Git/install assets.
+- [x] P14-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

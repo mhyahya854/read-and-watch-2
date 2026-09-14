@@ -5,11 +5,15 @@
   "engines": {
     "node": ">=22.13.0"
   },
+  "main": "electron/main.mjs",
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
-    "lint": "oxlint app components lib server vite.config.ts",
+    "desktop": "electron .",
+    "desktop:pack": "electron-builder --win --x64 --dir",
+    "package:win": "electron-builder --win --x64",
+    "lint": "oxlint app components lib server vite.config.ts && oxlint electron",
     "format": "oxfmt",
     "hygiene": "python ../scripts/check_repository_hygiene.py",
     "test": "node --test \"tests/*.test.mjs\""
@@ -36,6 +40,8 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.34",
+    "electron": "35.7.5",
+    "electron-builder": "26.15.3",
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
     "oxlint-tsgolint": "7.0.2001",
@@ -44,5 +50,81 @@
     "vite": "8.2.2",
     "wrangler": "4.127.1"
   },
-  "type": "module"
+  "type": "module",
+  "build": {
+    "appId": "com.readandwatch.app",
+    "productName": "Read & Watch",
+    "copyright": "Copyright © 2026 Read & Watch",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "server/**/*",
+      "package.json"
+    ],
+    "fileAssociations": [
+      {
+        "ext": "epub",
+        "name": "Electronic Publication",
+        "description": "Read & Watch EPUB Publication",
+        "role": "Viewer"
+      },
+      {
+        "ext": "pdf",
+        "name": "Portable Document Format",
+        "description": "Read & Watch PDF Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "mobi",
+        "name": "Mobipocket Document",
+        "description": "Read & Watch MOBI Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "azw",
+        "name": "Amazon Kindle Document",
+        "description": "Read & Watch AZW Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "azw3",
+        "name": "Amazon Kindle Format 8",
+        "description": "Read & Watch AZW3 Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "fb2",
+        "name": "FictionBook 2.0",
+        "description": "Read & Watch FB2 Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "fbz",
+        "name": "Compressed FictionBook",
+        "description": "Read & Watch FBZ Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "cbz",
+        "name": "Comic Book Archive",
+        "description": "Read & Watch CBZ Document",
+        "role": "Viewer"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
 }

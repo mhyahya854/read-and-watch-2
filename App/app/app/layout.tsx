@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/toast';
+import { DesktopOpenCoordinator } from '@/components/desktop/desktop-open-coordinator';
 
 export const metadata: Metadata = {
   title: 'Read & Watch | Local Library',
@@ -16,7 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <DesktopOpenCoordinator />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

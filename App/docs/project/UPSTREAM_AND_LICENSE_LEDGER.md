@@ -16,7 +16,9 @@ Verified against official upstream repository metadata on 2026-09-08. License co
 | PaddleOCR / PaddleOCR-VL | Deferred OCR candidate | `https://github.com/PaddlePaddle/PaddleOCR` | Apache-2.0 for repository code | No | Phase 17 must verify exact code, model, weight, and dataset terms separately |
 | Tesseract | Deferred OCR validator | `https://github.com/tesseract-ocr/tesseract` | Apache-2.0 | No | Phase 17/18 must verify engine and language-data licensing separately |
 | Urdu/Nastaliq specialist | Deferred benchmark candidate | TBD | UNKNOWN | No | No adoption until official source, license, model provenance, and benchmark evidence exist |
-| Tauri | Provisional desktop shell | `https://github.com/tauri-apps/tauri` | Apache-2.0 OR MIT per upstream license files | Indirectly present inside vendored Readest only | Phase 14 decision and exact-version pin required before direct adoption |
+| Tauri | Desktop candidate (EVALUATED - NOT ADOPTED) | `https://github.com/tauri-apps/tauri` | Apache-2.0 OR MIT per upstream license files | No | Evaluated extensively in Phase 14; rejected in favor of Electron due to Node.js ESM server store dependencies |
+| Electron | Adopted desktop shell | `https://github.com/electron/electron` | MIT | Yes, pinned package `electron@35.7.5` | Adopted in Phase 14 for Windows desktop native shell; sandboxed context bridge, loopback HTTP service, zero child processes |
+| electron-builder | Adopted desktop packaging tool | `https://github.com/electron-userland/electron-builder` | MIT | Yes, pinned package `electron-builder@26.15.3` | Adopted in Phase 14 for NSIS and portable Windows desktop packaging; builds to ignored `dist-electron/` |
 
 ## Provenance rules
 

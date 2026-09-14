@@ -384,3 +384,34 @@ Status: Accepted
 
 9. **Ordinary Notes Remain Untouched**: Standard reading notes, book summaries, and annotations are completely unmodified by Phase 13. The knowledge system is additive; it creates a separate `/knowledge` route and data domain without touching any existing reader, annotation, or notes functionality.
 
+## D-050 - Phase 14 Desktop Shell Selection: Electron with Least-Privilege Native Boundary
+
+Status: Accepted
+
+1. **Adoption of Electron 35.7.5 with Node 22.16.0 LTS (Outcome B)**:
+   Following an exhaustive 33-criterion desktop shell evaluation (`App/docs/project/DESKTOP_SHELL_EVALUATION.md`), Electron 35.7.5 (bundled with Node.js 22.16.0 LTS, Chromium 134, MIT) was adopted. This decision supersedes the provisional Tauri exploration because Read & Watch's architecture relies on 8 Node.js ESM server stores (`node:sqlite` with FTS5, file-first atomic mirrors, and `pdf-lib`). Adopting Tauri would have mandated either rewriting all 8 server stores into Rust (violating prompt constraints against rewriting server architecture into Rust) or running a separate Node.js child-process daemon (re-introducing the child-process failure modes that led to retiring Readest). Electron natively embeds Node.js in its privileged main process, delivering 100% architectural code reuse with zero child processes and zero dual-runtime drift.
+
+2. **Narrowest Least-Privilege Native Boundary**:
+   The Electron boundary is strictly sandboxed (`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`). The preload bridge exposes exactly 5 minimal APIs on `window.readWatchDesktop`:
+   - `chooseBookFiles(options)`: Native file picker restricted to supported publication extensions.
+   - `chooseDataRoot()`: Directory picker strictly rejecting Git repo paths, root directories, and system paths.
+   - `getAppPaths()`: Read-only query for canonical desktop path locations.
+   - `openExternalHttps(url)`: Validates `https://` protocol before delegating to OS browser.
+   - `onOpenFile(callback)` / `getPendingOpenFiles()` / `resolveOpenFile(filePath)`: Windows Open-With and single-instance event dispatching.
+   Generic `child_process.exec`, raw filesystem read/write APIs, and direct database access are strictly banned from renderer IPC.
+
+3. **Loopback-Only Embedded HTTP Service**:
+   The internal desktop server binds strictly to `127.0.0.1` on an ephemeral OS-assigned port with randomized security headers, disallowing external network traffic.
+
+4. **Native Windows File Associations & Single-Instance Lock**:
+   Uses Electron's built-in `app.requestSingleInstanceLock()` and `electron-builder` native file associations for 8 publication extensions (`.epub`, `.pdf`, `.mobi`, `.azw`, `.azw3`, `.fb2`, `.fbz`, `.cbz`). Subsequent launches focus the primary window and dispatch the file event to the renderer. Known books open immediately in the reader; unknown files trigger an explicit, non-destructive import dialog.
+
+5. **Windows Packaging & Safe Install Policy**:
+   Packaged with exact-pinned `electron-builder@26.15.3` (MIT). Produces an NSIS per-user installer (`Read & Watch Setup 0.1.0.exe`) and a standalone portable executable (`Read & Watch 0.1.0.exe`). Configured with `deleteAppDataOnUninstall: false` so that user catalogs, databases, annotations, and reading progress remain intact during uninstallation and reinstall.
+
+6. **Non-Silent Update & Rollback Protocol**:
+   Silent auto-updating is strictly prohibited. Desktop updates follow a manual, user-consented notification model. Rollback instructions and offline operation guarantees are formally documented.
+
+7. **Source Publication Immutability**:
+   Original publication files remain strictly read-only. File open operations, hash computations, and metadata extractions never write, alter, or convert source files in place. Verified 100% byte-identical across all 151 local books.
+

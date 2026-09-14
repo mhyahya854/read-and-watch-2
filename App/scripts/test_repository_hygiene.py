@@ -9,6 +9,7 @@ class RepositoryHygieneTests(unittest.TestCase):
             "Read/private.pdf",
             "App/library/catalog.json",
             "App/app/node_modules/pkg/index.js",
+            "App/app/dist-electron/ReadAndWatch-Setup.exe",
             "App/runtime/readest/bin/readest.exe",
             "recovery.bundle",
             "App/forks/readest/LICENSE",

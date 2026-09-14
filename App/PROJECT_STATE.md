@@ -4,11 +4,31 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-13` - Knowledge and Diagram System.
+Last completed phase: `PHASE-14` - Desktop Native Integration.
 
-Current actionable phase: `PHASE-14` - Desktop Native Integration (`NOT_STARTED`).
+Current actionable phase: `PHASE-15` - Modern Web Reader Upgrade (`NOT_STARTED`).
 
-Exact next task: `P14-T001` - desktop packaging framework evaluation and native boundaries.
+Exact next task: `P15-T001` - evaluate modern Web APIs for performance, rendering, and offline enhancements.
+
+Phase 14 implementation results:
+
+- Evaluated desktop shell candidates across 33 architectural criteria (`docs/project/DESKTOP_SHELL_EVALUATION.md`) and selected Outcome B: Electron 35.7.5 with Node.js 22.16.0 LTS (MIT) and electron-builder 26.15.3 (MIT).
+- Preserved 100% architectural reuse of all 8 server stores with zero child processes or sidecar daemons.
+- Implemented embedded loopback HTTP desktop service (`electron/desktop-service.mjs`) bound strictly to `127.0.0.1:0`.
+- Established hardened, sandboxed preload bridge (`electron/preload.mjs`) exposing exactly 5 safe APIs on `window.readWatchDesktop` (`chooseBookFiles`, `chooseDataRoot`, `getAppPaths`, `openExternalHttps`, `onOpenFile` / `getPendingOpenFiles` / `resolveOpenFile`).
+- Implemented single-instance lock (`app.requestSingleInstanceLock()`) and navigation security handlers in `electron/main.mjs`.
+- Configured native Windows file associations for 8 publication formats (`.epub`, `.pdf`, `.mobi`, `.azw`, `.azw3`, `.fb2`, `.fbz`, `.cbz`) and mounted `DesktopOpenCoordinator` in `app/layout.tsx`.
+- Produced NSIS installer (`Read & Watch Setup 0.1.0.exe`) and portable binary (`Read & Watch 0.1.0.exe`) with `deleteAppDataOnUninstall: false`.
+- Updated repository hygiene and gitignore to forbid `dist-electron/` and installer binaries from Git.
+- Authored canonical documentation: `docs/project/DESKTOP_SHELL_EVALUATION.md`, `docs/project/DESKTOP_NATIVE_BOUNDARY.md`, `docs/project/DESKTOP_INSTALL_AND_UPDATE.md`, and `docs/project/DESKTOP_THREAT_MODEL.md`.
+- Automated tests: **219/219 tests passing** across entire test suite (`npm test`), including 6 new boundary integration tests.
+- TypeScript compiler: **0 errors** (`npx tsc --noEmit`).
+- Linter: **0 warnings, 0 errors** (`npm run lint`).
+- Repository hygiene: **PASS** (`python scripts/check_repository_hygiene.py`).
+- Desktop review evidence: `READ_WATCH_DATA_ROOT/desktop-review/phase-14/` and `visual-review/phase-14/` (`manifest.json`, `REVIEW_INDEX.md`).
+- Source immutability: **151 local books 100% byte-identical**.
+- Recorded D-050 in `DECISIONS.md`.
+- Respected stop condition: stopped cleanly after Phase 14 closure without beginning Phase 15.
 
 Phase 13 implementation results:
 

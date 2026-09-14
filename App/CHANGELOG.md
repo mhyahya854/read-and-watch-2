@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-09-14 - Phase 14 desktop native integration
+
+- Executed exhaustive 33-criterion desktop shell evaluation matrix (`docs/project/DESKTOP_SHELL_EVALUATION.md`) comparing Electron, Tauri v2, Neutralinojs, Wails, and NW.js. Selected Outcome B (Adopt Electron 35.7.5) due to native Node.js 22.16.0 LTS embedding (`node:sqlite`, FTS5, file-first recovery mirrors, `pdf-lib`), delivering 100% architectural reuse of the 8 canonical application stores with zero child processes and zero dual-runtime drift.
+- Pinned exact dependencies in `package.json`: `electron@35.7.5` (MIT) and `electron-builder@26.15.3` (MIT). Pinned zero extraneous native plugins, relying on native platform capabilities (Ponytail compliance).
+- Authored canonical desktop architectural specifications:
+  - `docs/project/DESKTOP_SHELL_EVALUATION.md`: 33-criterion comparative analysis, trade-off matrix, and justification.
+  - `docs/project/DESKTOP_NATIVE_BOUNDARY.md`: Formal least-privilege boundary contract defining exactly 5 exposed IPC functions.
+  - `docs/project/DESKTOP_INSTALL_AND_UPDATE.md`: NSIS installer design, data preservation guarantees, non-silent update policy, and rollback procedures.
+  - `docs/project/DESKTOP_THREAT_MODEL.md`: Concrete threat analysis covering 10 abuse cases with preventive mitigations.
+- Implemented embedded desktop HTTP service (`electron/desktop-service.mjs`) binding strictly to `127.0.0.1:0` with random security token protection, serving client assets and directly executing canonical application stores in-process.
+- Implemented hardened preload script (`electron/preload.mjs`) with `contextIsolation: true` and `nodeIntegration: false`, exposing `window.readWatchDesktop`:
+  - `chooseBookFiles(options)`: OS file dialog restricted to supported publication formats.
+  - `chooseDataRoot()`: Directory picker rejecting Git repository, root, and system paths.
+  - `getAppPaths()`: Read-only query for system data locations.
+  - `openExternalHttps(url)`: Protocol-validated external link opener.
+  - `onOpenFile(callback)` / `getPendingOpenFiles()` / `resolveOpenFile(filePath)`: Windows Open-With and single-instance event dispatching.
+- Implemented main process window manager (`electron/main.mjs`) with single-instance locking (`app.requestSingleInstanceLock()`), protocol-guarded navigation handlers, and graceful store shutdown on quit.
+- Registered native Windows file associations for 8 publication formats (`.epub`, `.pdf`, `.mobi`, `.azw`, `.azw3`, `.fb2`, `.fbz`, `.cbz`) and mounted `DesktopOpenCoordinator` in `app/layout.tsx` for SHA-256 book matching and non-destructive external file dialogs.
+- Configured NSIS per-user packaging with `deleteAppDataOnUninstall: false`, ensuring user catalogs, databases, and annotations persist cleanly across uninstalls and upgrades.
+- Updated repository hygiene guards (`scripts/check_repository_hygiene.py`, `scripts/test_repository_hygiene.py`, `.gitignore`) to forbid `dist-electron/` and installer binaries from Git.
+- Added comprehensive automated test suite (`tests/desktop-native-boundary.test.mjs`) verifying boundary inventory, HTTPS URL validation, argument canonicalization, data root git protection, loopback HTTP dispatch, and source book immutability (219/219 test cases passing across suite).
+- Generated NSIS installer (`Read & Watch Setup 0.1.0.exe`) and portable executable (`Read & Watch 0.1.0.exe`) via `npm run package:win`, verifying packaging and recording SHA-256 checksums in external review directories.
+- Captured packaging and operational review evidence in `READ_WATCH_DATA_ROOT/desktop-review/phase-14/` and `visual-review/phase-14/` (`manifest.json`, `REVIEW_INDEX.md`).
+- Maintained 100% byte-identical source immutability across all 151 local books.
+- Recorded D-050 in `DECISIONS.md`; updated `docs/project/TECHNOLOGY_LEDGER.md` and `docs/project/UPSTREAM_AND_LICENSE_LEDGER.md`.
+- Respected stop condition: stopped cleanly after Phase 14 closure without beginning Phase 15.
+
 ## 2026-09-14 - Phase 13 knowledge and diagram system
 
 - Established calibrated 4-tier knowledge tool selection constitution (`docs/project/KNOWLEDGE_TOOL_SELECTION.md`): Native UI < Excalidraw < React Flow < Mermaid.
