@@ -5,7 +5,7 @@ export type DataPaths = {
   catalogPath: string;
   libraryDatabasePath: string;
   userDataRoot: string;
-  readerExecutable: string;
+  readerExecutable?: string | null;
 };
 
 export declare function resolveDataPaths(options: {

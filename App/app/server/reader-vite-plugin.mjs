@@ -42,9 +42,9 @@ async function readJson(request) {
 export function readerPlugin({
   libraryRoot,
   libraryDatabasePath,
-  readerExecutable,
+  readerExecutable = null,
   userDataRoot,
-}) {
+} = {}) {
   const store = createReaderStore({
     libraryRoot,
     libraryDatabasePath,
@@ -53,7 +53,7 @@ export function readerPlugin({
   });
 
   return {
-    name: 'local-readest-reader',
+    name: 'local-unified-reader',
     configureServer(server) {
       server.middlewares.use('/api/reader', async (request, response) => {
         try {

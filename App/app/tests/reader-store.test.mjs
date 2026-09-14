@@ -138,19 +138,15 @@ test('catalog traversal and absolute media paths are rejected', (t) => {
   }
 });
 
-test('supported readable file opens through the injected launcher', async (t) => {
-  const { store, launches, libraryRoot, readerExecutable } = setup(t, {
+test('supported readable file resolves to the unified reader route', async (t) => {
+  const { store } = setup(t, {
     files: { 'Read/Test-Book/media/test.epub': 'epub bytes' },
   });
   const opened = await store.open(READ_ID);
   assert.equal(opened.ok, true);
   assert.equal(opened.name, 'test.epub');
-  assert.deepEqual(launches, [
-    {
-      executable: readerExecutable,
-      source: join(libraryRoot, 'Read', 'Test-Book', 'media', 'test.epub'),
-    },
-  ]);
+  assert.equal(opened.format, 'EPUB');
+  assert.equal(opened.url, `/reader/${encodeURIComponent(READ_ID)}`);
 });
 
 test('unsupported format is reported safely and cannot launch', async (t) => {
@@ -165,7 +161,7 @@ test('unsupported format is reported safely and cannot launch', async (t) => {
       ],
     }),
   ];
-  const { store, launches } = setup(t, {
+  const { store } = setup(t, {
     items,
     files: { 'Read/Test-Book/media/preview.jpg': 'image bytes' },
   });
@@ -176,7 +172,6 @@ test('unsupported format is reported safely and cannot launch', async (t) => {
   ]);
   assert.equal('path' in status.unsupported[0], false);
   await assert.rejects(store.open(READ_ID), /No supported local book/);
-  assert.equal(launches.length, 0);
 });
 
 test('multiple readable candidates require an explicit opaque candidate ID', async (t) => {
@@ -196,7 +191,7 @@ test('multiple readable candidates require an explicit opaque candidate ID', asy
       ],
     }),
   ];
-  const { store, launches } = setup(t, {
+  const { store } = setup(t, {
     items,
     files: {
       'Read/Test-Book/media/one.epub': 'one',
@@ -207,10 +202,14 @@ test('multiple readable candidates require an explicit opaque candidate ID', asy
   assert.equal(status.state, 'multiple');
   assert.equal(status.candidates.length, 2);
   await assert.rejects(store.open(READ_ID), /Choose a book candidate/);
-  assert.equal(launches.length, 0);
-  await store.open(READ_ID, status.candidates[1].id);
-  assert.equal(launches.length, 1);
-  assert.match(launches[0].source, /two\.pdf$/);
+  const opened = await store.open(READ_ID, status.candidates[1].id);
+  assert.equal(opened.ok, true);
+  assert.equal(opened.name, 'two.pdf');
+  assert.equal(opened.format, 'PDF');
+  assert.equal(
+    opened.url,
+    `/reader/${encodeURIComponent(READ_ID)}?candidate=${encodeURIComponent(status.candidates[1].id)}`,
+  );
 });
 
 test('catalog-declared missing book is reported and cannot launch', async (t) => {

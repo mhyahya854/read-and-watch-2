@@ -1,7 +1,0 @@
-{
-  "private": true,
-  "license": "MIT",
-  "dependencies": {
-    "argparse": "^2.0.1"
-  }
-}

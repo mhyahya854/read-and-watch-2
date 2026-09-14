@@ -25,7 +25,6 @@ const {
   libraryRoot,
   libraryDatabasePath,
   userDataRoot,
-  readerExecutable,
 } = resolveDataPaths({ appRoot });
 
 const contentTypes: Record<string, string> = {
@@ -157,7 +156,6 @@ export default defineConfig(async () => {
       readerPlugin({
         libraryRoot,
         libraryDatabasePath,
-        readerExecutable,
         userDataRoot,
       }),
       vinext(),

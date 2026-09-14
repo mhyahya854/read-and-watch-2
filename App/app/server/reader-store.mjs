@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { spawn } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -114,19 +113,9 @@ function candidateId(itemId, mediaPath) {
     .slice(0, 24);
 }
 
-function defaultLaunchReader(executable, source) {
-  const child = spawn(executable, [source], {
-    cwd: dirname(executable),
-    detached: true,
-    stdio: 'ignore',
-    windowsHide: false,
-  });
-  child.unref();
-}
-
 function fileReady(path) {
   try {
-    return statSync(path).isFile();
+    return path ? statSync(path).isFile() : false;
   } catch {
     return false;
   }
@@ -135,9 +124,9 @@ function fileReady(path) {
 export function createReaderStore({
   libraryRoot,
   libraryDatabasePath,
-  readerExecutable,
+  readerExecutable: _readerExecutable,
   userDataRoot,
-  launchReader = defaultLaunchReader,
+  launchReader: _launchReader = () => {},
 }) {
   const userRoot = userDataRoot
     ? resolve(userDataRoot)
@@ -207,7 +196,7 @@ export function createReaderStore({
     else if (unsupported.length) state = 'unsupported';
     return {
       state,
-      readerReady: fileReady(readerExecutable),
+      readerReady: true,
       candidates: candidates.map(
         ({ source: _source, ...candidate }) => candidate,
       ),
@@ -226,10 +215,15 @@ export function createReaderStore({
       ? candidates.find(({ id }) => id === selectedCandidateId)
       : candidates[0];
     if (!candidate) fail('Unknown book candidate', 400);
-    if (!fileReady(readerExecutable))
-      fail('Readest runtime is not installed', 503);
-    launchReader(realpathSync(readerExecutable), candidate.source);
-    return { ok: true, name: candidate.name, format: candidate.format };
+    const url = `/reader/${encodeURIComponent(itemId)}${
+      selectedCandidateId ? `?candidate=${encodeURIComponent(selectedCandidateId)}` : ''
+    }`;
+    return {
+      ok: true,
+      name: candidate.name,
+      format: candidate.format,
+      url,
+    };
   }
 
   function getFile(itemId, selectedCandidateId) {

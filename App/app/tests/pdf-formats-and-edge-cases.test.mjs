@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import {
@@ -42,9 +43,8 @@ const SCAN_SOURCE = {
   title: 'Historical Document Scan.pdf',
 };
 
-const ALICE_PATH = resolve(
-  process.cwd(),
-  '../forks/readest/apps/readest-app/src/__tests__/fixtures/data/sample-alice.pdf'
+const ALICE_PATH = fileURLToPath(
+  new URL('./fixtures/pdf/sample-alice.pdf', import.meta.url)
 );
 const ALICE_BYTES = new Uint8Array(readFileSync(ALICE_PATH));
 

@@ -29,8 +29,7 @@ FORBIDDEN_PREFIXES = (
     "App/app/.wrangler/",
     "App/app/coverage/",
     "App/app/graphify-out/",
-    "App/forks/readest/node_modules/",
-    "App/forks/readest/target/",
+    "App/forks/readest/",
 )
 FORBIDDEN_EXACT = {
     ".gitattributes",
@@ -64,9 +63,9 @@ def path_violations(paths: list[str]) -> list[tuple[str, str]]:
             continue
         suffix = Path(normalized).suffix.casefold()
         if suffix in PRIVATE_BINARY_SUFFIXES and not lower.startswith(
-            "app/forks/readest/"
+            "app/app/tests/fixtures/"
         ):
-            violations.append((normalized, "private/archive binary outside vendored source"))
+            violations.append((normalized, "private/archive binary outside test fixtures"))
     return violations
 
 
@@ -75,8 +74,6 @@ def content_violations(repository_root: Path, paths: list[str]) -> list[tuple[st
     for path in paths:
         normalized = path.replace("\\", "/")
         if normalized == "App/scripts/check_repository_hygiene.py":
-            continue
-        if normalized.casefold().startswith("app/forks/readest/"):
             continue
         file = repository_root / Path(normalized)
         try:

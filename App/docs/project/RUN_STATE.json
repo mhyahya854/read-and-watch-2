@@ -4,16 +4,16 @@
   "canonical_remote": "mhyahya854/read-and-watch-2",
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
-  "current_phase_id": "PHASE-08",
+  "current_phase_id": "PHASE-09",
   "current_phase_status": "NOT_STARTED",
-  "current_task_id": "P08-T001",
-  "last_completed_phase_id": "PHASE-07",
-  "last_verified_local_head": "94aae776f8264aa53a8a8d70cae28e693d3cc0af",
-  "last_verified_remote_head": "94aae776f8264aa53a8a8d70cae28e693d3cc0af",
+  "current_task_id": "P09-T001",
+  "last_completed_phase_id": "PHASE-08",
+  "last_verified_local_head": "81a9276c190b4795b7093c55d175d0b73276fde7",
+  "last_verified_remote_head": "81a9276c190b4795b7093c55d175d0b73276fde7",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 07 Unified reader experience refresh; 828 nodes, 1703 edges, 60 communities, 0 import cycles; integrity clean",
-  "last_ponytail_status": "PASS: Phase 07 Unified reader experience complexity audit; zero new npm dependencies, native DOM/Web APIs, zero code bloat",
+  "last_graphify_status": "PASS: Phase 08 legacy Readest parity and retirement; 831 nodes, 1687 edges, 40 communities, 0 import cycles; integrity clean",
+  "last_ponytail_status": "PASS: Phase 08 legacy Readest retirement audit; 9,066 vendored files deleted, child_process.spawn eliminated, 0 new runtime dependencies",
   "active_blockers": [],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
@@ -33,5 +33,7 @@
   "phase_06_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_07_content_commit": "94aae776f8264aa53a8a8d70cae28e693d3cc0af",
   "phase_07_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "exact_next_action": "In a fresh invocation, start PHASE-08 P08-T001 for legacy Readest parity and retirement."
+  "phase_08_content_commit": "PENDING_CONTENT_COMMIT",
+  "phase_08_closure_commit": "SEE_LIVE_GIT_HEAD",
+  "exact_next_action": "In a fresh invocation, start PHASE-09 P09-T001 for unified annotation foundation."
 }

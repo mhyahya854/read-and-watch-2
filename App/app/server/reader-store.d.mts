@@ -27,12 +27,15 @@ export type ReaderStore = {
     ok: true;
     name: string;
     format: string;
+    url?: string;
   }>;
 };
 
 export declare function createReaderStore(options: {
   libraryRoot: string;
   libraryDatabasePath: string;
-  readerExecutable: string;
+  readerExecutable?: string | null;
+  userDataRoot?: string;
   launchReader?: (executable: string, source: string) => void | Promise<void>;
 }): ReaderStore;
+

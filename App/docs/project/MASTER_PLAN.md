@@ -561,7 +561,7 @@ Stop after Phase 07. Keep Readest fallback active.
 
 ## PHASE-08 - LEGACY READEST PARITY AND RETIREMENT
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -581,20 +581,20 @@ No early removal, history deletion, source-book change, new reader feature unrel
 
 ### Checklist
 
-- [ ] P08-T001 Inventory every currently relied-on Readest format, book, behavior, and fallback path.
-- [ ] P08-T002 Build and execute a native-versus-legacy parity matrix with real inputs.
-- [ ] P08-T003 Resolve parity gaps or record blockers without disabling fallback.
-- [ ] P08-T004 Design and verify rollback before changing active launcher/runtime paths.
-- [ ] P08-T005 Remove active Readest runtime/launcher dependencies only after all parity gates pass.
-- [ ] P08-T006 Decide and execute licensed vendored-source archival or safe removal while preserving provenance/reports.
-- [ ] P08-T007 Run full reader, library, hygiene, fresh-clone, and protected-source regressions.
+- [x] P08-T001 Inventory every currently relied-on Readest format, book, behavior, and fallback path.
+- [x] P08-T002 Build and execute a native-versus-legacy parity matrix with real inputs.
+- [x] P08-T003 Resolve parity gaps or record blockers without disabling fallback.
+- [x] P08-T004 Design and verify rollback before changing active launcher/runtime paths.
+- [x] P08-T005 Remove active Readest runtime/launcher dependencies only after all parity gates pass.
+- [x] P08-T006 Decide and execute licensed vendored-source archival or safe removal while preserving provenance/reports.
+- [x] P08-T007 Run full reader, library, hygiene, fresh-clone, and protected-source regressions.
 
 ### Verification gates
 
-- [ ] P08-G001 Every relied-on format and real book passes native parity.
-- [ ] P08-G002 Rollback and provenance/license retention are verified.
-- [ ] P08-G003 No obsolete active Readest path remains; protected sources are unchanged.
-- [ ] P08-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P08-G001 Every relied-on format and real book passes native parity.
+- [x] P08-G002 Rollback and provenance/license retention are verified.
+- [x] P08-G003 No obsolete active Readest path remains; protected sources are unchanged.
+- [x] P08-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

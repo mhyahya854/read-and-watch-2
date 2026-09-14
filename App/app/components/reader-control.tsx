@@ -1,13 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { BookOpen } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
   getReaderStatus,
-  openInReader,
-  type ReaderCandidate,
   type ReaderStatus,
 } from '@/lib/reader';
 
@@ -25,14 +24,12 @@ function statusMessage(status: ReaderStatus | null) {
     return 'No readable local book attached.';
   if (!status.readerReady) return 'The local reader is not installed.';
   if (status.state === 'multiple') return 'Choose which local book to open.';
-  return 'Opens in a separate local reader window.';
+  return 'Opens in the unified reader.';
 }
 
 export function ReaderControl({ itemId }: { itemId: string }) {
   const [status, setStatus] = useState<ReaderStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [openingId, setOpeningId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -48,25 +45,6 @@ export function ReaderControl({ itemId }: { itemId: string }) {
     return () => controller.abort();
   }, [itemId]);
 
-  async function open(candidate?: ReaderCandidate) {
-    const pendingId = candidate?.id ?? status?.candidates[0]?.id ?? 'single';
-    setOpeningId(pendingId);
-    setError(null);
-    setMessage(null);
-    try {
-      const result = await openInReader(itemId, candidate?.id);
-      setMessage(
-        `${result.name} opened in the local reader.`,
-      );
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : 'Could not open the reader',
-      );
-    } finally {
-      setOpeningId(null);
-    }
-  }
-
   const ready = status?.readerReady ?? false;
   const single = status?.state === 'available' ? status.candidates[0] : null;
 
@@ -75,39 +53,46 @@ export function ReaderControl({ itemId }: { itemId: string }) {
       {status?.state === 'multiple' ? (
         <div className="flex flex-wrap gap-2">
           {status.candidates.map((candidate) => (
-            <Button
+            <Link
               key={candidate.id}
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={!ready || openingId !== null}
-              onClick={() => open(candidate)}
+              href={`/reader/${encodeURIComponent(itemId)}?candidate=${encodeURIComponent(candidate.id)}`}
+              className={!ready ? 'pointer-events-none' : ''}
             >
-              <BookOpen />
-              {openingId === candidate.id
-                ? 'Opening...'
-                : `Open ${candidate.name} (${candidate.format})`}
-            </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={!ready}
+              >
+                <BookOpen />
+                {`Open ${candidate.name} (${candidate.format})`}
+              </Button>
+            </Link>
           ))}
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full justify-start"
-          disabled={!single || !ready || openingId !== null}
-          onClick={() => open()}
+        <Link
+          href={single && ready ? `/reader/${encodeURIComponent(itemId)}` : '#'}
+          className={!single || !ready ? 'pointer-events-none block' : 'block'}
         >
-          <BookOpen />
-          {openingId ? 'Opening...' : 'Open in Reader'}
-        </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full justify-start"
+            disabled={!single || !ready}
+          >
+            <BookOpen />
+            Open in Reader
+          </Button>
+        </Link>
       )}
       <p
         aria-live="polite"
         className={`text-[11px] ${error ? 'text-destructive' : 'text-muted-foreground'}`}
       >
-        {error ?? message ?? statusMessage(status)}
+        {error ?? statusMessage(status)}
       </p>
     </div>
   );
 }
+

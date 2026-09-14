@@ -4,11 +4,27 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-07` - Unified Reader Experience.
+Last completed phase: `PHASE-08` - Legacy Readest Parity and Retirement.
 
-Current actionable phase: `PHASE-08` - Legacy Readest Parity and Retirement (`NOT_STARTED`).
+Current actionable phase: `PHASE-09` - Unified Annotation Foundation (`NOT_STARTED`).
 
-Exact next task: `P08-T001` - audit legacy Readest feature parity and gap analysis.
+Exact next task: `P09-T001` - canonical annotation schema and storage model.
+
+Phase 08 implementation results:
+
+- Evaluated native-versus-legacy parity across all 151 real local publications (8 EPUBs, 143 PDFs) across 14 distinct reader behaviors (`BEH-01` through `BEH-14`); achieved 100% parity (747 parity matches, 1,208 native superior advantages, 0 parity gaps, 0 blocked items).
+- Verified rollback capability in an isolated worktree (`%TEMP%\rw-rollback`) at pre-retirement anchor commit `81a9276c190b4795b7093c55d175d0b73276fde7` with 97/97 tests passing prior to altering active launcher paths.
+- Retired the legacy Readest desktop launcher; completely eliminated `import { spawn } from 'node:child_process'` and all process launching logic from `reader-store.mjs`.
+- Updated `reader-control.tsx` to navigate directly to `/reader/:itemId` with query parameter preservation (`?candidate=:id`) for multiple-candidate books, removing obsolete launch states.
+- Safely removed `App/forks/readest/` (9,066 vendored files) from current Git HEAD, permanently resolving Windows `MAX_PATH` checkout failures caused by deep Android/Kotlin test directories and reducing tracked paths from 9,262 to 196.
+- Preserved complete upstream provenance, AGPL-3.0 license records, and Git recovery instructions in `App/docs/project/PROVENANCE_READEST.md`, `UPSTREAM_AND_LICENSE_LEDGER.md`, and `TECHNOLOGY_LEDGER.md`.
+- Decoupled PDF unit test fixtures by copying `sample-paper.pdf` and `sample-alice.pdf` to `App/app/tests/fixtures/pdf/`.
+- Added retirement enforcement test `App/app/tests/no-active-readest.test.mjs` verifying zero child process spawning, zero `forks/readest` imports, and null `readerExecutable` (100/100 tests passing).
+- Updated repository hygiene tooling (`check_repository_hygiene.py`, `test_repository_hygiene.py`) adding `App/forks/readest/` to `FORBIDDEN_PREFIXES`.
+- Re-verified source immutability: all 151 real local book files remained 100% byte-identical (0 hash changes).
+- Captured 18 visual review screenshots under `Read and Watch - Local Data/visual-review/phase-08/` with `manifest.json` and `REVIEW_INDEX.md`.
+- Completed Graphify audit (831 nodes, 1687 edges, 40 communities, 0 import cycles, zero reachability to Readest) and Ponytail audit (9,066 files deleted, 0 new runtime dependencies).
+
 
 Phase 07 implementation results:
 

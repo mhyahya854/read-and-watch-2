@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -21,9 +22,8 @@ const SAMPLE_SOURCE = {
   title: 'Geometry Principles.pdf',
 };
 
-const FIXTURE_PATH = resolve(
-  process.cwd(),
-  '../forks/readest/apps/readest-app/src/__tests__/fixtures/data/sample-paper.pdf'
+const FIXTURE_PATH = fileURLToPath(
+  new URL('./fixtures/pdf/sample-paper.pdf', import.meta.url)
 );
 
 test('PdfAdapter zoom controls clamp safely between MIN_PDF_ZOOM and MAX_PDF_ZOOM', async () => {

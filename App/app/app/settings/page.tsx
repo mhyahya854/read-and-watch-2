@@ -50,13 +50,13 @@ export default function SettingsPage() {
 
         <section className="space-y-3">
           <h2 className="font-editorial text-xl font-semibold text-foreground">
-            Reading &amp; Launcher
+            Reading
           </h2>
           <div className="rounded-md border border-border bg-surface">
             <dl className="divide-y divide-border text-sm">
               <div className="grid gap-1 px-5 py-3.5 sm:grid-cols-[12rem_1fr]">
-                <dt className="font-medium text-foreground">Reader bridge</dt>
-                <dd className="text-muted-foreground">Desktop launcher for verified local EPUB and PDF books</dd>
+                <dt className="font-medium text-foreground">Unified reader</dt>
+                <dd className="text-muted-foreground">Unified native reader for verified local EPUB and PDF publications</dd>
               </div>
               <div className="grid gap-1 px-5 py-3.5 sm:grid-cols-[12rem_1fr]">
                 <dt className="font-medium text-foreground">Source books</dt>

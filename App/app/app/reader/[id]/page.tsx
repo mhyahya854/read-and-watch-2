@@ -43,7 +43,16 @@ export default function ReaderPage({
         } else if (status.candidates.length === 0) {
           setError('No valid readable candidate attached to this item.');
         } else {
-          setSource(createSourceFromCandidate(itemId, status.candidates[0]));
+          let chosen = status.candidates[0];
+          if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const candId = params.get('candidate');
+            if (candId) {
+              const matched = status.candidates.find((c) => c.id === candId);
+              if (matched) chosen = matched;
+            }
+          }
+          setSource(createSourceFromCandidate(itemId, chosen));
         }
       })
       .catch((err: unknown) => {

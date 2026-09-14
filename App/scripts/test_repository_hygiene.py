@@ -11,6 +11,8 @@ class RepositoryHygieneTests(unittest.TestCase):
             "App/app/node_modules/pkg/index.js",
             "App/runtime/readest/bin/readest.exe",
             "recovery.bundle",
+            "App/forks/readest/LICENSE",
+            "App/forks/readest/apps/readest-app/src/__tests__/fixtures/data/sample-alice.epub",
         ]
         self.assertEqual(len(path_violations(paths)), len(paths))
 
@@ -18,8 +20,8 @@ class RepositoryHygieneTests(unittest.TestCase):
         paths = [
             "App/app/app/page.tsx",
             "App/import/scripts/import_library.py",
-            "App/forks/readest/LICENSE",
-            "App/forks/readest/apps/readest-app/src/__tests__/fixtures/data/sample-alice.epub",
+            "App/forks/foliate-js/package.json",
+            "App/app/tests/fixtures/pdf/sample-alice.pdf",
         ]
         self.assertEqual(path_violations(paths), [])
 

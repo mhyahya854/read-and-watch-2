@@ -22,10 +22,7 @@ test('external data paths derive from one configured root', () => {
     resolve(dataRoot, 'App/state/read-watch.sqlite3'),
   );
   assert.equal(paths.userDataRoot, resolve(dataRoot, 'App/user-data'));
-  assert.equal(
-    paths.readerExecutable,
-    resolve(dataRoot, 'App/runtime/readest/bin/readest.exe'),
-  );
+  assert.equal(paths.readerExecutable, null);
 });
 
 test('default data root is the repository sibling', () => {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import {
@@ -11,9 +12,8 @@ import {
   DocumentError,
 } from '../lib/document/index.ts';
 
-const FIXTURE_PATH = resolve(
-  process.cwd(),
-  '../forks/readest/apps/readest-app/src/__tests__/fixtures/data/sample-paper.pdf'
+const FIXTURE_PATH = fileURLToPath(
+  new URL('./fixtures/pdf/sample-paper.pdf', import.meta.url)
 );
 const FIXTURE_BYTES = new Uint8Array(readFileSync(FIXTURE_PATH));
 

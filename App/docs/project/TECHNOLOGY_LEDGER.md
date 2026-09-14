@@ -48,9 +48,9 @@ Use for flowcharts, sequence, ER, state, and other text-defined/generated techni
 
 ## Readest
 
-Relationship: `CERTIFIED LEGACY FALLBACK + FEATURE/ARCHITECTURE REFERENCE`
+Relationship: `RETIRED LEGACY FALLBACK + ARCHITECTURE REFERENCE (HISTORICAL)`
 
-Keep the verified reader integration, provenance, and fallback until Phase 08 parity passes. It is not the future UI, canonical reader, canonical annotation store, library manager, visual identity, or application shell.
+Retired in Phase 08 following 100% native parity verification across all 151 real local books. Upstream AGPL-3.0 provenance and commit history preserved at pre-retirement anchor `81a9276c190b4795b7093c55d175d0b73276fde7`. Active launcher and vendored source removed from HEAD per Decision D-044 and `docs/project/PROVENANCE_READEST.md`.
 
 ## Calibre
 

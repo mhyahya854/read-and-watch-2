@@ -24,12 +24,6 @@ export function resolveDataPaths({ appRoot, environment = process.env }) {
     catalogPath: resolve(dataAppRoot, 'library', 'catalog.json'),
     libraryDatabasePath: resolve(dataAppRoot, 'state', 'read-watch.sqlite3'),
     userDataRoot: resolve(dataAppRoot, 'user-data'),
-    readerExecutable: resolve(
-      dataAppRoot,
-      'runtime',
-      'readest',
-      'bin',
-      'readest.exe',
-    ),
+    readerExecutable: null,
   };
 }
