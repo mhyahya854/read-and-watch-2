@@ -348,3 +348,17 @@ Status: Accepted
 7. **Offline Selection Study Workflow**: Reader selection menu provides instant Copy, Append to Notes, Excerpt to Canvas, and offline-by-default Define/Translate extension hooks (`studyExtensions`). Operates 100% offline with zero external network or AI dependencies.
 8. **Source Document Immutability**: Source book files remain 100% byte-identical across all indexing, search, selection, and handoff operations.
 
+## D-048 - Phase 12 Export and Portability
+
+Status: Accepted
+
+1. **Canonical Runtime Truth vs Export Representations**: Canonical SQLite tables and atomic file-first recovery mirrors remain authoritative. Exports are strictly projections and representations; they never modify canonical runtime data or act as runtime truth.
+2. **Versioned Portable Schema Family (`PORTABILITY_SCHEMA_VERSION = 1`)**: Standardized canonical JSON packages (`read-watch.annotations`, `read-watch.notes`, `read-watch-canvas-export`, `read-watch.library-metadata`, `read-watch.backup`). All schemas declare version numbers, fail closed on unknown future versions, and reject directory traversal (`..`), absolute drive letters (`C:\`), and root paths (`/`).
+3. **Lossless Round-Trip Fidelity**: Full backup packages (`.rwbackup`) preserve 100% semantic identity, revision history, geometry rects, colors, deep links, and relationships across export/restore cycles.
+4. **Source Publication Immutability & Overwrite Refusal**: Original publication files (EPUB, PDF, and media assets) are never bundled in backups, never edited, and never overwritten. Exporting a derived PDF directly to the source path is rejected with an explicit refusal error. Pre- and post-export SHA-256 and filesystem `mtime` verification guarantees zero media mutation.
+5. **Exact-Pinned `pdf-lib@1.17.1` Restricted to Derivative PDF Export**: Pinned `pdf-lib@1.17.1` (MIT) solely for creating new derivative PDF files containing rendered highlights and comments summary pages. `pdf-lib` is strictly prohibited from serving as a reader or renderer.
+6. **Derived Search Index Exclusion from Backups**: Backups completely exclude derived SQLite FTS5 search index tables (`search_index_fts`, `search_index_records`, `search_index_meta`). Upon restore, `searchStore.rebuildIndex()` is automatically invoked to deterministically reconstruct the search index from restored canonical data.
+7. **Preflight Inspection & Conflict Handling**: Restores require preflight inspection reporting incoming counts (annotations, bookmarks, notes, canvases) and detecting conflicts (identical vs divergent). Users choose between `skip` (safe local preservation) and `overwrite` (update to backup revision).
+8. **Reflowable Annotation Portability Strategy**: Documented CFI and fuzzy quote context strategy with honest disclosure of why reflowable annotations cannot be "baked" into EPUB files without container mutation or layout instability.
+9. **Zero Telemetry, Zero Cloud**: 100% offline, local-first operation with standard HTML5 download triggers and zero cloud dependencies.
+

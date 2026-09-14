@@ -4,11 +4,36 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-11` - Search, Annotation Browser, and Study Workflow.
+Last completed phase: `PHASE-12` - Export and Portability.
 
-Current actionable phase: `PHASE-12` - Export and Portability (`NOT_STARTED`).
+Current actionable phase: `PHASE-13` - Knowledge and Diagram System (`NOT_STARTED`).
 
-Exact next task: `P12-T001` - canonical export schema and manifest design.
+Exact next task: `P13-T001` - canvas-first knowledge graph architecture and link schema.
+
+Phase 12 implementation results:
+
+- Established versioned portable schema family (`PORTABILITY_SCHEMA_VERSION = 1`) in `lib/portability/types.ts`: `read-watch.annotations`, `read-watch.notes`, `read-watch-canvas-export`, `read-watch.library-metadata`, `read-watch.backup`.
+- Implemented runtime validation, schema version guard, and security rules in `lib/portability/validation.ts` (rejection of directory traversal `..`, absolute drive letters, and root paths).
+- Authored canonical schema specifications and operational guides: `docs/project/PORTABLE_SCHEMAS.md`, `docs/project/BACKUP_AND_RESTORE.md`, and `docs/project/REFLOWABLE_ANNOTATION_PORTABILITY.md`.
+- Implemented core portability and export engine (`server/portability-store.mjs`):
+  - Annotation exports: machine-readable JSON with SHA-256 checksum and human-readable Markdown projection.
+  - Notes and Canvas exports: item thoughts, notes, canvas scenes, bidirectional deep links, and base64-encoded image assets.
+  - Library metadata export: standalone catalog records and item properties.
+  - Full unified backup bundle (`.rwbackup`): self-contained, lossless archive with cryptographic checksum manifests; original EPUB/PDF files are strictly excluded to preserve lean storage and avoid media mutation.
+  - Safe annotated-PDF derivative export using exact-pinned `pdf-lib@1.17.1` (MIT), drawing semi-transparent highlight rectangles and an editorial comments summary page. Enforces strict refusal guard against source path overwrites and verifies post-export byte-identical and mtime immutability.
+  - Restore engine with preflight inspection (`/api/portability/restore/preflight`), conflict breakdown (identical vs divergent), and flexible conflict resolution (`skip`, `overwrite`, `copy`).
+  - Automatic post-restore search index rebuild: derived SQLite FTS5 search tables are excluded from backups and deterministically reconstructed on restore via `searchStore.rebuildIndex()`.
+- Built user-facing Portability Settings panel (`components/settings/portability-settings.tsx`) mounted in `/settings` with Apple-style polish, backup download trigger, and preflight restore inspection dialog.
+- Added in-context export affordances in Reader Top Toolbar (`components/reader/reader-toolbar.tsx`) and Study Browser (`components/study/study-browser.tsx`).
+- Automated tests: **173/173 tests passing** across entire test suite (`npm test`).
+- TypeScript compiler: **0 errors** (`npx tsc --noEmit`).
+- Linter: **0 warnings, 0 errors** (`npm run lint`).
+- Production build: **Successful** (`npm run build`).
+- Repository hygiene: **PASS** (`check_repository_hygiene.py`).
+- Project governance: **PASS** (`validate_project_state.py`).
+- Graphify audit: **PASS** (`PHASE_12_GRAPHIFY_AUDIT.md`).
+- Ponytail audit: **PASS** (`PHASE_12_PONYTAIL_AUDIT.md`).
+- Visual review: `READ_WATCH_DATA_ROOT/visual-review/phase-12/` (`REVIEW_INDEX.md`, `manifest.json`).
 
 Phase 11 implementation results:
 

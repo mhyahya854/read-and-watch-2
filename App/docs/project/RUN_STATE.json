@@ -4,16 +4,16 @@
   "canonical_remote": "mhyahya854/read-and-watch-2",
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
-  "current_phase_id": "PHASE-12",
+  "current_phase_id": "PHASE-13",
   "current_phase_status": "NOT_STARTED",
-  "current_task_id": "P12-T001",
-  "last_completed_phase_id": "PHASE-11",
-  "last_verified_local_head": "5869c697484c448c1d9f27977c7f4de756361052",
-  "last_verified_remote_head": "5869c697484c448c1d9f27977c7f4de756361052",
+  "current_task_id": "P13-T001",
+  "last_completed_phase_id": "PHASE-12",
+  "last_verified_local_head": "de57a28fcfa089d81d45ff2da650ff1b519a9dbf",
+  "last_verified_remote_head": "de57a28fcfa089d81d45ff2da650ff1b519a9dbf",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 11 search, annotation browser, and study workflow; 100% derived/rebuildable, 0 orphaned indexes, 0 cloud/AI",
-  "last_ponytail_status": "PASS: Phase 11 search, annotation browser, and study workflow; 0 new npm packages (node:sqlite FTS5), 0 query DSL bloat",
+  "last_graphify_status": "PASS: Phase 12 export and portability; 100% canonical-to-export derivation, 0 cycles, 0 source mutation, 0 unneeded archive bloat",
+  "last_ponytail_status": "PASS: Phase 12 export and portability; exact-pinned pdf-lib@1.17.1 (derivative only), 0 unneeded zip libs, 0 cloud sync bloat",
   "active_blockers": [],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
@@ -41,5 +41,7 @@
   "phase_10_closure_commit": "07bbcd38fd9f52ce2810a76a0cf984e6731cfce3",
   "phase_11_content_commit": "8c0c922",
   "phase_11_closure_commit": "5869c697484c448c1d9f27977c7f4de756361052",
-  "exact_next_action": "In a fresh invocation, start PHASE-12 P12-T001 for export and portability."
+  "phase_12_content_commit": "de57a28",
+  "phase_12_closure_commit": "SEE_LIVE_GIT_HEAD",
+  "exact_next_action": "In a fresh invocation, start PHASE-13 P13-T001 for knowledge and diagram system."
 }

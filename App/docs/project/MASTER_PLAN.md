@@ -805,7 +805,7 @@ Stop after Phase 11. Do not start portability work.
 
 ## PHASE-12 - EXPORT AND PORTABILITY
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -825,20 +825,20 @@ No overwrite-in-place, unsupported portability claim, PDF rendering via pdf-lib,
 
 ### Checklist
 
-- [ ] P12-T001 Specify versioned portable schemas and compatibility guarantees.
-- [ ] P12-T002 Implement annotation JSON and Markdown exports.
-- [ ] P12-T003 Implement notes and canvas exports with links/provenance.
-- [ ] P12-T004 Implement library metadata export and documented backup/restore workflow.
-- [ ] P12-T005 Implement safe annotated-PDF derivative export where verified suitable.
-- [ ] P12-T006 Decide and document reflowable annotation portability with limitations.
-- [ ] P12-T007 Implement import/restore validation, conflict handling, and round-trip tests.
+- [x] P12-T001 Specify versioned portable schemas and compatibility guarantees.
+- [x] P12-T002 Implement annotation JSON and Markdown exports.
+- [x] P12-T003 Implement notes and canvas exports with links/provenance.
+- [x] P12-T004 Implement library metadata export and documented backup/restore workflow.
+- [x] P12-T005 Implement safe annotated-PDF derivative export where verified suitable.
+- [x] P12-T006 Decide and document reflowable annotation portability with limitations.
+- [x] P12-T007 Implement import/restore validation, conflict handling, and round-trip tests.
 
 ### Verification gates
 
-- [ ] P12-G001 Export schemas validate and representative round trips preserve identity/content.
-- [ ] P12-G002 Derived PDFs open independently and originals remain unchanged.
-- [ ] P12-G003 Backup/restore and file-first recovery work from documented inputs.
-- [ ] P12-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P12-G001 Export schemas validate and representative round trips preserve identity/content.
+- [x] P12-G002 Derived PDFs open independently and originals remain unchanged.
+- [x] P12-G003 Backup/restore and file-first recovery work from documented inputs.
+- [x] P12-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

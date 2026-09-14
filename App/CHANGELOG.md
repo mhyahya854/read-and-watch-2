@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-09-14 - Phase 12 export and portability
+
+- Established versioned portable schema family (`PORTABILITY_SCHEMA_VERSION = 1`) in `lib/portability/types.ts`: `read-watch.annotations`, `read-watch.notes`, `read-watch-canvas-export`, `read-watch.library-metadata`, `read-watch.backup`.
+- Implemented runtime validation, schema version guard, and security rules in `lib/portability/validation.ts` (rejection of directory traversal `..`, absolute drive letters, and root paths).
+- Authored canonical schema specifications and operational guides: `docs/project/PORTABLE_SCHEMAS.md`, `docs/project/BACKUP_AND_RESTORE.md`, and `docs/project/REFLOWABLE_ANNOTATION_PORTABILITY.md`.
+- Implemented core portability and export engine (`server/portability-store.mjs`):
+  - Annotation exports: machine-readable JSON with SHA-256 checksum and human-readable Markdown projection.
+  - Notes and Canvas exports: item thoughts, notes, canvas scenes, bidirectional deep links, and base64-encoded image assets.
+  - Library metadata export: standalone catalog records and item properties.
+  - Full unified backup bundle (`.rwbackup`): self-contained, lossless archive with cryptographic checksum manifests; original EPUB/PDF files are strictly excluded to preserve lean storage and avoid media mutation.
+  - Safe annotated-PDF derivative export using exact-pinned `pdf-lib@1.17.1` (MIT), drawing semi-transparent highlight rectangles and an editorial comments summary page. Enforces strict refusal guard against source path overwrites and verifies post-export byte-identical and mtime immutability.
+  - Restore engine with preflight inspection (`/api/portability/restore/preflight`), conflict breakdown (identical vs divergent), and flexible conflict resolution (`skip`, `overwrite`, `copy`).
+  - Automatic post-restore search index rebuild: derived SQLite FTS5 search tables are excluded from backups and deterministically reconstructed on restore via `searchStore.rebuildIndex()`.
+- Built user-facing Portability Settings panel (`components/settings/portability-settings.tsx`) mounted in `/settings` with Apple-style polish, backup download trigger, and preflight restore inspection dialog.
+- Added in-context export affordances in Reader Top Toolbar (`components/reader/reader-toolbar.tsx`) and Study Browser (`components/study/study-browser.tsx`).
+- Added 6 comprehensive automated tests in `tests/portability-store.test.mjs` verifying schema validation, annotation export, canvas export, backup bundle generation, safe PDF derivative export with source immutability, and complete round-trip restoration (173/173 total test cases passing across suite).
+- Maintained 100% source book immutability across all local publications.
+- Recorded D-048 in `DECISIONS.md`, passed Graphify and Ponytail audits (`PHASE_12_GRAPHIFY_AUDIT.md`, `PHASE_12_PONYTAIL_AUDIT.md`).
+- Captured visual review operational evidence in `READ_WATCH_DATA_ROOT/visual-review/phase-12/` (`REVIEW_INDEX.md`, `manifest.json`).
+
 ## 2026-09-14 - Phase 11 search, annotation browser, and study workflow
 
 - Implemented derived, rebuildable SQLite FTS5 search index (`server/search-store.mjs`) managing `search_index_fts` with `unicode61 remove_diacritics 0`, `search_index_records`, and `search_index_meta` (zero new external npm dependencies, 100% offline).
