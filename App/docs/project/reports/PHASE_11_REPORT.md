@@ -5,7 +5,7 @@
 **Status:** `COMPLETE`  
 **Completion Date:** 2026-09-14  
 **Content Commit:** `8c0c922` — Build Phase 11 search, annotation browser, and study workflow  
-**Closure Commit:** `SEE_LIVE_GIT_HEAD` — Close Phase 11 search, annotation browser, and study workflow  
+**Closure Commit:** `5869c69` — Close Phase 11 search, annotation browser, and study workflow  
 **Primary Verification Artifacts:**
 - Unit & Integration Test Suites: `tests/search-store.test.mjs`, `tests/book-local-search.test.mjs`, `tests/study-workflow.test.mjs` (167 total test cases passing across suite)
 - Visual Review Artifacts: `READ_WATCH_DATA_ROOT/visual-review/phase-11/` (`REVIEW_INDEX.md`, `manifest.json`)
