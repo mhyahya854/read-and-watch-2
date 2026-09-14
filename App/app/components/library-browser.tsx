@@ -11,9 +11,10 @@ import {
   Columns3,
   Highlighter,
   LibraryBig,
-  Network,
+  PenTool,
   Search,
   Settings,
+  Workflow,
 } from 'lucide-react';
 
 import { ItemDetail } from '@/components/item-detail';
@@ -413,7 +414,8 @@ export function LibraryBrowser({
           <nav aria-label="Workspace" className="space-y-1 text-sm">
             {[
               ['/highlights', 'Highlights', Highlighter],
-              ['/canvas-notes', 'Canvas Notes', Network],
+              ['/knowledge', 'Knowledge & Diagrams', Workflow],
+              ['/canvas-notes', 'Canvas Notes', PenTool],
               ['/settings', 'Settings', Settings],
             ].map(([href, label, Icon]) => (
               <Link

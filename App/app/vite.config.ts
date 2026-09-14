@@ -16,6 +16,7 @@ import { userDataPlugin } from './server/user-data-vite-plugin.mjs';
 import { searchPlugin } from './server/search-vite-plugin.mjs';
 import { createSearchStore } from './server/search-store.mjs';
 import { portabilityPlugin } from './server/portability-vite-plugin.mjs';
+import { knowledgePlugin } from './server/knowledge-vite-plugin.mjs';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
@@ -171,6 +172,11 @@ export default defineConfig(async () => {
       portabilityPlugin({
         libraryDatabasePath,
         libraryRoot,
+        userDataRoot,
+        searchStore,
+      }),
+      knowledgePlugin({
+        libraryDatabasePath,
         userDataRoot,
         searchStore,
       }),

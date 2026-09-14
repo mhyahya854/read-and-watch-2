@@ -248,11 +248,13 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
   // -------------------------------------------------------------------------
 
   /** List canvas metadata records. */
-  function listCanvases({ itemId = null, includeDeleted = false } = {}) {
+  function listCanvases({ itemId = null, standaloneOnly = false, includeDeleted = false } = {}) {
     let sql = 'SELECT * FROM canvases WHERE 1=1';
     const params = [];
 
-    if (itemId !== null && itemId !== undefined) {
+    if (standaloneOnly) {
+      sql += ' AND item_id IS NULL';
+    } else if (itemId !== null && itemId !== undefined) {
       sql += ' AND item_id = ?';
       params.push(itemId);
     }

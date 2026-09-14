@@ -15,6 +15,7 @@
 import type { Annotation } from '../annotation/types.ts';
 import type { Bookmark } from '../document/bookmark.ts';
 import type { ReadWatchCanvasDocument } from '../canvas/types.ts';
+import type { KnowledgeGraphDocument, MermaidDocument } from '../knowledge/types.ts';
 
 export const PORTABILITY_SCHEMA_VERSION = 1 as const;
 
@@ -28,6 +29,8 @@ export const PORTABLE_FORMATS = {
   CANVAS: 'read-watch-canvas-export', // Reuses Phase 10 .rwcanvas format
   LIBRARY_METADATA: 'read-watch.library-metadata',
   BACKUP: 'read-watch.backup',
+  KNOWLEDGE_GRAPH: 'read-watch.knowledge-graph',
+  MERMAID_DIAGRAM: 'read-watch.mermaid-diagram',
 } as const;
 
 export type PortableFormatId =
@@ -173,12 +176,15 @@ export interface BackupManifest {
     readonly notes: number;
     readonly canvases: number;
     readonly canvasAssets: number;
+    readonly knowledgeGraphs?: number;
+    readonly mermaidDocuments?: number;
   };
   readonly checksums: {
     readonly librarySha256: string;
     readonly annotationsSha256: string;
     readonly notesSha256: string;
     readonly canvasesSha256: string;
+    readonly knowledgeSha256?: string;
   };
 }
 
@@ -191,6 +197,10 @@ export interface BackupPackage extends BaseExportEnvelope {
   readonly annotations: AnnotationsExportPackage;
   readonly notes: NotesExportPackage;
   readonly canvases: ReadonlyArray<CanvasExportPackage>;
+  readonly knowledge?: {
+    readonly graphs: ReadonlyArray<KnowledgeGraphDocument>;
+    readonly diagrams: ReadonlyArray<MermaidDocument>;
+  };
   readonly checksumSha256?: string;
 }
 
@@ -206,7 +216,7 @@ export type ConflictKind =
   | 'UNSUPPORTED_VERSION';
 
 export interface RestoreConflict {
-  readonly entityType: 'item' | 'annotation' | 'bookmark' | 'note' | 'canvas';
+  readonly entityType: 'item' | 'annotation' | 'bookmark' | 'note' | 'canvas' | 'knowledge-graph' | 'mermaid-diagram';
   readonly entityId: string;
   readonly kind: ConflictKind;
   readonly message: string;

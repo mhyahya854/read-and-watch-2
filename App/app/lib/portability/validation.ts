@@ -277,3 +277,34 @@ export function validateBackupPackage(obj: unknown): BackupPackage {
 
   return record as unknown as BackupPackage;
 }
+
+/** Validate Knowledge Graph Package. */
+export function validateKnowledgeGraphPackage(obj: unknown): Record<string, unknown> {
+  const base = validateBaseEnvelope(obj);
+  if (base.format !== PORTABLE_FORMATS.KNOWLEDGE_GRAPH) {
+    throw new PortabilityValidationError(
+      `Expected format ${PORTABLE_FORMATS.KNOWLEDGE_GRAPH}, got ${base.format}`,
+    );
+  }
+  const record = obj as Record<string, unknown>;
+  if (!record.graph || typeof record.graph !== 'object') {
+    throw new PortabilityValidationError('Knowledge graph package missing graph object');
+  }
+  return record;
+}
+
+/** Validate Mermaid Diagram Package. */
+export function validateMermaidDiagramPackage(obj: unknown): Record<string, unknown> {
+  const base = validateBaseEnvelope(obj);
+  if (base.format !== PORTABLE_FORMATS.MERMAID_DIAGRAM) {
+    throw new PortabilityValidationError(
+      `Expected format ${PORTABLE_FORMATS.MERMAID_DIAGRAM}, got ${base.format}`,
+    );
+  }
+  const record = obj as Record<string, unknown>;
+  if (!record.diagram || typeof record.diagram !== 'object') {
+    throw new PortabilityValidationError('Mermaid diagram package missing diagram object');
+  }
+  return record;
+}
+

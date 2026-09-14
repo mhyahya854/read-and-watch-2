@@ -5,8 +5,9 @@ import {
   Clapperboard,
   Highlighter,
   LibraryBig,
-  Network,
+  PenTool,
   Settings,
+  Workflow,
 } from 'lucide-react';
 
 export function StaticProductPage({
@@ -60,7 +61,8 @@ export function StaticProductPage({
               ['/?collection=read', 'Read', BookOpen],
               ['/?collection=watch', 'Watch', Clapperboard],
               ['/highlights', 'Highlights', Highlighter],
-              ['/canvas-notes', 'Canvas Notes', Network],
+              ['/knowledge', 'Knowledge & Diagrams', Workflow],
+              ['/canvas-notes', 'Canvas Notes', PenTool],
               ['/settings', 'Settings', Settings],
             ].map(([href, label, Icon]) => (
               <Link

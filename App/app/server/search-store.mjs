@@ -197,6 +197,8 @@ export function createSearchStore({
         bookmarks: 0,
         canvases: 0,
         notes: 0,
+        graphs: 0,
+        diagrams: 0,
         total: 0,
       };
 
@@ -562,6 +564,95 @@ export function createSearchStore({
         }
       } catch {
         // notes table optional
+      }
+
+      // 6. Index Knowledge Graphs
+      try {
+        const graphs = db.prepare("SELECT * FROM knowledge_graphs WHERE deleted_at_utc IS NULL").all();
+        for (const g of graphs) {
+          const nodes = db.prepare("SELECT label, notes FROM knowledge_nodes WHERE graph_id = ? AND deleted_at_utc IS NULL").all(g.id);
+          const nodeTexts = nodes.map((n) => `${n.label} ${n.notes}`).join(' ');
+          const fullText = [g.title, g.description, nodeTexts].filter(Boolean).join(' ');
+          const target = {
+            type: 'knowledge-graph',
+            graphId: g.id,
+          };
+
+          insertRecord.run(
+            g.id,
+            'knowledge',
+            'graph',
+            null,
+            null,
+            g.title,
+            `${nodes.length} concepts`,
+            (g.description || nodeTexts).slice(0, 200),
+            JSON.stringify(target),
+            null,
+            g.updated_at_utc,
+            g.created_at_utc,
+          );
+
+          insertFts.run(
+            g.id,
+            'knowledge',
+            'graph',
+            null,
+            g.title,
+            'Concept Graph',
+            fullText,
+            `knowledge graph concept ${g.title}`,
+          );
+
+          counts.graphs++;
+          counts.total++;
+        }
+      } catch {
+        // knowledge_graphs table optional
+      }
+
+      // 7. Index Mermaid Diagrams
+      try {
+        const diagrams = db.prepare("SELECT * FROM mermaid_documents WHERE deleted_at_utc IS NULL").all();
+        for (const d of diagrams) {
+          const bookTitle = d.associated_item_id ? (itemBookTitleMap.get(d.associated_item_id) || '') : '';
+          const fullText = [d.title, d.description, d.source_text].filter(Boolean).join(' ');
+          const target = {
+            type: 'mermaid-diagram',
+            diagramId: d.id,
+          };
+
+          insertRecord.run(
+            d.id,
+            'diagram',
+            d.diagram_type,
+            d.associated_item_id || null,
+            bookTitle,
+            d.title,
+            d.diagram_type,
+            (d.description || d.source_text).slice(0, 200),
+            JSON.stringify(target),
+            null,
+            d.updated_at_utc,
+            d.created_at_utc,
+          );
+
+          insertFts.run(
+            d.id,
+            'diagram',
+            d.diagram_type,
+            d.associated_item_id || null,
+            d.title,
+            d.diagram_type,
+            fullText,
+            `diagram mermaid ${d.diagram_type} ${bookTitle}`,
+          );
+
+          counts.diagrams++;
+          counts.total++;
+        }
+      } catch {
+        // mermaid_documents table optional
       }
 
       // Commit transaction

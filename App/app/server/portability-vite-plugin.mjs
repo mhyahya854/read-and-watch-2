@@ -21,6 +21,7 @@ import { createAnnotationStore } from './annotation-store.mjs';
 import { createReaderStore } from './reader-store.mjs';
 import { createUserDataStore } from './user-data-store.mjs';
 import { createCanvasStore } from './canvas-store.mjs';
+import { createKnowledgeStore } from './knowledge-store.mjs';
 import { createPortabilityStore } from './portability-store.mjs';
 
 function sendJson(res, statusCode, data) {
@@ -73,6 +74,7 @@ export function portabilityPlugin({
     readerStore: createReaderStore({ libraryRoot, libraryDatabasePath, userDataRoot, searchStore }),
     userDataStore: createUserDataStore({ userDataRoot, libraryDatabasePath, searchStore }),
     canvasStore: createCanvasStore({ databasePath: libraryDatabasePath, userDataRoot, searchStore }),
+    knowledgeStore: createKnowledgeStore({ databasePath: libraryDatabasePath, userDataRoot, searchStore }),
     searchStore,
   });
 
@@ -124,6 +126,20 @@ export function portabilityPlugin({
           if (parts.length === 2 && parts[0] === 'canvases' && req.method === 'GET') {
             const canvasId = decodeURIComponent(parts[1]);
             const data = store.exportCanvasPackage(canvasId);
+            return sendJson(res, 200, data);
+          }
+
+          // GET /api/portability/knowledge/graphs/:id
+          if (parts.length === 3 && parts[0] === 'knowledge' && parts[1] === 'graphs' && req.method === 'GET') {
+            const graphId = decodeURIComponent(parts[2]);
+            const data = store.exportKnowledgeGraph(graphId);
+            return sendJson(res, 200, data);
+          }
+
+          // GET /api/portability/knowledge/diagrams/:id
+          if (parts.length === 3 && parts[0] === 'knowledge' && parts[1] === 'diagrams' && req.method === 'GET') {
+            const diagramId = decodeURIComponent(parts[2]);
+            const data = store.exportMermaidDiagram(diagramId);
             return sendJson(res, 200, data);
           }
 

@@ -39,15 +39,15 @@ Pinned exact package: `@excalidraw/excalidraw@0.18.1` (MIT). Bundled fonts (Virg
 
 ## React Flow / xyflow
 
-Relationship: `STRUCTURED GRAPH TOOL, ONLY WHEN IT MATTERS`
+Relationship: `STRUCTURED GRAPH TOOL, ONLY WHEN IT MATTERS (PINNED PACKAGE)`
 
-Use for semantic node-edge structures, knowledge graphs, meaningful cross-book relationships, and topology-dependent workflows. Do not use for handwriting, basic drawings, ordinary notes, or every diagram.
+Pinned exact package: `@xyflow/react@12.11.6` (MIT). Official upstream: `https://github.com/xyflow/xyflow`. Role: Structured semantic topology, concept maps, argument structures, and cross-book relationship graphs in Phase 13. Strict boundaries: React Flow is strictly a transient client-side visual projection. Read & Watch owns canonical graph schema in SQLite (`knowledge_graphs`, `knowledge_nodes`, `knowledge_edges`) and atomic file-first recovery mirrors. Not used for freehand drawing, writing primary long-form text notes, or replacing ordinary bookmark lists.
 
 ## Mermaid
 
-Relationship: `TEXT-DEFINED DIAGRAM TOOL`
+Relationship: `TEXT-DEFINED DIAGRAM TOOL (PINNED PACKAGE)`
 
-Use for flowcharts, sequence, ER, state, and other text-defined/generated technical diagrams. Do not use as a handwriting, freeform canvas, page annotation, or universal diagram editor.
+Pinned exact package: `mermaid@12.0.0` (MIT). Official upstream: `https://github.com/mermaid-js/mermaid`. Role: Text-defined diagrams (flowcharts, sequence diagrams, state machines, class diagrams, ER diagrams) in Phase 13. Strict boundaries: Source text is canonical. Rendered SVG is disposable and derived client-side. Rendered strictly with `securityLevel: 'strict'`. Zero loose mode, zero inline script evaluation, zero remote network calls; 100% offline. Not used as a freehand canvas or universal note editor.
 
 ## Readest
 

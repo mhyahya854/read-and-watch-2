@@ -86,6 +86,7 @@ export function createPortabilityStore({
   userDataStore,
   canvasStore,
   searchStore = null,
+  knowledgeStore = null,
 }) {
 
   // -------------------------------------------------------------------------
@@ -408,6 +409,14 @@ export function createPortabilityStore({
     const notesSha = sha256String(JSON.stringify(notesPkg.notes));
     const canvasesSha = sha256String(JSON.stringify(canvasesList));
 
+    const knowledgeGraphs = knowledgeStore
+      ? knowledgeStore.listGraphs().map((g) => knowledgeStore.getGraph(g.id))
+      : [];
+    const mermaidDiagrams = knowledgeStore ? knowledgeStore.listDiagrams() : [];
+    const knowledgeSha = sha256String(
+      JSON.stringify({ graphs: knowledgeGraphs, diagrams: mermaidDiagrams }),
+    );
+
     const totalCanvasAssets = canvasesList.reduce(
       (sum, c) => sum + (c.document?.assets?.length || 0),
       0,
@@ -440,18 +449,25 @@ export function createPortabilityStore({
           notes: notesPkg.notes.length,
           canvases: canvasesList.length,
           canvasAssets: totalCanvasAssets,
+          knowledgeGraphs: knowledgeGraphs.length,
+          mermaidDocuments: mermaidDiagrams.length,
         },
         checksums: {
           librarySha256: librarySha,
           annotationsSha256: annotationsSha,
           notesSha256: notesSha,
           canvasesSha256: canvasesSha,
+          knowledgeSha256: knowledgeSha,
         },
       },
       library: libraryPkg,
       annotations: annotationsPkg,
       notes: notesPkg,
       canvases: canvasesList,
+      knowledge: {
+        graphs: knowledgeGraphs,
+        diagrams: mermaidDiagrams,
+      },
     };
 
     bundle.checksumSha256 = sha256String(JSON.stringify(bundle.manifest));
@@ -862,6 +878,44 @@ export function createPortabilityStore({
       }
     }
 
+    // Check knowledge graph and diagram conflicts
+    if (knowledgeStore && validated.knowledge) {
+      if (Array.isArray(validated.knowledge.graphs)) {
+        for (const g of validated.knowledge.graphs) {
+          try {
+            const existing = knowledgeStore.getGraph(g.id);
+            if (existing) {
+              conflicts.push({
+                entityType: 'knowledge-graph',
+                entityId: g.id,
+                kind: existing.revision === g.revision ? 'IDENTICAL' : 'CONFLICT_DIVERGENT',
+                message: `Knowledge graph ${g.id} (${g.title}) already exists locally.`,
+                currentRevision: existing.revision,
+                incomingRevision: g.revision,
+              });
+            }
+          } catch {}
+        }
+      }
+      if (Array.isArray(validated.knowledge.diagrams)) {
+        for (const d of validated.knowledge.diagrams) {
+          try {
+            const existing = knowledgeStore.getDiagram(d.id);
+            if (existing) {
+              conflicts.push({
+                entityType: 'mermaid-diagram',
+                entityId: d.id,
+                kind: existing.revision === d.revision ? 'IDENTICAL' : 'CONFLICT_DIVERGENT',
+                message: `Mermaid diagram ${d.id} (${d.title}) already exists locally.`,
+                currentRevision: existing.revision,
+                incomingRevision: d.revision,
+              });
+            }
+          } catch {}
+        }
+      }
+    }
+
     return {
       canRestore: true,
       schemaVersion: validated.schemaVersion,
@@ -873,6 +927,8 @@ export function createPortabilityStore({
         incomingBookmarks: (validated.annotations.bookmarks || []).length,
         incomingNotes: validated.notes.notes.length,
         incomingCanvases: validated.canvases.length,
+        incomingKnowledgeGraphs: validated.knowledge?.graphs?.length || 0,
+        incomingMermaidDocuments: validated.knowledge?.diagrams?.length || 0,
       },
       conflicts,
       warnings,
@@ -888,6 +944,8 @@ export function createPortabilityStore({
       bookmarks: 0,
       notes: 0,
       canvases: 0,
+      knowledgeGraphs: 0,
+      mermaidDocuments: 0,
     };
     const skippedCounts = {
       items: 0,
@@ -895,6 +953,8 @@ export function createPortabilityStore({
       bookmarks: 0,
       notes: 0,
       canvases: 0,
+      knowledgeGraphs: 0,
+      mermaidDocuments: 0,
     };
 
     // 1. Restore Annotations
@@ -999,7 +1059,75 @@ export function createPortabilityStore({
       }
     }
 
-    // 5. Post-Restore Search Rebuild (derived index is NEVER restored from backup)
+    // 5. Restore Knowledge (Graphs & Diagrams)
+    if (knowledgeStore && validated.knowledge) {
+      if (Array.isArray(validated.knowledge.graphs)) {
+        for (const g of validated.knowledge.graphs) {
+          try {
+            let existing = null;
+            try {
+              existing = knowledgeStore.getGraph(g.id);
+            } catch {}
+
+            if (existing) {
+              if (conflictResolution === 'skip' || (existing.revision >= g.revision && conflictResolution !== 'overwrite')) {
+                skippedCounts.knowledgeGraphs++;
+              } else if (conflictResolution === 'overwrite') {
+                knowledgeStore.saveGraphDocument(g.id, {
+                  title: g.title,
+                  description: g.description,
+                  tags: g.tags,
+                  nodes: g.nodes,
+                  edges: g.edges,
+                  expectedRevision: existing.revision,
+                });
+                restoredCounts.knowledgeGraphs++;
+              }
+            } else {
+              knowledgeStore.createGraph(g);
+              restoredCounts.knowledgeGraphs++;
+            }
+          } catch {
+            skippedCounts.knowledgeGraphs++;
+          }
+        }
+      }
+
+      if (Array.isArray(validated.knowledge.diagrams)) {
+        for (const d of validated.knowledge.diagrams) {
+          try {
+            let existing = null;
+            try {
+              existing = knowledgeStore.getDiagram(d.id);
+            } catch {}
+
+            if (existing) {
+              if (conflictResolution === 'skip' || (existing.revision >= d.revision && conflictResolution !== 'overwrite')) {
+                skippedCounts.mermaidDocuments++;
+              } else if (conflictResolution === 'overwrite') {
+                knowledgeStore.updateDiagram(d.id, {
+                  title: d.title,
+                  description: d.description,
+                  diagramType: d.diagramType,
+                  sourceText: d.sourceText,
+                  tags: d.tags,
+                  associatedItemId: d.associatedItemId,
+                  expectedRevision: existing.revision,
+                });
+                restoredCounts.mermaidDocuments++;
+              }
+            } else {
+              knowledgeStore.createDiagram(d);
+              restoredCounts.mermaidDocuments++;
+            }
+          } catch {
+            skippedCounts.mermaidDocuments++;
+          }
+        }
+      }
+    }
+
+    // 6. Post-Restore Search Rebuild (derived index is NEVER restored from backup)
     let searchRebuilt = false;
     if (searchStore) {
       try {
@@ -1023,6 +1151,30 @@ export function createPortabilityStore({
     };
   }
 
+  function exportKnowledgeGraph(graphId) {
+    if (!knowledgeStore) throw new Error('Knowledge store not available');
+    const doc = knowledgeStore.getGraph(graphId);
+    return {
+      schemaVersion: PORTABILITY_SCHEMA_VERSION,
+      format: PORTABLE_FORMATS.KNOWLEDGE_GRAPH,
+      exportedAt: nowUtc(),
+      app: { name: 'Read & Watch', version: '0.1.0' },
+      graph: doc,
+    };
+  }
+
+  function exportMermaidDiagram(diagramId) {
+    if (!knowledgeStore) throw new Error('Knowledge store not available');
+    const doc = knowledgeStore.getDiagram(diagramId);
+    return {
+      schemaVersion: PORTABILITY_SCHEMA_VERSION,
+      format: PORTABLE_FORMATS.MERMAID_DIAGRAM,
+      exportedAt: nowUtc(),
+      app: { name: 'Read & Watch', version: '0.1.0' },
+      diagram: doc,
+    };
+  }
+
   return {
     exportAnnotationsJson,
     exportAnnotationsMarkdown,
@@ -1032,6 +1184,8 @@ export function createPortabilityStore({
     exportLibraryMetadata,
     createBackupBundle,
     exportAnnotatedPdf,
+    exportKnowledgeGraph,
+    exportMermaidDiagram,
     preflightRestore,
     applyRestore,
   };
