@@ -305,3 +305,18 @@ Status: Accepted
 5. **Tracked Provenance Retention**: Established `docs/project/PROVENANCE_READEST.md` recording official upstream identity (`https://github.com/readest/readest`), pinned commit `6df90139dc7b72246572ab33b12d485b281ca6e6`, AGPL-3.0 copyleft terms, historical role, and exact Git recovery procedures. Updated `UPSTREAM_AND_LICENSE_LEDGER.md` and `TECHNOLOGY_LEDGER.md` marking Readest as retired.
 6. **Automated Retirement Enforcement**: Introduced `tests/no-active-readest.test.mjs` to continuously enforce zero child process spawning, zero `forks/readest` imports, and null `readerExecutable`. Added `App/forks/readest/` to `FORBIDDEN_PREFIXES` in repository hygiene tooling.
 7. **Source Document Immutability Preserved**: Verified that all 151 real local book files remained 100% byte-identical (0 hash changes, 0 timestamp modifications) throughout parity testing and retirement.
+
+## D-045 - Phase 09 Unified Annotation Foundation
+
+Status: Accepted
+
+1. **Single Canonical Store**: SQLite (`read-watch.sqlite3`) is the canonical annotation store. External JSON (`user-data/items/:itemId/annotations.json`) is a crash-recovery mirror only. No LocalStorage, engine memory, or secondary SQLite is canonical.
+2. **Engine-Independent Anchors**: All anchor types (`pdf-text`, `pdf-drawing`, `reflowable-text`) store only Read & Watch-owned data. No PDF.js or Foliate-JS internal objects appear in the canonical model.
+3. **Normalized Coordinates**: PDF anchors use page-normalized `[0..1]` fractional coordinates. These are zoom- and orthogonal-rotation-invariant. Display transforms are a render-time concern of the UI layer.
+4. **CFI Anchors for Reflowable**: Reflowable books use EPUB CFI ranges (`startCfi`, `endCfi`) plus `spineIndex`, `quote`, and `prefix`/`suffix` context for fuzzy re-resolution. CFI is inherently font-size and layout-invariant.
+5. **Optimistic Concurrency**: All update and delete operations require `expectedRevision`. Mismatch returns HTTP 409 Conflict. Revision increments on every mutation.
+6. **Soft Delete Only**: Annotations are never hard-deleted in the normal path. Soft delete sets `deleted_at_utc` and `lifecycle = 'soft-deleted'`. Hard purge is a future maintenance operation not in scope for Phase 09.
+7. **File-First Recovery**: Every write atomically exports a full JSON mirror via `writeFileSync` + `renameSync`. This mirror is the crash-recovery input if the SQLite DB is damaged or reset.
+8. **surfaceMarkup PDF-Only**: The `surfaceMarkup` capability (pen, line, arrow, rectangle, ellipse, text-box) is present only in `STANDARD_PDF_CAPABILITIES`. Reflowable books explicitly exclude this capability — freehand geometry cannot survive dynamic reflow.
+9. **Named Bookmarks via Phase 07 Model**: The existing `Bookmark` model (Phase 07) with its `label` field satisfies the named bookmark requirement. No duplicate annotation store for bookmarks.
+10. **Zero New Dependencies**: Phase 09 uses only Node.js built-ins (`node:sqlite`, `node:crypto`, `node:fs`, `node:path`). No new npm packages added.

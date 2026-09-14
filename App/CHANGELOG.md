@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-09-14 - Phase 09 unified annotation foundation
+
+- Implemented unified Read & Watch annotation system covering all 13 annotation types across PDF (text marks + vector drawing) and reflowable books (text marks only).
+- Added `lib/annotation/types.ts`: `ANNOTATION_SCHEMA_VERSION = 1`, `Annotation` record with `schemaVersion`, stable UUID `id`, `itemId`, `assetId`, `kind`, `anchor`, `content`, `style`, `sourceHash`, `revision`, `lifecycle`, `createdAt`, `updatedAt`, `deletedAt`.
+- Added `lib/annotation/validation.ts`: strict validation of all anchor kinds, content payloads, normalized bounds `[0..1]`, lifecycle states, and schema version.
+- Added `lib/annotation/history.ts`: `AnnotationHistory` bounded at 50 entries with `undo()`, `redo()`, `push()`, and `clear()`.
+- Added `server/annotation-store.mjs`: SQLite persistence via `BEGIN IMMEDIATE` transactions; optimistic concurrency (revision mismatch → 409); soft delete; restore; batch create; source hash mismatch detection; atomic file-first crash-recovery mirror to `user-data/items/:itemId/annotations.json`.
+- Extended `lib/document/capabilities.ts` with `textAnnotations` (all engines) and `surfaceMarkup` (PDF only — reflowable explicitly disabled because freehand geometry cannot survive dynamic reflow).
+- Added 8 annotation API routes to `server/reader-vite-plugin.mjs`: GET list, POST create, POST batch, PUT update, DELETE soft-delete, PATCH restore, GET hash-check, POST recover.
+- PDF anchors (`pdf-text`): normalized page-relative bounding rects `[0..1]`, zoom- and orthogonal-rotation-invariant, 1-based `pageNumber`, `quote`, `prefix`, `suffix`, `sourceHash`.
+- PDF drawing anchors (`pdf-drawing`): normalized page-relative `points` and `bounds`, `[0..1]`-invariant, supports all 7 drawing sub-kinds (pen, highlighter, line, arrow, rectangle, ellipse, text-box).
+- Reflowable anchors (`reflowable-text`): `startCfi`, `endCfi`, `spineIndex`, `quote`, `prefix`, `suffix`, `sourceHash` — inherently font-size and layout-invariant.
+- Named bookmarks use Phase 07 `Bookmark` model with existing `label` field — no duplicate annotation store.
+- Added 36 new tests (20 anchor + 16 transaction/recovery) — total suite: 136/136 pass.
+- Source immutability verified: all 151 real local books remain 100% byte-identical (0 hash changes, 0 mtime modifications).
+- Graphify audit: PASS — 0 engine leakage, 0 import cycles (`PHASE_09_GRAPHIFY_AUDIT.md`).
+- Ponytail audit: PASS — 0 new runtime dependencies (`PHASE_09_PONYTAIL_AUDIT.md`).
+- Recorded D-045 in `DECISIONS.md`.
+
 ## 2026-09-14 - Phase 08 legacy Readest parity and retirement
 
 - Evaluated native-versus-legacy parity across all 151 real local publications (8 EPUBs, 143 PDFs) across 14 distinct reader behaviors (`BEH-01` through `BEH-14`); achieved 100% parity (747 parity matches, 1,208 native superior advantages, 0 parity gaps, 0 blocked items).

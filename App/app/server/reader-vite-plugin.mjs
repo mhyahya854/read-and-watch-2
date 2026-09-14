@@ -2,8 +2,9 @@ import { createReadStream, existsSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createReaderStore } from './reader-store.mjs';
+import { createAnnotationStore } from './annotation-store.mjs';
 
-const MAX_BODY_BYTES = 16 * 1024;
+const MAX_BODY_BYTES = 256 * 1024; // 256 KB — sufficient for annotation batch payloads
 const FORMAT_MIME_TYPES = {
   EPUB: 'application/epub+zip',
   MOBI: 'application/x-mobipocket-ebook',
@@ -49,6 +50,11 @@ export function readerPlugin({
     libraryRoot,
     libraryDatabasePath,
     readerExecutable,
+    userDataRoot,
+  });
+
+  const annotationStore = createAnnotationStore({
+    databasePath: libraryDatabasePath,
     userDataRoot,
   });
 
@@ -228,6 +234,143 @@ export function readerPlugin({
           if (parts.length === 1 && parts[0] === 'settings' && request.method === 'PUT') {
             const body = await readJson(request);
             return sendJson(response, 200, store.saveSettings(body));
+          }
+
+          // -------------------------------------------------------------------
+          // Annotations — GET list
+          // GET /api/reader/items/:id/annotations
+          // -------------------------------------------------------------------
+          if (
+            parts.length === 3 &&
+            parts[0] === 'items' &&
+            parts[2] === 'annotations' &&
+            request.method === 'GET'
+          ) {
+            const itemId = decodeURIComponent(parts[1]);
+            const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
+            return sendJson(response, 200, annotationStore.getAnnotations(itemId, { includeDeleted }));
+          }
+
+          // -------------------------------------------------------------------
+          // Annotations — POST create
+          // POST /api/reader/items/:id/annotations
+          // -------------------------------------------------------------------
+          if (
+            parts.length === 3 &&
+            parts[0] === 'items' &&
+            parts[2] === 'annotations' &&
+            request.method === 'POST'
+          ) {
+            const itemId = decodeURIComponent(parts[1]);
+            const body = await readJson(request);
+            body.itemId = itemId;
+            const created = annotationStore.createAnnotation(body);
+            return sendJson(response, 201, created);
+          }
+
+          // -------------------------------------------------------------------
+          // Annotations — batch create
+          // POST /api/reader/items/:id/annotations/batch
+          // -------------------------------------------------------------------
+          if (
+            parts.length === 4 &&
+            parts[0] === 'items' &&
+            parts[2] === 'annotations' &&
+            parts[3] === 'batch' &&
+            request.method === 'POST'
+          ) {
+            const body = await readJson(request);
+            return sendJson(response, 201, annotationStore.batchCreateAnnotations(body.items ?? body));
+          }
+
+          // -------------------------------------------------------------------
+          // Annotations — PUT update single
+          // PUT /api/reader/items/:id/annotations/:annotationId
+          // -------------------------------------------------------------------
+          if (
+            parts.length === 4 &&
+            parts[0] === 'items' &&
+            parts[2] === 'annotations' &&
+            request.method === 'PUT'
+          ) {
+            const annotationId = decodeURIComponent(parts[3]);
+            const body = await readJson(request);
+            const updated = annotationStore.updateAnnotation(
+              annotationId,
+              body,
+              typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+            );
+            return sendJson(response, 200, updated);
+          }
+
+          // -------------------------------------------------------------------
+          // Annotations — DELETE (soft)
+          // DELETE /api/reader/items/:id/annotations/:annotationId
+          // -------------------------------------------------------------------
+          if (
+            parts.length === 4 &&
+            parts[0] === 'items' &&
+            parts[2] === 'annotations' &&
+            request.method === 'DELETE'
+          ) {
+            const annotationId = decodeURIComponent(parts[3]);
+            const body = await readJson(request);
+            const result = annotationStore.deleteAnnotation(
+              annotationId,
+              typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+            );
+            return sendJson(response, 200, result);
+          }
+
+          // -------------------------------------------------------------------
+          // Annotations — PATCH restore (un-delete)
+          // PATCH /api/reader/items/:id/annotations/:annotationId/restore
+          // -------------------------------------------------------------------
+          if (
+            parts.length === 5 &&
+            parts[0] === 'items' &&
+            parts[2] === 'annotations' &&
+            parts[4] === 'restore' &&
+            request.method === 'PATCH'
+          ) {
+            const annotationId = decodeURIComponent(parts[3]);
+            const body = await readJson(request);
+            const restored = annotationStore.restoreAnnotation(
+              annotationId,
+              typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined,
+            );
+            return sendJson(response, 200, restored);
+          }
+
+          // -------------------------------------------------------------------
+          // Annotations — source hash mismatch check
+          // GET /api/reader/items/:id/annotations/hash-check?sourceHash=<sha256>
+          // -------------------------------------------------------------------
+          if (
+            parts.length === 4 &&
+            parts[0] === 'items' &&
+            parts[2] === 'annotations' &&
+            parts[3] === 'hash-check' &&
+            request.method === 'GET'
+          ) {
+            const itemId = decodeURIComponent(parts[1]);
+            const sourceHash = url.searchParams.get('sourceHash') || '';
+            return sendJson(response, 200, annotationStore.checkSourceHashMismatches(itemId, sourceHash));
+          }
+
+          // -------------------------------------------------------------------
+          // Annotations — crash recovery from external file
+          // POST /api/reader/items/:id/annotations/recover
+          // -------------------------------------------------------------------
+          if (
+            parts.length === 4 &&
+            parts[0] === 'items' &&
+            parts[2] === 'annotations' &&
+            parts[3] === 'recover' &&
+            request.method === 'POST'
+          ) {
+            const itemId = decodeURIComponent(parts[1]);
+            return sendJson(response, 200, annotationStore.recoverFromExternalFile(itemId));
           }
 
           return sendJson(response, 404, { error: 'Reader route not found' });

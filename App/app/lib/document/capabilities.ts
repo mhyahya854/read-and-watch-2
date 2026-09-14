@@ -18,7 +18,9 @@ export type DocumentCapability =
   | 'themeControls'
   | 'spreadLayout'
   | 'bookmarks'
-  | 'textExtraction';
+  | 'textExtraction'
+  | 'textAnnotations'   // highlights, underline, strike, comments, excerpts
+  | 'surfaceMarkup';    // pen, line, arrow, rectangle, ellipse, text-box — PDF only
 
 export type DocumentCapabilities = ReadonlySet<DocumentCapability>;
 
@@ -47,6 +49,8 @@ export const STANDARD_PDF_CAPABILITIES: DocumentCapabilities = createCapabilitie
   'spreadLayout',
   'bookmarks',
   'textExtraction',
+  'textAnnotations',
+  'surfaceMarkup',
 ]);
 
 /** Standard baseline capability set typical of reflowable document engines (e.g. Foliate-JS) */
@@ -61,4 +65,6 @@ export const STANDARD_REFLOWABLE_CAPABILITIES: DocumentCapabilities = createCapa
   'themeControls',
   'bookmarks',
   'textExtraction',
+  'textAnnotations',
+  // surfaceMarkup intentionally excluded: freehand geometry cannot survive reflow
 ]);

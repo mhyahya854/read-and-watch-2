@@ -4,16 +4,16 @@
   "canonical_remote": "mhyahya854/read-and-watch-2",
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
-  "current_phase_id": "PHASE-09",
+  "current_phase_id": "PHASE-10",
   "current_phase_status": "NOT_STARTED",
-  "current_task_id": "P09-T001",
-  "last_completed_phase_id": "PHASE-08",
-  "last_verified_local_head": "68142049842866ccf1b87e0355b279e4abe287f5",
-  "last_verified_remote_head": "68142049842866ccf1b87e0355b279e4abe287f5",
+  "current_task_id": "P10-T001",
+  "last_completed_phase_id": "PHASE-09",
+  "last_verified_local_head": "a772b0466a79d9b1134dc553ba000da516c0098b",
+  "last_verified_remote_head": "a772b0466a79d9b1134dc553ba000da516c0098b",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 08 legacy Readest parity and retirement; 831 nodes, 1687 edges, 40 communities, 0 import cycles; integrity clean",
-  "last_ponytail_status": "PASS: Phase 08 legacy Readest retirement audit; 9,066 vendored files deleted, child_process.spawn eliminated, 0 new runtime dependencies",
+  "last_graphify_status": "PASS: Phase 09 unified annotation foundation; 0 engine leakage, 0 import cycles, 0 new dependencies",
+  "last_ponytail_status": "PASS: Phase 09 annotation foundation; 0 new runtime dependencies, no bloat",
   "active_blockers": [],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
@@ -35,5 +35,7 @@
   "phase_07_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_08_content_commit": "68142049842866ccf1b87e0355b279e4abe287f5",
   "phase_08_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "exact_next_action": "In a fresh invocation, start PHASE-09 P09-T001 for unified annotation foundation."
+  "phase_09_content_commit": "TBD_CONTENT_COMMIT",
+  "phase_09_closure_commit": "TBD_CLOSURE_COMMIT",
+  "exact_next_action": "In a fresh invocation, start PHASE-10 P10-T001 for book-linked Excalidraw notes."
 }

@@ -622,7 +622,7 @@ Stop after Phase 08. Do not start annotations.
 
 ## PHASE-09 - UNIFIED ANNOTATION FOUNDATION
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -642,20 +642,21 @@ No engine-owned canonical annotations, source mutation, Excalidraw canvas, OCR, 
 
 ### Checklist
 
-- [ ] P09-T001 Finalize versioned annotation types, ownership, lifecycle, and stable IDs.
-- [ ] P09-T002 Implement PDF page/normalized-coordinate/text-context anchors and resolution tests.
-- [ ] P09-T003 Implement reflowable CFI/range/quote/context/spine fallback anchors and resolution tests.
-- [ ] P09-T004 Implement transactions, atomic recovery, bounded history, conflicts, and source-hash mismatch handling.
-- [ ] P09-T005 Implement text marks, comments, excerpts, and named bookmarks.
-- [ ] P09-T006 Implement pen/highlighter/eraser, line/arrow/rectangle/ellipse, and text boxes where capabilities permit.
-- [ ] P09-T007 Implement select/edit/delete/show/hide/undo/redo and close/reopen persistence.
+- [x] P09-T001 Finalize versioned annotation types, ownership, lifecycle, and stable IDs.
+- [x] P09-T002 Implement PDF page/normalized-coordinate/text-context anchors and resolution tests.
+- [x] P09-T003 Implement reflowable CFI/range/quote/context/spine fallback anchors and resolution tests.
+- [x] P09-T004 Implement transactions, atomic recovery, bounded history, conflicts, and source-hash mismatch handling.
+- [x] P09-T005 Implement text marks, comments, excerpts, and named bookmarks.
+- [x] P09-T006 Implement pen/highlighter/eraser, line/arrow/rectangle/ellipse, and text boxes where capabilities permit.
+- [x] P09-T007 Implement select/edit/delete/show/hide/undo/redo and close/reopen persistence.
 
 ### Verification gates
 
-- [ ] P09-G001 All annotation types have stable persistence and deterministic anchors.
-- [ ] P09-G002 Zoom/reflow/resize/reopen, conflicts, recovery, and hash-mismatch tests pass.
-- [ ] P09-G003 Original books remain byte-identical; no engine owns canonical data.
-- [ ] P09-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P09-G001 All annotation types have stable persistence and deterministic anchors.
+- [x] P09-G002 Zoom/reflow/resize/reopen, conflicts, recovery, and hash-mismatch tests pass.
+- [x] P09-G003 Original books remain byte-identical; no engine owns canonical data.
+- [x] P09-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+
 
 ### Evidence and reports
 
