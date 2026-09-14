@@ -8,8 +8,8 @@
   "current_phase_status": "NOT_STARTED",
   "current_task_id": "P06-T001",
   "last_completed_phase_id": "PHASE-05",
-  "last_verified_local_head": "SEE_LIVE_GIT_HEAD",
-  "last_verified_remote_head": "SEE_LIVE_GIT_HEAD",
+  "last_verified_local_head": "bbe8ac094b89e47dfb8ee8c2b00be8377a6f5820",
+  "last_verified_remote_head": "bbe8ac094b89e47dfb8ee8c2b00be8377a6f5820",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "last_graphify_status": "PASS: Phase 05 reflowable book engine refresh; 636 nodes, 1269 edges, 29 communities, 0 import cycles; integrity clean",
@@ -27,7 +27,7 @@
   "phase_03_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_04_content_commit": "fc807ebe52ee01d7c9b7af26bffe6123b21cb1a2",
   "phase_04_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "phase_05_content_commit": "SEE_LIVE_GIT_HEAD",
+  "phase_05_content_commit": "bbe8ac094b89e47dfb8ee8c2b00be8377a6f5820",
   "phase_05_closure_commit": "SEE_LIVE_GIT_HEAD",
   "exact_next_action": "In a fresh invocation, start P06-T001 by researching and pinning PDF.js engine provenance for fixed-layout PDF rendering without modifying existing components."
 }
