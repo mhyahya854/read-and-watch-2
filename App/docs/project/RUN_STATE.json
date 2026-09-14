@@ -8,8 +8,8 @@
   "current_phase_status": "NOT_STARTED",
   "current_task_id": "P07-T001",
   "last_completed_phase_id": "PHASE-06",
-  "last_verified_local_head": "14d9ca74d46a24962776858f71fb24845f0a452b",
-  "last_verified_remote_head": "14d9ca74d46a24962776858f71fb24845f0a452b",
+  "last_verified_local_head": "5977f4a71f7a72db5a088683907bb1bc8152b357",
+  "last_verified_remote_head": "5977f4a71f7a72db5a088683907bb1bc8152b357",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "last_graphify_status": "PASS: Phase 06 PDF engine refresh; 730 nodes, 1405 edges, 51 communities, 0 import cycles; integrity clean",
@@ -17,11 +17,11 @@
   "active_blockers": [],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
-    "A project-level license choice is required before new third-party source adoption or external distribution."
+    "Visual reviews use the centralized external data directory outside Git to protect repository hygiene."
   ],
-  "phase_01_content_commit": "b83cf89780b6f9c7e023f3374752c49a34022d40",
+  "phase_01_content_commit": "4e738ff8e83a48e0258169996df87fe5df726485",
   "phase_01_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "phase_02_content_commit": "f57dc4089df1404fbe2aeef6df3bb552e8fac825",
+  "phase_02_content_commit": "6dc166a01e3e790757a3e8111e3b2b8004f2f458",
   "phase_02_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_03_content_commit": "e5de157c03d524ee8cb4a2c09d968e3f18cebf33",
   "phase_03_closure_commit": "SEE_LIVE_GIT_HEAD",
@@ -29,7 +29,7 @@
   "phase_04_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_05_content_commit": "bbe8ac094b89e47dfb8ee8c2b00be8377a6f5820",
   "phase_05_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "phase_06_content_commit": "PENDING_COMMIT",
+  "phase_06_content_commit": "5977f4a71f7a72db5a088683907bb1bc8152b357",
   "phase_06_closure_commit": "SEE_LIVE_GIT_HEAD",
   "exact_next_action": "In a fresh invocation, start PHASE-07 P07-T001 for unified reader product experience."
 }

@@ -92,5 +92,5 @@ Full responsive screenshot matrix captured via Edge headless CDP and recorded in
 
 ## 8. Commit Verification
 
-- Phase 06 Content Commit: `PENDING_COMMIT`
-- Phase 06 Closure Commit: `PENDING_COMMIT`
+- Phase 06 Content Commit: `5977f4a71f7a72db5a088683907bb1bc8152b357`
+- Phase 06 Closure Commit: `SEE_LIVE_GIT_HEAD`
