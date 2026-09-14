@@ -8,8 +8,8 @@
   "current_phase_status": "NOT_STARTED",
   "current_task_id": "P13-T001",
   "last_completed_phase_id": "PHASE-12",
-  "last_verified_local_head": "de57a28fcfa089d81d45ff2da650ff1b519a9dbf",
-  "last_verified_remote_head": "de57a28fcfa089d81d45ff2da650ff1b519a9dbf",
+  "last_verified_local_head": "48250f24f5a340a6b7d5ae3e75877da3b27b3b78",
+  "last_verified_remote_head": "48250f24f5a340a6b7d5ae3e75877da3b27b3b78",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "last_graphify_status": "PASS: Phase 12 export and portability; 100% canonical-to-export derivation, 0 cycles, 0 source mutation, 0 unneeded archive bloat",
@@ -42,6 +42,6 @@
   "phase_11_content_commit": "8c0c922",
   "phase_11_closure_commit": "5869c697484c448c1d9f27977c7f4de756361052",
   "phase_12_content_commit": "de57a28",
-  "phase_12_closure_commit": "SEE_LIVE_GIT_HEAD",
+  "phase_12_closure_commit": "48250f24f5a340a6b7d5ae3e75877da3b27b3b78",
   "exact_next_action": "In a fresh invocation, start PHASE-13 P13-T001 for knowledge and diagram system."
 }
