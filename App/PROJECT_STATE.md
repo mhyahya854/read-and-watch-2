@@ -4,11 +4,30 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-05` - Reflowable Book Engine.
+Last completed phase: `PHASE-06` - PDF Engine.
 
-Current actionable phase: `PHASE-06` - PDF Engine (`NOT_STARTED`).
+Current actionable phase: `PHASE-07` - Unified Reader Experience (`NOT_STARTED`).
 
-Exact next task: `P06-T001` - research and pin PDF.js engine provenance for fixed-layout PDF rendering without modifying existing components.
+Exact next task: `P07-T001` - design unified reader product interface and shared layout.
+
+Phase 06 implementation results:
+
+- Pinned official Mozilla PDF.js npm distribution: `"pdfjs-dist": "4.10.38"` (Apache-2.0, zero vulnerabilities); recorded in `App/docs/project/PROVENANCE_PDFJS.md`.
+- Implemented production `PdfAdapter` under `App/app/lib/document/pdf-adapter.ts` fully conforming to the canonical `DocumentAdapter` contract with complete lifecycle state machine, metadata extraction, outline/TOC extraction, navigation, search with cancellation, selection, and versioned `pdf-geometry` text anchors (`schemaVersion: 1`).
+- Implemented resolution-independent canvas rendering with `devicePixelRatio` backing store scaling, bounded by `MAX_CANVAS_DIMENSION = 8192` to prevent memory exhaustion on mobile and large zoom levels.
+- Implemented synchronized `.textLayer` aligned directly to unscaled canvas CSS viewport with zero coordinate drift across zoom (0.25x - 5.0x) and orthogonal 90°/180°/270° rotation. Text selection overlay styled with the Phase 03 Warm Editorial palette.
+- Enforced strict Zero-OCR policy: zero OCR dependencies, binaries, or background workers exist. Scanned/missing-text PDFs truthfully report lack of text capabilities, and the reader UI displays an "Image Scan" badge with disabled search.
+- Added controlled local endpoints in `reader-vite-plugin.mjs` serving verified worker (`/api/reader/pdfjs/worker.mjs`), CMaps, and standard fonts with `X-Content-Type-Options: nosniff` and immutable caching headers, eliminating all third-party CDN dependencies.
+- Refactored reader presentation layer at `App/app/app/reader/[id]/page.tsx` to be 100% capability-driven (`canZoom`, `canPaginate`, `canSearch`, `canAdjustFont`), eliminating format branching and passing the architectural audit.
+- Source Immutability Gate passed: verified against real local publications (including local cookbook and library books). Confirmed 100% byte-identical SHA-256 hashes and modification timestamps before and after reader operations.
+- Automated tests: 92/92 Node tests passing (23 new tests covering conformance, page geometry, features, edge cases, and source immutability).
+- Visual review: 18 responsive screenshots captured across Desktop (1440x900), States, Tablet (1024x768), and Mobile (390x844) under `READ_WATCH_DATA_ROOT/visual-review/phase-06/` with `manifest.json` and `REVIEW_INDEX.md`.
+- TypeScript 0 errors, oxlint 0 errors/warnings across 58 files, production build passing cleanly.
+- Graphify: PASS - 730 nodes, 1405 edges, 51 communities, 0 import cycles.
+- Ponytail: PASS - minimal dependency pin, zero Mozilla viewer bloat, zero OCR bloat, zero code bloat.
+- Phase 06 content commit `PENDING_COMMIT` (to be recorded upon push and verification).
+
+Starting Phase 06 local/remote HEAD: `14d9ca74d46a24962776858f71fb24845f0a452b`.
 
 Phase 05 implementation results:
 

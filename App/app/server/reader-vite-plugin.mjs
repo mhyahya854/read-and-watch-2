@@ -1,4 +1,6 @@
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createReaderStore } from './reader-store.mjs';
 
 const MAX_BODY_BYTES = 16 * 1024;
@@ -57,6 +59,46 @@ export function readerPlugin({
           let parts = url.pathname.split('/').filter(Boolean);
           if (parts[0] === 'api' && parts[1] === 'reader')
             parts = parts.slice(2);
+
+          if (parts[0] === 'pdfjs') {
+            const pdfjsDistRoot = resolve(
+              dirname(fileURLToPath(import.meta.url)),
+              '../node_modules/pdfjs-dist',
+            );
+            if (parts.length === 2 && parts[1] === 'worker.mjs' && request.method === 'GET') {
+              const workerPath = resolve(pdfjsDistRoot, 'build/pdf.worker.mjs');
+              if (!existsSync(workerPath)) return sendJson(response, 404, { error: 'Worker not found' });
+              response.statusCode = 200;
+              response.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+              response.setHeader('X-Content-Type-Options', 'nosniff');
+              response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+              createReadStream(workerPath).pipe(response);
+              return;
+            }
+            if (parts.length === 3 && parts[1] === 'cmaps' && request.method === 'GET') {
+              const filename = basename(decodeURIComponent(parts[2]));
+              const cmapPath = resolve(pdfjsDistRoot, 'cmaps', filename);
+              if (!existsSync(cmapPath)) return sendJson(response, 404, { error: 'CMap not found' });
+              response.statusCode = 200;
+              response.setHeader('Content-Type', 'application/octet-stream');
+              response.setHeader('X-Content-Type-Options', 'nosniff');
+              response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+              createReadStream(cmapPath).pipe(response);
+              return;
+            }
+            if (parts.length === 3 && parts[1] === 'standard_fonts' && request.method === 'GET') {
+              const filename = basename(decodeURIComponent(parts[2]));
+              const fontPath = resolve(pdfjsDistRoot, 'standard_fonts', filename);
+              if (!existsSync(fontPath)) return sendJson(response, 404, { error: 'Standard font not found' });
+              response.statusCode = 200;
+              response.setHeader('Content-Type', 'application/octet-stream');
+              response.setHeader('X-Content-Type-Options', 'nosniff');
+              response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+              createReadStream(fontPath).pipe(response);
+              return;
+            }
+            return sendJson(response, 404, { error: 'PDF.js asset not found' });
+          }
 
           if (
             parts.length === 2 &&

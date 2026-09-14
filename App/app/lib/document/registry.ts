@@ -7,7 +7,15 @@ import { DocumentError } from './errors.ts';
 import { type DocumentFormat, type ReadonlyDocumentSource, validateDocumentSource } from './source.ts';
 import { type DocumentAdapter } from './adapter.ts';
 
-export type DocumentAdapterFactory = (source: ReadonlyDocumentSource) => DocumentAdapter;
+export interface CreateAdapterOptions {
+  container?: HTMLElement | null;
+  initialData?: Uint8Array | ArrayBuffer | Blob | null;
+}
+
+export type DocumentAdapterFactory = (
+  source: ReadonlyDocumentSource,
+  options?: CreateAdapterOptions
+) => DocumentAdapter;
 
 export type EngineFamily = 'pdf' | 'reflowable';
 
@@ -62,7 +70,10 @@ export class DocumentAdapterRegistry {
   }
 
   /** Instantiate a DocumentAdapter for the given document source */
-  createAdapter(source: ReadonlyDocumentSource): DocumentAdapter {
+  createAdapter(
+    source: ReadonlyDocumentSource,
+    options?: CreateAdapterOptions
+  ): DocumentAdapter {
     const validSource = validateDocumentSource(source);
     const factory = this.getFactory(validSource.format);
 
@@ -70,7 +81,7 @@ export class DocumentAdapterRegistry {
       throw DocumentError.unsupportedFormat(validSource.format);
     }
 
-    return factory(validSource);
+    return factory(validSource, options);
   }
 
   /** Clear all registrations (primarily useful in test suites) */
@@ -83,6 +94,7 @@ export class DocumentAdapterRegistry {
 export const defaultAdapterRegistry = new DocumentAdapterRegistry();
 
 import { FoliateReflowableAdapter } from './reflowable-adapter.ts';
+import { PdfAdapter } from './pdf-adapter.ts';
 
 export function registerReflowableAdapters(
   registry: DocumentAdapterRegistry = defaultAdapterRegistry,
@@ -94,7 +106,7 @@ export function registerReflowableAdapters(
       {
         format: fmt,
         family: 'reflowable',
-        factory: () => new FoliateReflowableAdapter(),
+        factory: (_source, options) => new FoliateReflowableAdapter(options),
         displayName: `Foliate ${fmt.toUpperCase()} Adapter`,
       },
       allowOverwrite
@@ -102,5 +114,21 @@ export function registerReflowableAdapters(
   }
 }
 
+export function registerPdfAdapter(
+  registry: DocumentAdapterRegistry = defaultAdapterRegistry,
+  allowOverwrite = false
+): void {
+  registry.register(
+    {
+      format: 'pdf',
+      family: 'pdf',
+      factory: (_source, options) => new PdfAdapter(options),
+      displayName: 'Mozilla PDF.js Adapter',
+    },
+    allowOverwrite
+  );
+}
+
 registerReflowableAdapters(defaultAdapterRegistry, true);
+registerPdfAdapter(defaultAdapterRegistry, true);
 

@@ -441,7 +441,7 @@ Stop after Phase 05. Do not start PDF.js.
 
 ## PHASE-06 - PDF ENGINE
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -461,19 +461,19 @@ No Mozilla viewer chrome/styling, OCR, PDF source mutation, canonical PDF.js ann
 
 ### Checklist
 
-- [ ] P06-T001 Pin official PDF.js package/source and record license/provenance.
-- [ ] P06-T002 Implement PDF adapter loading, cleanup, workers, errors, and capabilities.
-- [ ] P06-T003 Implement page rendering and selectable synchronized text layer at high DPI.
-- [ ] P06-T004 Implement navigation, outline, links, zoom, rotation, metadata, search, progress, and restore.
-- [ ] P06-T005 Test text PDFs, missing text, malformed files, large files, and available real PDFs.
-- [ ] P06-T006 Verify no OCR path or source write exists.
+- [x] P06-T001 Pin official PDF.js package/source and record license/provenance.
+- [x] P06-T002 Implement PDF adapter loading, cleanup, workers, errors, and capabilities.
+- [x] P06-T003 Implement page rendering and selectable synchronized text layer at high DPI.
+- [x] P06-T004 Implement navigation, outline, links, zoom, rotation, metadata, search, progress, and restore.
+- [x] P06-T005 Test text PDFs, missing text, malformed files, large files, and available real PDFs.
+- [x] P06-T006 Verify no OCR path or source write exists.
 
 ### Verification gates
 
-- [ ] P06-G001 Adapter conformance and PDF feature matrix pass.
-- [ ] P06-G002 Text selection/search alignment and high-DPI rendering pass across zoom/rotation.
-- [ ] P06-G003 Original PDF hashes and modification times remain unchanged.
-- [ ] P06-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P06-G001 Adapter conformance and PDF feature matrix pass.
+- [x] P06-G002 Text selection/search alignment and high-DPI rendering pass across zoom/rotation.
+- [x] P06-G003 Original PDF hashes and modification times remain unchanged.
+- [x] P06-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

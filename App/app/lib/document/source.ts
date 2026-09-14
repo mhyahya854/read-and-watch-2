@@ -72,3 +72,52 @@ export function validateDocumentSource(input: unknown): ReadonlyDocumentSource {
     ...(s.resolverRef !== undefined ? { resolverRef: s.resolverRef } : {}),
   };
 }
+
+export function createSourceFromCandidate(
+  itemId: string,
+  candidate: { id: string; format: string; sizeBytes: number; name: string }
+): ReadonlyDocumentSource {
+  const rawFormat = candidate.format.toLowerCase().trim();
+  const format: DocumentFormat =
+    rawFormat === 'pdf' ||
+    rawFormat === 'epub' ||
+    rawFormat === 'mobi' ||
+    rawFormat === 'azw' ||
+    rawFormat === 'azw3' ||
+    rawFormat === 'cbz' ||
+    rawFormat === 'fb2'
+      ? rawFormat
+      : 'unknown';
+
+  return {
+    itemId,
+    formatId: candidate.id,
+    format,
+    sourceHash: candidate.id,
+    byteSize: candidate.sizeBytes,
+    title: candidate.name,
+    resolverRef: candidate.id,
+  };
+}
+
+export function createSampleSource(sampleId: string): ReadonlyDocumentSource {
+  if (sampleId.includes('pdf')) {
+    return {
+      itemId: sampleId,
+      formatId: 'sample-pdf-format',
+      format: 'pdf',
+      sourceHash: 'samplepdfhash00000000000000000000000000000000000000000000000000000000',
+      byteSize: 1024,
+      title: 'Sample PDF Document',
+    };
+  }
+  return {
+    itemId: sampleId,
+    formatId: 'media-sample',
+    format: 'epub',
+    sourceHash: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+    byteSize: 524288,
+    title: 'Domain Driven Reader Systems.epub',
+  };
+}
+

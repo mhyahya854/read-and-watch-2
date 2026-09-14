@@ -16,9 +16,11 @@ Pinned upstream commit `78914aef4466eb960965702401634c2cb348e9b1` (MIT), vendore
 
 ## PDF.js
 
-Relationship: `PDF ENGINE`
+Relationship: `PRODUCTION PDF ENGINE (PINNED PACKAGE)`
 
-Use for parsing, page rendering, text layer and selection, search primitives, navigation, outline, links, metadata, zoom, and rotation. Do not adopt Mozilla viewer UI/styling, canonical annotation storage, or source mutation.
+Capabilities: Parsing, high-DPI page rendering, synchronized selectable text layer, page navigation, hierarchical outline, internal links, zoom, 90-degree rotation, metadata extraction, search, progress, and text anchors encapsulated behind Read & Watch `DocumentAdapter`.
+
+Pinned exact package: `pdfjs-dist@4.10.38` (Apache-2.0). Worker is served locally from controlled application assets (`/api/reader/pdfjs/worker.mjs`) matching the exact engine version without CDN dependencies. Mozilla viewer chrome, styling, and canonical annotations are excluded; all UI is 100% Read & Watch owned. Embedded PDF JavaScript execution is strictly disabled.
 
 ## pdf-lib
 
