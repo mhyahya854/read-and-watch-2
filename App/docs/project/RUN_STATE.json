@@ -8,7 +8,7 @@
   "current_phase_status": "NOT_STARTED",
   "current_task_id": "P15-T001",
   "last_completed_phase_id": "PHASE-14",
-  "last_verified_local_head": "450a0e4",
+  "last_verified_local_head": "c889adc",
   "last_verified_remote_head": "6faffad02acfd4236869603357de9ba6c24c7114",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
@@ -46,6 +46,6 @@
   "phase_13_content_commit": "f8d0177b90a6f9beb56e31d42542bbc7e887f3c9",
   "phase_13_closure_commit": "9a3e8513b89640b25fd60ace230c0b7827e37f40",
   "phase_14_content_commit": "450a0e4",
-  "phase_14_closure_commit": "SEE_LIVE_GIT_HEAD",
+  "phase_14_closure_commit": "c889adc",
   "exact_next_action": "Phase 14 COMPLETE. Stop condition reached: do not begin modern web reader upgrade (PHASE-15)."
 }
