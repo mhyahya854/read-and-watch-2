@@ -35,7 +35,7 @@
   "phase_07_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_08_content_commit": "68142049842866ccf1b87e0355b279e4abe287f5",
   "phase_08_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "phase_09_content_commit": "TBD_CONTENT_COMMIT",
+  "phase_09_content_commit": "9baa473",
   "phase_09_closure_commit": "TBD_CLOSURE_COMMIT",
   "exact_next_action": "In a fresh invocation, start PHASE-10 P10-T001 for book-linked Excalidraw notes."
 }
