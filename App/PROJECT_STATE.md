@@ -4,11 +4,30 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-08` - Legacy Readest Parity and Retirement.
+Last completed phase: `PHASE-11` - Search, Annotation Browser, and Study Workflow.
 
-Current actionable phase: `PHASE-09` - Unified Annotation Foundation (`NOT_STARTED`).
+Current actionable phase: `PHASE-12` - Export and Portability (`NOT_STARTED`).
 
-Exact next task: `P09-T001` - canonical annotation schema and storage model.
+Exact next task: `P12-T001` - canonical export schema and manifest design.
+
+Phase 11 implementation results:
+
+- Implemented derived, rebuildable SQLite FTS5 search index (`server/search-store.mjs`) managing `search_index_fts` with `unicode61 remove_diacritics 0`, `search_index_records`, and `search_index_meta` (zero new external npm dependencies, 100% offline).
+- Engineered safe query pipeline (`server/search-query.mjs`, `lib/search/query.ts`) that normalizes user inputs, escapes FTS5 syntax characters, and extracts structured snippet tokens for HTML-safe `<mark>` rendering.
+- Built unified Study & Annotation Browser (`app/highlights/page.tsx`, `components/study/study-browser.tsx`) featuring truthful artifact counters (highlights, comments, bookmarks, canvases, notes, total), debounced search (`/` shortcut), multi-kind filters, book filter dropdown, and direct source jumps.
+- Enhanced book-local reader search (`components/reader/reader-search.tsx`) with semantic chapter/section labels, CFI/page locations, accessible `<output aria-live="polite">` regions, and truthful missing-text notice for scanned PDFs without invoking OCR.
+- Built reader selection context menu (`components/reader/reader-selection-menu.tsx`) mounted in `ReaderViewport` supporting instant Copy, Define hook (offline notice), Translate hook (offline notice), Send to Item Notes (markdown excerpt append with citation and optimistic conflict protection), and Send to Canvas (adding excerpt card element to linked Excalidraw scenes).
+- Wired direct URL jump navigation (`/reader/:id?annotationId=...` and `?location=...`) with source hash verification and calm mismatch alerts.
+- Wired synchronous incremental invalidation hooks across all canonical stores (`annotationStore`, `canvasStore`, `userDataStore`, `readerStore`, `libraryStore`).
+- Automated tests: **167/167 tests passing** across entire test suite (`npm test`).
+- TypeScript compiler: **0 errors** (`npx tsc --noEmit`).
+- Linter: **0 warnings, 0 errors** (`npm run lint`).
+- Production build: **Successful** (`npm run build`).
+- Repository hygiene: **PASS** (`check_repository_hygiene.py`).
+- Project governance: **PASS** (`validate_project_state.py`).
+- Graphify audit: **PASS** (`PHASE_11_GRAPHIFY_AUDIT.md`).
+- Ponytail audit: **PASS** (`PHASE_11_PONYTAIL_AUDIT.md`).
+- Visual review: `READ_WATCH_DATA_ROOT/visual-review/phase-11/` (`REVIEW_INDEX.md`, `manifest.json`).
 
 Phase 08 implementation results:
 

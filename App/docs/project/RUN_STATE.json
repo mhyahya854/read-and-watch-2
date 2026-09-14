@@ -4,16 +4,16 @@
   "canonical_remote": "mhyahya854/read-and-watch-2",
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
-  "current_phase_id": "PHASE-11",
+  "current_phase_id": "PHASE-12",
   "current_phase_status": "NOT_STARTED",
-  "current_task_id": "P11-T001",
-  "last_completed_phase_id": "PHASE-10",
+  "current_task_id": "P12-T001",
+  "last_completed_phase_id": "PHASE-11",
   "last_verified_local_head": "07bbcd38fd9f52ce2810a76a0cf984e6731cfce3",
   "last_verified_remote_head": "07bbcd38fd9f52ce2810a76a0cf984e6731cfce3",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 10 book-linked Excalidraw notes; 100% Read & Watch owned, 0 cloud dependencies, 0 engine leakage",
-  "last_ponytail_status": "PASS: Phase 10 book-linked Excalidraw notes; 1 pinned dependency (@excalidraw/excalidraw@0.18.1), 0 cloud bloat",
+  "last_graphify_status": "PASS: Phase 11 search, annotation browser, and study workflow; 100% derived/rebuildable, 0 orphaned indexes, 0 cloud/AI",
+  "last_ponytail_status": "PASS: Phase 11 search, annotation browser, and study workflow; 0 new npm packages (node:sqlite FTS5), 0 query DSL bloat",
   "active_blockers": [],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
@@ -39,5 +39,7 @@
   "phase_09_closure_commit": "1306475",
   "phase_10_content_commit": "cfb9e06",
   "phase_10_closure_commit": "07bbcd38fd9f52ce2810a76a0cf984e6731cfce3",
-  "exact_next_action": "In a fresh invocation, start PHASE-11 P11-T001 for search, annotation browser, and study workflow."
+  "phase_11_content_commit": "8c0c922",
+  "phase_11_closure_commit": "SEE_LIVE_GIT_HEAD",
+  "exact_next_action": "In a fresh invocation, start PHASE-12 P12-T001 for export and portability."
 }

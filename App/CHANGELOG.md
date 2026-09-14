@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-14 - Phase 11 search, annotation browser, and study workflow
+
+- Implemented derived, rebuildable SQLite FTS5 search index (`server/search-store.mjs`) managing `search_index_fts` with `unicode61 remove_diacritics 0`, `search_index_records`, and `search_index_meta` (zero new external npm dependencies, 100% offline).
+- Engineered safe query pipeline (`server/search-query.mjs`, `lib/search/query.ts`) that normalizes user inputs, escapes FTS5 syntax operators, and extracts structured snippet tokens for HTML-safe `<mark>` rendering without dangerouslySetInnerHTML.
+- Built unified Study & Annotation Browser (`app/highlights/page.tsx`, `components/study/study-browser.tsx`) featuring truthful artifact counters (highlights, comments, bookmarks, canvases, notes, total), debounced search (`/` shortcut), multi-kind filters, book filter dropdown, and direct source jumps.
+- Enhanced book-local reader search (`components/reader/reader-search.tsx`) with semantic chapter/section labels, CFI/page locations, accessible `<output aria-live="polite">` regions, and truthful missing-text notice for scanned PDFs without invoking OCR.
+- Built reader selection context menu (`components/reader/reader-selection-menu.tsx`) mounted in `ReaderViewport` supporting instant Copy, Define hook (offline notice), Translate hook (offline notice), Send to Item Notes (markdown excerpt append with citation and optimistic conflict protection), and Send to Canvas (adding excerpt card element to linked Excalidraw scenes).
+- Wired direct URL jump navigation (`/reader/:id?annotationId=...` and `?location=...`) with source hash verification and calm mismatch alerts.
+- Wired synchronous incremental invalidation hooks across all canonical stores (`annotationStore`, `canvasStore`, `userDataStore`, `readerStore`, `libraryStore`).
+- Added 16 new automated tests across `tests/search-store.test.mjs`, `tests/book-local-search.test.mjs`, and `tests/study-workflow.test.mjs` (167/167 total test cases passing).
+- Verified zero AI dependencies, zero vector database dependencies, and complete offline capability.
+- Passed Graphify and Ponytail audits (`PHASE_11_GRAPHIFY_AUDIT.md`, `PHASE_11_PONYTAIL_AUDIT.md`).
+- Captured external visual review evidence in `READ_WATCH_DATA_ROOT/visual-review/phase-11/` (`REVIEW_INDEX.md`, `manifest.json`).
+
 ## 2026-09-14 - Phase 10 book-linked Excalidraw notes
 
 - Pinned official upstream release `@excalidraw/excalidraw@0.18.1` (MIT license) with verified React 19 compatibility.

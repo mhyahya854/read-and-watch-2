@@ -745,7 +745,7 @@ Stop after Phase 10. Do not start study/search aggregation.
 
 ## PHASE-11 - SEARCH, ANNOTATION BROWSER, AND STUDY WORKFLOW
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -765,19 +765,19 @@ No required AI, embeddings, silent generated content, or detached search index w
 
 ### Checklist
 
-- [ ] P11-T001 Define searchable fields, index ownership, rebuild, invalidation, and privacy boundaries.
-- [ ] P11-T002 Implement book-local search through adapter capabilities.
-- [ ] P11-T003 Implement library metadata and annotation search with type/book filters.
-- [ ] P11-T004 Implement unified annotation browser and direct location jumps.
-- [ ] P11-T005 Implement selection copy, define/translate extension hooks, Notes handoff, and Canvas handoff.
-- [ ] P11-T006 Implement keyboard/accessibility and empty/error/rebuild states.
+- [x] P11-T001 Define searchable fields, index ownership, rebuild, invalidation, and privacy boundaries.
+- [x] P11-T002 Implement book-local search through adapter capabilities.
+- [x] P11-T003 Implement library metadata and annotation search with type/book filters.
+- [x] P11-T004 Implement unified annotation browser and direct location jumps.
+- [x] P11-T005 Implement selection copy, define/translate extension hooks, Notes handoff, and Canvas handoff.
+- [x] P11-T006 Implement keyboard/accessibility and empty/error/rebuild states.
 
 ### Verification gates
 
-- [ ] P11-G001 Search result completeness/precision and index rebuild tests pass.
-- [ ] P11-G002 Every result jumps to the correct source location or reports an unresolved anchor honestly.
-- [ ] P11-G003 Core workflow functions with AI disabled/unavailable.
-- [ ] P11-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P11-G001 Search result completeness/precision and index rebuild tests pass.
+- [x] P11-G002 Every result jumps to the correct source location or reports an unresolved anchor honestly.
+- [x] P11-G003 Core workflow functions with AI disabled/unavailable.
+- [x] P11-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

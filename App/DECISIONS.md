@@ -334,3 +334,17 @@ Status: Accepted
 7. **Beside-Reader Split & Full-Screen Workspaces**: Responsive split layout with 320px minimum pane widths preserves active reader engine and unsaved drawing state. Narrow viewports switch via a mobile "Book | Canvas" tab bar. Full-screen routes (`/canvas-notes/:id`, `/canvas-notes`) offer dedicated canvas workspaces.
 8. **Portable Standalone Export/Restore**: Standardized `.rwcanvas` JSON bundle packages metadata, scene elements, links, and embedded assets for offline transport and restoration.
 9. **Source Book Immutability**: Source books remain 100% read-only and byte-identical. All canvas notes, links, and assets reside exclusively in `user-data`.
+
+## D-047 - Phase 11 Search, Annotation Browser, and Study Workflow
+
+Status: Accepted
+
+1. **Derived, Disposable FTS5 Search Index**: SQLite FTS5 index (`search_index_fts`, `search_index_records`, `search_index_meta`) is 100% derived from canonical primary sources (library items, user annotations, bookmarks, canvases, markdown notes). If deleted, corrupted, or schema-upgraded, the search index rebuilds completely from primary data without loss of canonical user data.
+2. **Zero New Dependencies & Node:sqlite Built-in**: Full-text search leverages Node 22 built-in `node:sqlite` with FTS5 and `unicode61 remove_diacritics 0` for multilingual text (Latin, Arabic, Urdu). Zero external dependencies or npm packages added. Zero cloud search, zero vector databases.
+3. **Incremental Invalidation Across Primary Stores**: Mutating library records, annotations, bookmarks, canvases, or user notes issues non-blocking incremental invalidation events (`invalidateBookIndex`, `invalidateAnnotationIndex`, `invalidateCanvasIndex`, etc.) to the search store, keeping search immediate and fresh.
+4. **Safe Snippet Rendering**: FTS5 snippet extraction tokenizes matches into safe token trees (`parseSnippetTokens`) rendered as native React `<mark>` elements, completely eliminating `dangerouslySetInnerHTML` and XSS injection vectors.
+5. **Unified Annotation & Study Browser**: The `/highlights` route provides unified study browsing with type filters (`highlight`, `underline`, `note`, `bookmark`, `canvas-card`), book filters, keyword search, and direct source jumps.
+6. **Robust Source Jumps with Integrity Verification**: Source navigation inspects document content hashes. Mismatches or unresolvable anchors display an honest, calm, non-crashing UI notice with graceful fallback to chapter/page context.
+7. **Offline Selection Study Workflow**: Reader selection menu provides instant Copy, Append to Notes, Excerpt to Canvas, and offline-by-default Define/Translate extension hooks (`studyExtensions`). Operates 100% offline with zero external network or AI dependencies.
+8. **Source Document Immutability**: Source book files remain 100% byte-identical across all indexing, search, selection, and handoff operations.
+
