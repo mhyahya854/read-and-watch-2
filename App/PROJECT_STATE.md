@@ -6,9 +6,9 @@ Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
 Last completed phase: `PHASE-14` - Desktop Native Integration.
 
-Current actionable phase: `PHASE-15` - Modern Web Reader Upgrade (`NOT_STARTED`).
+Current actionable phase: `PHASE-15` - Privacy, Terms, Settings, and Product Polish (`NOT_STARTED`).
 
-Exact next task: `P15-T001` - evaluate modern Web APIs for performance, rendering, and offline enhancements.
+Exact next task: `P15-T001` - Inventory actual data flows, storage, third parties, permissions, exports, updates, and network behavior.
 
 Phase 14 implementation results:
 
