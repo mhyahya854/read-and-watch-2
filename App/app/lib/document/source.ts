@@ -101,6 +101,16 @@ export function createSourceFromCandidate(
 }
 
 export function createSampleSource(sampleId: string): ReadonlyDocumentSource {
+  if (sampleId.includes('scan')) {
+    return {
+      itemId: sampleId,
+      formatId: 'sample-scan-format',
+      format: 'pdf',
+      sourceHash: 'samplescanhash0000000000000000000000000000000000000000000000000000000',
+      byteSize: 2048,
+      title: 'Historical Archive Manuscript (Scanned Edition).pdf',
+    };
+  }
   if (sampleId.includes('pdf')) {
     return {
       itemId: sampleId,

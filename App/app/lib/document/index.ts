@@ -17,5 +17,8 @@ export * from './test-doubles/conformance.ts';
 export * from './reflowable-adapter.ts';
 export * from './pdf-adapter.ts';
 export * from './resource-boundary.ts';
+export * from './history.ts';
+export * from './bookmark.ts';
+export * from './preferences.ts';
 
 

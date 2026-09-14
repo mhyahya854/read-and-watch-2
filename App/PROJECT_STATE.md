@@ -4,11 +4,31 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-06` - PDF Engine.
+Last completed phase: `PHASE-07` - Unified Reader Experience.
 
-Current actionable phase: `PHASE-07` - Unified Reader Experience (`NOT_STARTED`).
+Current actionable phase: `PHASE-08` - Legacy Readest Parity and Retirement (`NOT_STARTED`).
 
-Exact next task: `P07-T001` - design unified reader product interface and shared layout.
+Exact next task: `P08-T001` - audit legacy Readest feature parity and gap analysis.
+
+Phase 07 implementation results:
+
+- Unified the reflowable (Foliate-JS) and fixed-layout (Mozilla PDF.js) engines behind a single capability-driven Read & Watch reader interface (`App/app/app/reader/[id]/page.tsx`, `App/app/components/reader/`).
+- Eliminated all format-conditional branching (`format === 'pdf'`, `isPdf`) across presentation components; reader chrome queries runtime capabilities (`canZoom`, `fontControls`, `textSearch`, `continuousLayout`, `canRotate`).
+- Built modular reader component suite adhering strictly to the Warm Editorial design system: `ReaderShell`, `ReaderToolbar`, `ReaderSidebar`, `ReaderContents`, `ReaderSearch`, `ReaderBookmarks`, `ReaderSettingsDialog`, `ReaderViewport`, `ReaderStatus`.
+- Implemented `ReaderHistory` with 50-entry bounded storage, consecutive location deduplication, forward truncation on branching navigation, and bi-directional Back/Forward stepping.
+- Implemented canonical format-independent `Bookmark` model with atomic persistence to external data storage via `/api/reader/items/:id/bookmarks`.
+- Implemented format-appropriate preferences and theming: Light, Warm, and Dark theme tokens (`.theme-warm`, `.theme-dark`), font family (Serif, Sans, Mono), font sizing (12–28px), line height, text alignment, and zoom (50%–300%) / rotation (90° increments) controls.
+- Implemented accessible keyboard model (Arrow keys, Space bar, Ctrl+F, B for bookmarks, Esc to close modals/sidebars), touch swipe gesture handling, accessible `<dialog>` focus trapping, and error recovery states with retry and library return actions.
+- Preserved complete engine invisibility: zero vendor chrome, toolbars, logos, or engine-native state storage.
+- Reaffirmed Zero-OCR policy: image-only and scanned documents truthfully report lack of text capabilities, disabling search and displaying a clear "Image Scan" badge.
+- Automated tests: 97/97 tests passing (5 new tests in `tests/reader-unified-experience.test.mjs` verifying history, bookmarks, preferences, error recovery, and zero format branching).
+- Visual review: 101 responsive screenshots captured across Desktop, Tablet, and Mobile under `READ_WATCH_DATA_ROOT/visual-review/phase-07/` with `manifest.json` and `REVIEW_INDEX.md`.
+- TypeScript 0 errors, oxlint 0 errors/warnings across 72 files, production build passing cleanly.
+- Graphify: PASS - 828 nodes, 1703 edges, 60 communities, 0 import cycles.
+- Ponytail: PASS - zero new npm dependencies, native Web/DOM APIs, zero dead code or premature abstractions.
+- Phase 07 content commit `PENDING_COMMIT` (to be recorded upon push and verification).
+
+Starting Phase 07 local/remote HEAD: `9209598ab8ed5a25f9e14f74ae00d016c657086b`.
 
 Phase 06 implementation results:
 
@@ -25,7 +45,7 @@ Phase 06 implementation results:
 - TypeScript 0 errors, oxlint 0 errors/warnings across 58 files, production build passing cleanly.
 - Graphify: PASS - 730 nodes, 1405 edges, 51 communities, 0 import cycles.
 - Ponytail: PASS - minimal dependency pin, zero Mozilla viewer bloat, zero OCR bloat, zero code bloat.
-- Phase 06 content commit `PENDING_COMMIT` (to be recorded upon push and verification).
+- Phase 06 content commit `5977f4a71f7a72db5a088683907bb1bc8152b357` was pushed and verified on GitHub; the closure commit records that remote gate.
 
 Starting Phase 06 local/remote HEAD: `14d9ca74d46a24962776858f71fb24845f0a452b`.
 

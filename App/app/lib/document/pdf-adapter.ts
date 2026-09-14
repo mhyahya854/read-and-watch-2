@@ -265,6 +265,35 @@ startxref
   return bytes;
 }
 
+function getSyntheticScannedPdfBytes(): Uint8Array {
+  const scanPdf = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>
+endobj
+xref
+0 4
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+trailer
+<< /Size 4 /Root 1 0 R >>
+startxref
+192
+%%EOF`;
+  const bytes = new Uint8Array(scanPdf.length);
+  for (let i = 0; i < scanPdf.length; i++) {
+    bytes[i] = scanPdf.charCodeAt(i);
+  }
+  return bytes;
+}
+
 export class PdfAdapter implements DocumentAdapter {
   private _state: AdapterLifecycleState = 'created';
   private _source: ReadonlyDocumentSource | null = null;
@@ -378,7 +407,9 @@ export class PdfAdapter implements DocumentAdapter {
       }
 
       if (!data) {
-        if (source.itemId.includes('sample') || source.itemId.includes('test')) {
+        if (source.itemId.includes('scan')) {
+          data = getSyntheticScannedPdfBytes();
+        } else if (source.itemId.includes('sample') || source.itemId.includes('test')) {
           data = getSyntheticPdfBytes();
         } else {
           throw DocumentError.sourceNotFound(source.itemId, source.formatId);

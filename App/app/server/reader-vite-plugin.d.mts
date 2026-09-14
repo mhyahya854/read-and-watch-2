@@ -4,4 +4,5 @@ export declare function readerPlugin(options: {
   libraryRoot: string;
   libraryDatabasePath: string;
   readerExecutable: string;
+  userDataRoot?: string;
 }): Plugin;

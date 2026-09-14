@@ -177,3 +177,34 @@ export function deserializeDocumentLocation(
     throw DocumentError.invalidSource(`Failed to parse location JSON: ${String(err)}`);
   }
 }
+
+export function areDocumentLocationsEqual(a: DocumentLocation, b: DocumentLocation): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.schemaVersion !== b.schemaVersion || a.kind !== b.kind || a.sourceHash !== b.sourceHash) {
+    return false;
+  }
+  if (a.kind === 'page' && b.kind === 'page') {
+    const pa = a.payload as PageLocationPayload;
+    const pb = b.payload as PageLocationPayload;
+    return pa.pageNumber === pb.pageNumber;
+  }
+  if (a.kind === 'semantic' && b.kind === 'semantic') {
+    const pa = a.payload as SemanticLocationPayload;
+    const pb = b.payload as SemanticLocationPayload;
+    if (pa.cfi && pb.cfi) return pa.cfi === pb.cfi;
+    if (pa.sectionId && pb.sectionId) {
+      if (pa.progression !== undefined && pb.progression !== undefined) {
+        return pa.sectionId === pb.sectionId && Math.abs(pa.progression - pb.progression) < 0.001;
+      }
+      return pa.sectionId === pb.sectionId;
+    }
+    return pa.progression === pb.progression && pa.title === pb.title;
+  }
+  if (a.kind === 'progression' && b.kind === 'progression') {
+    const pa = a.payload as ProgressionLocationPayload;
+    const pb = b.payload as ProgressionLocationPayload;
+    return Math.abs(pa.fraction - pb.fraction) < 0.001;
+  }
+  return false;
+}

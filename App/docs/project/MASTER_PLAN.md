@@ -501,7 +501,7 @@ Stop after Phase 06. Do not start unified reader polish.
 
 ## PHASE-07 - UNIFIED READER EXPERIENCE
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -521,19 +521,19 @@ No visible Foliate/PDF.js identity, annotations beyond bookmarks, Readest remova
 
 ### Checklist
 
-- [ ] P07-T001 Define shared reader navigation, toolbar, sidebar, status, and settings grammar.
-- [ ] P07-T002 Implement adapter-capability-driven controls with no unrelated format branching.
-- [ ] P07-T003 Implement TOC, search, back/forward history, bookmarks, progress, and restore across engines.
-- [ ] P07-T004 Implement format-appropriate typography, zoom, themes, layout, and optional headers/footers.
-- [ ] P07-T005 Implement keyboard, touch, focus, accessibility, loading, error, and recovery behavior.
-- [ ] P07-T006 Verify real cross-format continuity and design constitution compliance.
+- [x] P07-T001 Define shared reader navigation, toolbar, sidebar, status, and settings grammar.
+- [x] P07-T002 Implement adapter-capability-driven controls with no unrelated format branching.
+- [x] P07-T003 Implement TOC, search, back/forward history, bookmarks, progress, and restore across engines.
+- [x] P07-T004 Implement format-appropriate typography, zoom, themes, layout, and optional headers/footers.
+- [x] P07-T005 Implement keyboard, touch, focus, accessibility, loading, error, and recovery behavior.
+- [x] P07-T006 Verify real cross-format continuity and design constitution compliance.
 
 ### Verification gates
 
-- [ ] P07-G001 Shared-reader parity matrix passes for both adapter families.
-- [ ] P07-G002 Keyboard/touch/accessibility/console and restore tests pass.
-- [ ] P07-G003 No visible engine brand or engine canonical storage remains.
-- [ ] P07-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P07-G001 Shared-reader parity matrix passes for both adapter families.
+- [x] P07-G002 Keyboard/touch/accessibility/console and restore tests pass.
+- [x] P07-G003 No visible engine brand or engine canonical storage remains.
+- [x] P07-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

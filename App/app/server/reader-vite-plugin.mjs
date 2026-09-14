@@ -43,11 +43,13 @@ export function readerPlugin({
   libraryRoot,
   libraryDatabasePath,
   readerExecutable,
+  userDataRoot,
 }) {
   const store = createReaderStore({
     libraryRoot,
     libraryDatabasePath,
     readerExecutable,
+    userDataRoot,
   });
 
   return {
@@ -149,6 +151,85 @@ export function readerPlugin({
               await store.open(decodeURIComponent(parts[1]), body.candidateId),
             );
           }
+
+          // Reading State
+          if (
+            parts.length === 3 &&
+            parts[0] === 'items' &&
+            parts[2] === 'state' &&
+            request.method === 'GET'
+          ) {
+            return sendJson(
+              response,
+              200,
+              store.getReadingState(decodeURIComponent(parts[1])),
+            );
+          }
+          if (
+            parts.length === 3 &&
+            parts[0] === 'items' &&
+            parts[2] === 'position' &&
+            request.method === 'PUT'
+          ) {
+            const body = await readJson(request);
+            return sendJson(
+              response,
+              200,
+              store.saveReadingState(decodeURIComponent(parts[1]), body),
+            );
+          }
+
+          // Bookmarks
+          if (
+            parts.length === 3 &&
+            parts[0] === 'items' &&
+            parts[2] === 'bookmarks' &&
+            request.method === 'GET'
+          ) {
+            return sendJson(
+              response,
+              200,
+              store.getBookmarks(decodeURIComponent(parts[1])),
+            );
+          }
+          if (
+            parts.length === 3 &&
+            parts[0] === 'items' &&
+            parts[2] === 'bookmarks' &&
+            request.method === 'POST'
+          ) {
+            const body = await readJson(request);
+            return sendJson(
+              response,
+              201,
+              store.addBookmark(decodeURIComponent(parts[1]), body),
+            );
+          }
+          if (
+            parts.length === 4 &&
+            parts[0] === 'items' &&
+            parts[2] === 'bookmarks' &&
+            request.method === 'DELETE'
+          ) {
+            return sendJson(
+              response,
+              200,
+              store.deleteBookmark(
+                decodeURIComponent(parts[1]),
+                decodeURIComponent(parts[3]),
+              ),
+            );
+          }
+
+          // Reader Settings
+          if (parts.length === 1 && parts[0] === 'settings' && request.method === 'GET') {
+            return sendJson(response, 200, store.getSettings());
+          }
+          if (parts.length === 1 && parts[0] === 'settings' && request.method === 'PUT') {
+            const body = await readJson(request);
+            return sendJson(response, 200, store.saveSettings(body));
+          }
+
           return sendJson(response, 404, { error: 'Reader route not found' });
         } catch (error) {
           if (error instanceof SyntaxError) {

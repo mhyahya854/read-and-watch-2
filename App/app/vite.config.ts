@@ -154,7 +154,12 @@ export default defineConfig(async () => {
       libraryAssets(),
       libraryPlugin({ libraryDatabasePath }),
       userDataPlugin({ userDataRoot, libraryDatabasePath }),
-      readerPlugin({ libraryRoot, libraryDatabasePath, readerExecutable }),
+      readerPlugin({
+        libraryRoot,
+        libraryDatabasePath,
+        readerExecutable,
+        userDataRoot,
+      }),
       vinext(),
       sites(),
       cloudflare({

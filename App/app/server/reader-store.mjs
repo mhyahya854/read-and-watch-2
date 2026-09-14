@@ -1,11 +1,20 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { realpathSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import {
   basename,
   dirname,
   extname,
   isAbsolute,
+  join,
   relative,
   resolve,
 } from 'node:path';
@@ -38,6 +47,25 @@ function assertItemId(itemId) {
   if (typeof itemId !== 'string' || !ITEM_ID_PATTERN.test(itemId)) {
     fail('Invalid item ID');
   }
+}
+
+function assertItemIdOrSample(itemId) {
+  if (
+    typeof itemId !== 'string' ||
+    (!ITEM_ID_PATTERN.test(itemId) && !itemId.startsWith('sample-'))
+  ) {
+    fail('Invalid item ID');
+  }
+}
+
+function writeAtomic(target, content) {
+  mkdirSync(dirname(target), { recursive: true });
+  const tmp = join(
+    dirname(target),
+    `.${basename(target)}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  );
+  writeFileSync(tmp, content, 'utf8');
+  renameSync(tmp, target);
 }
 
 function assertSafeRelativePath(value, label) {
@@ -108,8 +136,12 @@ export function createReaderStore({
   libraryRoot,
   libraryDatabasePath,
   readerExecutable,
+  userDataRoot,
   launchReader = defaultLaunchReader,
 }) {
+  const userRoot = userDataRoot
+    ? resolve(userDataRoot)
+    : resolve(libraryRoot, '../user-data');
   const libraryStore = createLibraryStore({
     databasePath: libraryDatabasePath,
     readOnly: true,
@@ -220,7 +252,127 @@ export function createReaderStore({
     };
   }
 
-  return { getStatus, open, getFile, resolveItem };
+  function getReadingState(itemId) {
+    assertItemIdOrSample(itemId);
+    const target = join(userRoot, 'items', itemId, 'reading-state.json');
+    if (!existsSync(target)) return null;
+    try {
+      return JSON.parse(readFileSync(target, 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+
+  function saveReadingState(itemId, state) {
+    assertItemIdOrSample(itemId);
+    if (!state || typeof state !== 'object') {
+      fail('Invalid reading state payload');
+    }
+    const target = join(userRoot, 'items', itemId, 'reading-state.json');
+    const record = {
+      ...state,
+      updatedAt: new Date().toISOString(),
+    };
+    writeAtomic(target, JSON.stringify(record, null, 2));
+    return { ok: true, state: record };
+  }
+
+  function getBookmarks(itemId) {
+    assertItemIdOrSample(itemId);
+    const target = join(userRoot, 'items', itemId, 'bookmarks.json');
+    if (!existsSync(target)) return [];
+    try {
+      const parsed = JSON.parse(readFileSync(target, 'utf8'));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function addBookmark(itemId, bookmark) {
+    assertItemIdOrSample(itemId);
+    if (!bookmark || typeof bookmark !== 'object') {
+      fail('Invalid bookmark payload');
+    }
+    const target = join(userRoot, 'items', itemId, 'bookmarks.json');
+    const list = getBookmarks(itemId);
+    const id = bookmark.id || `bm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const newBookmark = {
+      id,
+      itemId,
+      location: bookmark.location,
+      sourceHash: bookmark.sourceHash,
+      createdAt: bookmark.createdAt || new Date().toISOString(),
+      ...(bookmark.label ? { label: String(bookmark.label).trim() } : {}),
+      ...(bookmark.snippet ? { snippet: String(bookmark.snippet).trim() } : {}),
+      ...(typeof bookmark.pageNumber === 'number' ? { pageNumber: bookmark.pageNumber } : {}),
+      ...(typeof bookmark.progression === 'number' ? { progression: bookmark.progression } : {}),
+    };
+    const updated = [newBookmark, ...list.filter((b) => b.id !== id)];
+    writeAtomic(target, JSON.stringify(updated, null, 2));
+    return newBookmark;
+  }
+
+  function deleteBookmark(itemId, bookmarkId) {
+    assertItemIdOrSample(itemId);
+    if (!bookmarkId || typeof bookmarkId !== 'string') {
+      fail('Invalid bookmark ID');
+    }
+    const target = join(userRoot, 'items', itemId, 'bookmarks.json');
+    const list = getBookmarks(itemId);
+    const updated = list.filter((b) => b.id !== bookmarkId);
+    writeAtomic(target, JSON.stringify(updated, null, 2));
+    return { ok: true, count: updated.length };
+  }
+
+  function getSettings() {
+    const target = join(userRoot, 'reader-settings.json');
+    const defaults = {
+      schemaVersion: 1,
+      theme: 'light',
+      fontSize: 16,
+      fontFamily: 'serif',
+      lineHeight: 1.6,
+      contentWidth: 'normal',
+      layoutMode: 'paginated',
+      showHeaderFooter: true,
+    };
+    if (!existsSync(target)) return defaults;
+    try {
+      return { ...defaults, ...JSON.parse(readFileSync(target, 'utf8')) };
+    } catch {
+      return defaults;
+    }
+  }
+
+  function saveSettings(settings) {
+    if (!settings || typeof settings !== 'object') {
+      fail('Invalid settings payload');
+    }
+    const target = join(userRoot, 'reader-settings.json');
+    const current = getSettings();
+    const updated = {
+      ...current,
+      ...settings,
+      schemaVersion: 1,
+    };
+    writeAtomic(target, JSON.stringify(updated, null, 2));
+    return updated;
+  }
+
+  return {
+    getStatus,
+    open,
+    getFile,
+    resolveItem,
+    getReadingState,
+    saveReadingState,
+    getBookmarks,
+    addBookmark,
+    deleteBookmark,
+    getSettings,
+    saveSettings,
+  };
 }
 
 
