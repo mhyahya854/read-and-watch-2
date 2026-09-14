@@ -271,3 +271,41 @@
   background-color: rgba(36, 75, 76, 0.15);
   border-radius: 2px;
 }
+
+/* Accessibility: Reduced motion overrides */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+[data-reduce-motion="reduce"] *,
+[data-reduce-motion="reduce"] ::before,
+[data-reduce-motion="reduce"] ::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Accessibility: High contrast focus ring */
+[data-high-contrast-focus="true"] *:focus-visible {
+  outline: 3px solid var(--primary) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--primary) 25%, transparent) !important;
+}
+
+/* Appearance: Font scale token overrides */
+[data-font-scale="compact"] {
+  font-size: 13.5px;
+}
+
+[data-font-scale="large"] {
+  font-size: 16.5px;
+}
+

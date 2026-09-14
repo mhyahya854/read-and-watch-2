@@ -9,6 +9,7 @@ import {
   BookOpen,
   Clapperboard,
   Columns3,
+  FolderOpen,
   Highlighter,
   LibraryBig,
   PenTool,
@@ -124,8 +125,22 @@ export function LibraryBrowser({
   const [showViewForm, setShowViewForm] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const isDesktop = typeof window !== 'undefined' && Boolean(window.readWatchDesktop);
   const confirmDiscard = () =>
     !dirty || window.confirm('Discard unsaved changes?');
+
+  const handleOpenBook = async () => {
+    if (typeof window !== 'undefined' && window.readWatchDesktop) {
+      try {
+        const res = await window.readWatchDesktop.chooseBookFiles({ multiple: false });
+        if (!res.canceled && res.files && res.files.length > 0) {
+          window.dispatchEvent(new CustomEvent('readwatch:open-file', { detail: res.files[0] }));
+        }
+      } catch {
+        // Dialog cancelled or unhandled
+      }
+    }
+  };
 
   async function refreshLibrary() {
     try {
@@ -341,7 +356,10 @@ export function LibraryBrowser({
   }
 
   return (
-    <main className="flex h-dvh min-h-[32rem] flex-col overflow-hidden bg-background text-foreground">
+    <main
+      id="main-content"
+      className="flex h-dvh min-h-[32rem] flex-col overflow-hidden bg-background text-foreground"
+    >
       <header className="flex h-14 shrink-0 items-center border-b border-border bg-surface px-3 md:px-5">
         <Link
           href="/"
@@ -355,12 +373,29 @@ export function LibraryBrowser({
           </span>
         </Link>
         <nav aria-label="Product" className="ml-auto flex items-center gap-1 text-sm">
+          {isDesktop && collection === 'read' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleOpenBook()}
+              className="mr-1 hidden h-8 text-xs sm:inline-flex"
+            >
+              <FolderOpen size={14} className="mr-1.5" />
+              Open Book...
+            </Button>
+          )}
           <Link
             href="/"
             aria-current="page"
             className="hidden rounded-md bg-surface-muted px-3 py-2 font-medium sm:block"
           >
             Library
+          </Link>
+          <Link
+            href="/settings"
+            className="hidden rounded-md px-3 py-2 text-muted-foreground hover:bg-surface-muted hover:text-foreground sm:block"
+          >
+            Settings
           </Link>
           <Link
             href="/privacy"
@@ -775,10 +810,70 @@ export function LibraryBrowser({
                     </TableBody>
                   </Table>
                   {!filteredItems.length && (
-                    <div className="grid h-40 place-items-center border-t border-border px-6 text-center text-sm text-muted-foreground">
-                      {collectionItems.length
-                        ? 'No items match these filters.'
-                        : `No ${collection} items are in the library yet.`}
+                    <div className="flex flex-col items-center justify-center border-t border-border bg-surface p-8 text-center sm:p-12">
+                      {collectionItems.length === 0 ? (
+                        <div className="max-w-md space-y-3">
+                          <div className="mx-auto grid size-12 place-items-center rounded-lg border border-border bg-surface-muted text-muted-foreground">
+                            {collection === 'read' ? (
+                              <BookOpen size={24} />
+                            ) : (
+                              <Clapperboard size={24} />
+                            )}
+                          </div>
+                          <h2 className="font-editorial text-lg font-semibold text-foreground">
+                            {collection === 'read'
+                              ? 'No books in your Read library yet'
+                              : 'No items in your Watch library yet'}
+                          </h2>
+                          <p className="text-xs leading-relaxed text-muted-foreground">
+                            {collection === 'read'
+                              ? 'Read & Watch reads publications directly from your local filesystem. Add supported books (EPUB, PDF, MOBI, Comic formats) to your local library folder to begin reading, highlighting, and taking notes.'
+                              : 'Films, series, and video recordings in your configured local library directory appear here.'}
+                          </p>
+                          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                            {isDesktop && collection === 'read' && (
+                              <Button
+                                size="sm"
+                                onClick={() => void handleOpenBook()}
+                              >
+                                <FolderOpen size={14} className="mr-1.5" />
+                                Open Book File
+                              </Button>
+                            )}
+                            <Link href="/settings">
+                              <Button variant="outline" size="sm">
+                                <Settings size={14} className="mr-1.5" />
+                                Library Settings
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="max-w-sm space-y-3">
+                          <div className="mx-auto grid size-10 place-items-center rounded-lg border border-border bg-surface-muted text-muted-foreground">
+                            <Search size={20} />
+                          </div>
+                          <h2 className="font-editorial text-base font-semibold text-foreground">
+                            No matching items found
+                          </h2>
+                          <p className="text-xs leading-relaxed text-muted-foreground">
+                            No items match your active search and filter criteria.
+                          </p>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setQuery('');
+                              setType('');
+                              setStatus('');
+                              setTag('');
+                            }}
+                            className="text-xs"
+                          >
+                            Reset filters
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

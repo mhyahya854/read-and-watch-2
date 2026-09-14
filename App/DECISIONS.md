@@ -415,3 +415,24 @@ Status: Accepted
 7. **Source Publication Immutability**:
    Original publication files remain strictly read-only. File open operations, hash computations, and metadata extractions never write, alter, or convert source files in place. Verified 100% byte-identical across all 151 local books.
 
+## D-051 - Phase 15 Legal Honesty, Global Settings Architecture, and Anti-Vibe Polish
+
+Status: Accepted
+
+1. **Truthful Legal Architecture Without Corporate Fiction**:
+   The Privacy Policy (`/privacy`) and Terms & Conditions (`/terms`) describe the implemented software architecture with complete fidelity. The software is disclosed as a private, local-first reading and media study workstation. No fictitious corporations, jurisdictions, GDPR/CCPA certifications, or commercial SaaS terms are claimed. Zero telemetry, zero analytics, zero cookies, and zero external tracking scripts are verified.
+
+2. **Global Settings Architecture with Resilient Atomic Persistence**:
+   Global application preferences are managed by `server/settings-store.mjs` with atomic filesystem writes (`user-data/app-settings.json`), clamped numerical ranges, enumerated value validation, and graceful recovery to defaults upon JSON corruption. Schema versions are strictly checked (`schemaVersion: 1`), failing closed against unsupported future versions.
+
+3. **Data Protection Hard Gate on Settings Reset (P15-G002 & Section 182)**:
+   Resetting preferences restores appearance, reading defaults, library sorting, and accessibility to default values. It is strictly prohibited from deleting or altering library catalog items, reading notes, thoughts, annotations, bookmarks, canvases, knowledge graphs, or backup archives. Verified in automated test suite `tests/settings-store.test.mjs`.
+
+4. **Machine-Isolated Portable Settings Export/Import**:
+   Exporting settings generates a portable JSON package (`read-watch.settings` v1) containing user preferences while strictly excluding local machine paths, session tokens, and passwords.
+
+5. **First-Run, Empty States, and Accessible Native Opening**:
+   Empty library states provide calm, editorial guidance on placing books into the local library folder. When running on desktop, an "Open Book File..." action integrates with `DesktopOpenCoordinator` to resolve books by SHA-256 or display non-destructive file metadata.
+
+6. **Anti-Vibe Polish & Full Accessibility**:
+   User-facing copy contains zero em dashes (`—`), zero fake reviews, testimonials, follower counts, or cloud marketing teasers. Full keyboard focus navigation, Skip-to-Main-Content navigation, `@media (prefers-reduced-motion: reduce)`, and high-contrast focus rings are implemented and certified.

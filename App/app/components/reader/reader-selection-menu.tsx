@@ -210,7 +210,7 @@ export function ReaderSelectionMenu() {
       const bookTitle = snapshot.source?.title || 'Publication';
       const pageInfo =
         snapshot.currentPage > 0 ? ` (Page ${snapshot.currentPage})` : '';
-      const citation = `\n\n> "${selectedText}"\n> — *${bookTitle}${pageInfo}*\n`;
+      const citation = `\n\n> "${selectedText}"\n> - *${bookTitle}${pageInfo}*\n`;
 
       const nextContent = currentContent ? `${currentContent.trimEnd()}${citation}` : citation.trimStart();
 
@@ -267,7 +267,7 @@ export function ReaderSelectionMenu() {
 
       const bookTitle = snapshot.source?.title || 'Book';
       const pageNum = snapshot.currentPage > 0 ? ` p. ${snapshot.currentPage}` : '';
-      const excerptText = `"${selectedText}"\n\n— ${bookTitle}${pageNum}`;
+      const excerptText = `"${selectedText}"\n\n- ${bookTitle}${pageNum}`;
 
       // 2. Create text card element
       const elementId = generateCanvasElementId();

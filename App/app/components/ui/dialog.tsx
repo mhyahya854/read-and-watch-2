@@ -23,6 +23,12 @@ export function Dialog({
 
   useEffect(() => {
     if (!open) return;
+    const previousActive = document.activeElement as HTMLElement | null;
+    const focusable = dialogRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    focusable?.focus();
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.stopPropagation();
@@ -30,7 +36,10 @@ export function Dialog({
       }
     }
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      previousActive?.focus();
+    };
   }, [open, onClose]);
 
   if (!open) return null;

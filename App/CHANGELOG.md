@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-09-15 - Phase 15 privacy, terms, settings, and product polish
+
+- Conducted whole-product data flow, network, permission, and third-party inventory (`docs/project/PRODUCT_DATA_FLOW_INVENTORY.md`). Verified zero telemetry, zero analytics, zero cookies, zero external font/script CDNs, zero background outbound traffic.
+- Authored truthful Privacy Policy (`app/privacy/page.tsx`): 18 comprehensive sections, Table of Contents, stable anchor IDs, local-first disclosure, external search transparency, and removal of stale "separate reader process" claims.
+- Authored user-centric Terms & Conditions (`app/terms/page.tsx`): 15 structured sections, complete user ownership of notes and content, explicit backup responsibility, warranty and liability disclaimers, and standard open-source attribution without invented corporate entities.
+- Established legal metadata constants in `lib/legal-metadata.ts` (`APP_VERSION = '0.1.0'`, `LEGAL_DOCUMENT_VERSION = '1.0.0'`, `LEGAL_EFFECTIVE_DATE = 'September 15, 2026'`).
+- Added accessible Skip-to-Main-Content navigation anchor (`#main-content`) across `app/layout.tsx` and all product page templates.
+- Implemented global application settings architecture:
+  - Canonical data models and schemas in `lib/settings/types.ts` and `schema.ts`: appearance (theme, font scale), reading defaults (typography, line spacing, margins, layout), library defaults, and accessibility. Clamped ranges, enumerated value validation, and fail-closed `schemaVersion > 1` guard.
+  - Persistent server store in `server/settings-store.mjs` with atomic writes to `user-data/app-settings.json` and resilient JSON corruption recovery to defaults.
+  - Mounted `/api/settings` endpoints in Vite development plugin and Electron desktop service.
+  - Interactive Settings Manager in `components/settings/settings-manager.tsx` mounted on `/settings`.
+  - Machine-isolated portable settings export and import (`read-watch.settings` v1).
+  - Hard-gated Settings Reset safety verification (`tests/settings-store.test.mjs` - `P15-G002` / Section 182): resetting preferences restores interface defaults without deleting or modifying books, notes, thoughts, annotations, bookmarks, canvases, diagrams, or backups.
+- Completed first-run, add/import, empty, loading, and error states in `components/library-browser.tsx`:
+  - Calm, informative empty states for Read and Watch collections with placement guidance and Settings links.
+  - Desktop native "Open Book File..." action integrated with `DesktopOpenCoordinator`.
+  - Desktop unregistered publication inspection modal with SHA-256 computation, format details, and clear non-destructive placement guidance.
+  - 1-click "Reset filters" on 0-match search results.
+- Executed whole-product visible copy and anti-vibe audit:
+  - Eliminated all em dashes (`—`) across all user-facing JSX/TSX copy in `app/`, `components/`, and `lib/`.
+  - Verified zero fake reviews, testimonials, ratings, metrics, avatars, user accounts, or cloud teasers.
+  - Removed legacy Readest runtime references in `README.md`.
+- Executed accessibility remediation:
+  - Full keyboard focus order and dialog focus management (auto-focusing first element, trapping, and restoring focus to trigger on close in `components/ui/dialog.tsx`).
+  - Added Escape key dismissal to all dialogs and modals.
+  - Implemented `@media (prefers-reduced-motion: reduce)` and `[data-reduce-motion="reduce"]` CSS overrides.
+  - Implemented high-contrast focus ring style (`[data-high-contrast-focus="true"]`).
+- Generated external visual review evidence in `READ_WATCH_DATA_ROOT/visual-review/phase-15/` (`manifest.json`, `REVIEW_INDEX.md`).
+- Passed Graphify audit (`docs/project/reports/PHASE_15_GRAPHIFY_AUDIT.md`) and Ponytail audit (`docs/project/reports/PHASE_15_PONYTAIL_AUDIT.md`).
+- Recorded D-051 in `DECISIONS.md`.
+- All 222 automated tests pass with 0 failures; repository hygiene and project governance checks pass.
+- Respected stop condition: stopped cleanly after Phase 15 closure without starting Phase 16.
+
 ## 2026-09-14 - Phase 14 desktop native integration
 
 - Executed exhaustive 33-criterion desktop shell evaluation matrix (`docs/project/DESKTOP_SHELL_EVALUATION.md`) comparing Electron, Tauri v2, Neutralinojs, Wails, and NW.js. Selected Outcome B (Adopt Electron 35.7.5) due to native Node.js 22.16.0 LTS embedding (`node:sqlite`, FTS5, file-first recovery mirrors, `pdf-lib`), delivering 100% architectural reuse of the 8 canonical application stores with zero child processes and zero dual-runtime drift.

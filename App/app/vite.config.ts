@@ -17,6 +17,7 @@ import { searchPlugin } from './server/search-vite-plugin.mjs';
 import { createSearchStore } from './server/search-store.mjs';
 import { portabilityPlugin } from './server/portability-vite-plugin.mjs';
 import { knowledgePlugin } from './server/knowledge-vite-plugin.mjs';
+import { settingsPlugin } from './server/settings-vite-plugin.mjs';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
@@ -179,6 +180,9 @@ export default defineConfig(async () => {
         libraryDatabasePath,
         userDataRoot,
         searchStore,
+      }),
+      settingsPlugin({
+        userDataRoot,
       }),
       vinext(),
       sites(),

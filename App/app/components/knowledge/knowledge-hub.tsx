@@ -477,7 +477,7 @@ export function KnowledgeHub() {
                 Knowledge Tool Selection Constitution
               </h2>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Read & Watch rejects the &ldquo;everything is a graph&rdquo; fallacy. Instead of forcing all your thoughts into messy node webs, we provide four dedicated tools—each deployed strictly where its cognitive structure is best.
+                Read & Watch rejects the &ldquo;everything is a graph&rdquo; fallacy. Instead of forcing all your thoughts into messy node webs, we provide four dedicated tools, each deployed strictly where its cognitive structure is best.
               </p>
             </div>
 

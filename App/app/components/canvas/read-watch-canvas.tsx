@@ -327,7 +327,7 @@ export function ReadWatchCanvas({
         y: 115,
         width: 290,
         height: 90,
-        text: `"${quoteText}"\n\n— ${bookTitle || 'Linked Book'}`,
+        text: `"${quoteText}"\n\n- ${bookTitle || 'Linked Book'}`,
         fontSize: 14,
         fontFamily: 1,
         textAlign: 'left',

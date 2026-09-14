@@ -2,7 +2,7 @@
 
 /**
  * Desktop Open Coordinator.
- * Phase 14 — Desktop Native Integration.
+ * Phase 14 - Desktop Native Integration.
  *
  * Coordinates Windows Explorer "Open with" and file association events.
  * Resolves existing publications by stable SHA-256 identity.
@@ -17,16 +17,13 @@ export function DesktopOpenCoordinator() {
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.readWatchDesktop) {
-      return;
-    }
-
-    const bridge = window.readWatchDesktop;
+    if (typeof window === 'undefined') return;
 
     async function handleFile(file: DesktopFileInfo) {
+      if (!window.readWatchDesktop) return;
       try {
         setStatusNotice(`Checking library for "${file.name}"...`);
-        const resolved = await bridge.resolveOpenFile(file.path);
+        const resolved = await window.readWatchDesktop.resolveOpenFile(file.path);
         setStatusNotice(null);
 
         if (resolved.found && resolved.itemId) {
@@ -42,6 +39,22 @@ export function DesktopOpenCoordinator() {
       }
     }
 
+    const handleCustomOpen = (event: Event) => {
+      const customEvent = event as CustomEvent<DesktopFileInfo>;
+      if (customEvent.detail) {
+        void handleFile(customEvent.detail);
+      }
+    };
+    window.addEventListener('readwatch:open-file', handleCustomOpen);
+
+    if (!window.readWatchDesktop) {
+      return () => {
+        window.removeEventListener('readwatch:open-file', handleCustomOpen);
+      };
+    }
+
+    const bridge = window.readWatchDesktop;
+
     // Check for any file passed at cold launch
     void bridge.getPendingOpenFiles().then((files) => {
       if (files.length > 0) {
@@ -55,9 +68,22 @@ export function DesktopOpenCoordinator() {
     });
 
     return () => {
+      window.removeEventListener('readwatch:open-file', handleCustomOpen);
       unsubscribe();
     };
   }, []);
+
+  // Handle Escape key to dismiss dialog
+  useEffect(() => {
+    if (!unregisteredFile) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setUnregisteredFile(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [unregisteredFile]);
 
   if (statusNotice) {
     return (
@@ -86,11 +112,11 @@ export function DesktopOpenCoordinator() {
         <h2 id="open-dialog-title" className="text-base font-serif font-bold text-[#1c1c1a] mb-2">
           Open External Publication
         </h2>
-        <p className="text-xs text-[#52524e] mb-4 leading-relaxed">
-          This publication is not currently part of your local library catalog.
+        <p className="text-xs text-[#52524e] mb-3 leading-relaxed">
+          This publication is not currently part of your local library catalog. To include it in your library, copy or move this file into your library folder (<code className="font-mono text-[11px] bg-[#f4f4f2] px-1 py-0.5 rounded">data/library/read</code>).
         </p>
 
-        <div className="bg-[#f4f4f2] border border-[#e5e5e2] rounded p-3 text-xs mb-5 space-y-1.5 font-mono">
+        <div className="bg-[#f4f4f2] border border-[#e5e5e2] rounded p-3 text-xs mb-4 space-y-1.5 font-mono">
           <div className="flex justify-between">
             <span className="text-[#73736c]">File:</span>
             <span className="text-[#1c1c1a] font-semibold truncate max-w-[240px]" title={file.name}>
@@ -113,7 +139,7 @@ export function DesktopOpenCoordinator() {
           </div>
         </div>
 
-        <div className="text-xs text-[#73736c] mb-6 italic">
+        <div className="text-xs text-[#73736c] mb-5">
           Note: Source publications are strictly read-only and will never be modified or converted in place.
         </div>
 
@@ -123,14 +149,12 @@ export function DesktopOpenCoordinator() {
             onClick={() => setUnregisteredFile(null)}
             className="px-3.5 py-1.5 text-xs rounded border border-[#d6d6d2] bg-white text-[#1c1c1a] hover:bg-[#f4f4f2] transition-colors cursor-pointer"
           >
-            Cancel
+            Close
           </button>
           <button
             type="button"
-            onClick={() => {
-              // Dismiss modal and return to library
-              setUnregisteredFile(null);
-            }}
+            autoFocus
+            onClick={() => setUnregisteredFile(null)}
             className="px-3.5 py-1.5 text-xs rounded bg-[#244b4c] text-white hover:bg-[#1a3839] transition-colors cursor-pointer font-medium"
           >
             Return to Library

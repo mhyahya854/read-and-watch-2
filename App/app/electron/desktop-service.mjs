@@ -22,6 +22,7 @@ import { createCanvasStore } from '../server/canvas-store.mjs';
 import { createKnowledgeStore } from '../server/knowledge-store.mjs';
 import { createSearchStore } from '../server/search-store.mjs';
 import { createPortabilityStore } from '../server/portability-store.mjs';
+import { createSettingsStore } from '../server/settings-store.mjs';
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -135,6 +136,10 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     libraryRoot,
     userDataRoot,
     searchStore,
+  });
+
+  const settingsStore = createSettingsStore({
+    userDataRoot,
   });
 
   const sessionToken = randomBytes(32).toString('hex');
@@ -481,6 +486,31 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         return sendJson(res, 200, portabilityStore.preflightRestore(buf));
       }
       return sendJson(res, 404, { error: 'Portability route not found' });
+    }
+
+    // -------------------------------------------------------------
+    // Settings APIs: /api/settings/*
+    // -------------------------------------------------------------
+    if (pathname.startsWith('/api/settings')) {
+      const sub = pathname.replace(/^\/api\/settings\/?/, '');
+      if ((sub === '' || sub === '/') && method === 'GET') {
+        return sendJson(res, 200, settingsStore.getSettings());
+      }
+      if ((sub === '' || sub === '/') && method === 'PUT') {
+        const body = await readJsonBody(req);
+        return sendJson(res, 200, settingsStore.saveSettings(body));
+      }
+      if (sub === 'reset' && method === 'POST') {
+        return sendJson(res, 200, settingsStore.resetSettings());
+      }
+      if (sub === 'export' && method === 'GET') {
+        return sendJson(res, 200, settingsStore.exportSettings());
+      }
+      if (sub === 'import' && method === 'POST') {
+        const body = await readJsonBody(req);
+        return sendJson(res, 200, settingsStore.importSettings(body));
+      }
+      return sendJson(res, 404, { error: 'Settings route not found' });
     }
 
     return sendJson(res, 404, { error: 'Unknown API endpoint' });

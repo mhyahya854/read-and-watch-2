@@ -6,6 +6,8 @@ const baseClass =
 const variants = {
   default: 'bg-primary text-primary-foreground hover:bg-primary/90',
   secondary: 'border-border bg-surface text-secondary-foreground hover:bg-surface-muted',
+  outline: 'border-border bg-transparent text-foreground hover:bg-surface-muted',
+  destructive: 'bg-destructive text-white hover:bg-destructive/90',
   ghost: 'text-muted-foreground hover:bg-surface-muted hover:text-foreground',
 } as const;
 

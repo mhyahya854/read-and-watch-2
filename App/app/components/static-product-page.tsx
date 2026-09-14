@@ -33,22 +33,28 @@ export function StaticProductPage({
             Read &amp; Watch
           </span>
         </Link>
-        <nav aria-label="Product" className="ml-auto flex items-center gap-1 text-sm">
+        <nav aria-label="Product" className="ml-auto flex items-center gap-1 text-xs sm:text-sm">
           <Link
             href="/"
-            className="rounded-md px-3 py-2 text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+            className="rounded-md px-2 py-1.5 text-muted-foreground hover:bg-surface-muted hover:text-foreground sm:px-3 sm:py-2"
           >
             Library
           </Link>
           <Link
+            href="/settings"
+            className="rounded-md px-2 py-1.5 text-muted-foreground hover:bg-surface-muted hover:text-foreground sm:px-3 sm:py-2"
+          >
+            Settings
+          </Link>
+          <Link
             href="/privacy"
-            className="hidden rounded-md px-3 py-2 text-muted-foreground hover:bg-surface-muted hover:text-foreground sm:block"
+            className="rounded-md px-2 py-1.5 text-muted-foreground hover:bg-surface-muted hover:text-foreground sm:px-3 sm:py-2"
           >
             Privacy
           </Link>
           <Link
             href="/terms"
-            className="hidden rounded-md px-3 py-2 text-muted-foreground hover:bg-surface-muted hover:text-foreground sm:block"
+            className="rounded-md px-2 py-1.5 text-muted-foreground hover:bg-surface-muted hover:text-foreground sm:px-3 sm:py-2"
           >
             Terms
           </Link>
@@ -76,7 +82,7 @@ export function StaticProductPage({
             ))}
           </nav>
         </aside>
-        <article className="mx-auto w-full max-w-3xl px-5 py-10 md:px-10 md:py-14">
+        <article id="main-content" className="mx-auto w-full max-w-3xl px-5 py-10 md:px-10 md:py-14">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
             {eyebrow}
           </p>

@@ -987,7 +987,7 @@ Stop after Phase 14. Do not start final product polish.
 
 ## PHASE-15 - PRIVACY, TERMS, SETTINGS, AND PRODUCT POLISH
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -1007,20 +1007,20 @@ No invented legal claims, fake users/accounts/testimonials/metrics, SaaS marketi
 
 ### Checklist
 
-- [ ] P15-T001 Inventory actual data flows, storage, third parties, permissions, exports, updates, and network behavior.
-- [ ] P15-T002 Draft and review Privacy Policy and Terms against implemented architecture and jurisdictional needs.
-- [ ] P15-T003 Implement legal routes, version/date display, and accessible navigation.
-- [ ] P15-T004 Implement settings with validated defaults, persistence, reset, import/export, and recovery.
-- [ ] P15-T005 Complete first-run, add/import, empty, loading, error, offline, and recovery states.
-- [ ] P15-T006 Complete keyboard and accessibility review and fix in-scope failures.
-- [ ] P15-T007 Audit all visible copy against the design constitution and product truthfulness.
+- [x] P15-T001 Inventory actual data flows, storage, third parties, permissions, exports, updates, and network behavior.
+- [x] P15-T002 Draft and review Privacy Policy and Terms against implemented architecture and jurisdictional needs.
+- [x] P15-T003 Implement legal routes, version/date display, and accessible navigation.
+- [x] P15-T004 Implement settings with validated defaults, persistence, reset, import/export, and recovery.
+- [x] P15-T005 Complete first-run, add/import, empty, loading, error, offline, and recovery states.
+- [x] P15-T006 Complete keyboard and accessibility review and fix in-scope failures.
+- [x] P15-T007 Audit all visible copy against the design constitution and product truthfulness.
 
 ### Verification gates
 
-- [ ] P15-G001 Legal text maps to measured current behavior and has no deceptive claims.
-- [ ] P15-G002 Settings, reset, first-run, recovery, keyboard, and accessibility checks pass.
-- [ ] P15-G003 Anti-vibe and fake-content audit passes.
-- [ ] P15-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P15-G001 Legal text maps to measured current behavior and has no deceptive claims.
+- [x] P15-G002 Settings, reset, first-run, recovery, keyboard, and accessibility checks pass.
+- [x] P15-G003 Anti-vibe and fake-content audit passes.
+- [x] P15-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

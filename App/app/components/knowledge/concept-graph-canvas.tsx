@@ -553,9 +553,9 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
                           {n.nodeType}
                         </Badge>
                       </td>
-                      <td className="py-3 px-3 text-muted-foreground max-w-xs truncate">{n.notes || '—'}</td>
+                      <td className="py-3 px-3 text-muted-foreground max-w-xs truncate">{n.notes || '-'}</td>
                       <td className="py-3 px-3">
-                        {n.deepLink ? <DeepLinkBadge link={n.deepLink} /> : <span className="text-muted-foreground">—</span>}
+                        {n.deepLink ? <DeepLinkBadge link={n.deepLink} /> : <span className="text-muted-foreground">-</span>}
                       </td>
                       <td className="py-3 px-3 text-right space-x-2">
                         <Button size="sm" variant="ghost" onClick={() => openInspector(n.id)} className="h-7 text-xs px-2">
