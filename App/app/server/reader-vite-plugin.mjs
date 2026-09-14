@@ -1,10 +1,11 @@
 import { createReadStream, existsSync } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createReaderStore } from './reader-store.mjs';
 import { createAnnotationStore } from './annotation-store.mjs';
+import { createCanvasStore } from './canvas-store.mjs';
 
-const MAX_BODY_BYTES = 256 * 1024; // 256 KB — sufficient for annotation batch payloads
+const MAX_BODY_BYTES = 16 * 1024 * 1024; // 16 MB — supports canvas payloads, exports, and image assets
 const FORMAT_MIME_TYPES = {
   EPUB: 'application/epub+zip',
   MOBI: 'application/x-mobipocket-ebook',
@@ -28,16 +29,18 @@ function sendJson(response, status, payload) {
 
 async function readJson(request) {
   const chunks = [];
-  let size = 0;
+  let totalBytes = 0;
   for await (const chunk of request) {
-    size += chunk.length;
-    if (size > MAX_BODY_BYTES) {
-      throw Object.assign(new Error('Request body too large'), { status: 413 });
+    totalBytes += chunk.length;
+    if (totalBytes > MAX_BODY_BYTES) {
+      throw Object.assign(new Error('Request body exceeds limit'), {
+        status: 413,
+      });
     }
     chunks.push(chunk);
   }
-  const body = Buffer.concat(chunks).toString('utf8');
-  return body ? JSON.parse(body) : {};
+  const raw = Buffer.concat(chunks).toString('utf8').trim();
+  return raw ? JSON.parse(raw) : {};
 }
 
 export function readerPlugin({
@@ -54,6 +57,11 @@ export function readerPlugin({
   });
 
   const annotationStore = createAnnotationStore({
+    databasePath: libraryDatabasePath,
+    userDataRoot,
+  });
+
+  const canvasStore = createCanvasStore({
     databasePath: libraryDatabasePath,
     userDataRoot,
   });
@@ -106,6 +114,43 @@ export function readerPlugin({
               return;
             }
             return sendJson(response, 404, { error: 'PDF.js asset not found' });
+          }
+
+          // -------------------------------------------------------------------
+          // Excalidraw — local static assets (fonts, locales, data)
+          // GET /api/reader/excalidraw-assets/*
+          // -------------------------------------------------------------------
+          if (parts[0] === 'excalidraw-assets') {
+            const excalidrawProdRoot = resolve(
+              dirname(fileURLToPath(import.meta.url)),
+              '../node_modules/@excalidraw/excalidraw/dist/prod',
+            );
+            const relativeAsset = parts.slice(1).map(decodeURIComponent).join('/');
+            if (relativeAsset.includes('..')) {
+              return sendJson(response, 400, { error: 'Invalid asset path' });
+            }
+            const assetPath = resolve(excalidrawProdRoot, relativeAsset);
+            if (!existsSync(assetPath)) {
+              return sendJson(response, 404, { error: 'Excalidraw asset not found' });
+            }
+            const ext = extname(assetPath).toLowerCase();
+            const MIME_TYPES = {
+              '.woff2': 'font/woff2',
+              '.woff': 'font/woff',
+              '.ttf': 'font/ttf',
+              '.js': 'application/javascript; charset=utf-8',
+              '.json': 'application/json; charset=utf-8',
+              '.css': 'text/css; charset=utf-8',
+              '.png': 'image/png',
+              '.svg': 'image/svg+xml',
+            };
+            const mime = MIME_TYPES[ext] || 'application/octet-stream';
+            response.statusCode = 200;
+            response.setHeader('Content-Type', mime);
+            response.setHeader('X-Content-Type-Options', 'nosniff');
+            response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            createReadStream(assetPath).pipe(response);
+            return;
           }
 
           if (
@@ -371,6 +416,161 @@ export function readerPlugin({
           ) {
             const itemId = decodeURIComponent(parts[1]);
             return sendJson(response, 200, annotationStore.recoverFromExternalFile(itemId));
+          }
+
+          // ===================================================================
+          // CANVASES (Phase 10 — Book-Linked Excalidraw Notes)
+          // ===================================================================
+
+          // GET /api/reader/canvases — list canvases
+          if (parts.length === 1 && parts[0] === 'canvases' && request.method === 'GET') {
+            const itemId = url.searchParams.get('itemId') || undefined;
+            const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
+            return sendJson(response, 200, canvasStore.listCanvases({ itemId, includeDeleted }));
+          }
+
+          // POST /api/reader/canvases — create canvas
+          if (parts.length === 1 && parts[0] === 'canvases' && request.method === 'POST') {
+            const body = await readJson(request);
+            const created = canvasStore.createCanvas(body);
+            return sendJson(response, 201, created);
+          }
+
+          // POST /api/reader/canvases/import — import / restore canvas package
+          if (parts.length === 2 && parts[0] === 'canvases' && parts[1] === 'import' && request.method === 'POST') {
+            const body = await readJson(request);
+            const pkg = body.package || body;
+            const newId = body.newId === true;
+            return sendJson(response, 201, canvasStore.importCanvas(pkg, { newId }));
+          }
+
+          // GET /api/reader/items/:id/canvases — list canvases for a specific book
+          if (parts.length === 3 && parts[0] === 'items' && parts[2] === 'canvases' && request.method === 'GET') {
+            const itemId = decodeURIComponent(parts[1]);
+            const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
+            return sendJson(response, 200, canvasStore.listCanvases({ itemId, includeDeleted }));
+          }
+
+          // POST /api/reader/items/:id/canvases — create canvas attached to a book
+          if (parts.length === 3 && parts[0] === 'items' && parts[2] === 'canvases' && request.method === 'POST') {
+            const itemId = decodeURIComponent(parts[1]);
+            const body = await readJson(request);
+            body.itemId = itemId;
+            const created = canvasStore.createCanvas(body);
+            return sendJson(response, 201, created);
+          }
+
+          // GET /api/reader/items/:id/canvas-links — get all links for an item
+          if (parts.length === 3 && parts[0] === 'items' && parts[2] === 'canvas-links' && request.method === 'GET') {
+            const itemId = decodeURIComponent(parts[1]);
+            return sendJson(response, 200, canvasStore.getLinksForItem(itemId));
+          }
+
+          // GET /api/reader/annotations/:id/canvas-links — get links for an annotation
+          if (parts.length === 3 && parts[0] === 'annotations' && parts[2] === 'canvas-links' && request.method === 'GET') {
+            const annotationId = decodeURIComponent(parts[1]);
+            return sendJson(response, 200, canvasStore.getLinksForAnnotation(annotationId));
+          }
+
+          // GET /api/reader/canvases/:id — get canvas document
+          if (parts.length === 2 && parts[0] === 'canvases' && request.method === 'GET') {
+            const canvasId = decodeURIComponent(parts[1]);
+            return sendJson(response, 200, canvasStore.getCanvas(canvasId));
+          }
+
+          // PUT /api/reader/canvases/:id — update canvas scene + links
+          if (parts.length === 2 && parts[0] === 'canvases' && request.method === 'PUT') {
+            const canvasId = decodeURIComponent(parts[1]);
+            const body = await readJson(request);
+            const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision;
+            const updated = canvasStore.updateCanvas(canvasId, body, expectedRev);
+            return sendJson(response, 200, updated);
+          }
+
+          // PUT /api/reader/canvases/:id/metadata — rename canvas
+          if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'metadata' && request.method === 'PUT') {
+            const canvasId = decodeURIComponent(parts[1]);
+            const body = await readJson(request);
+            const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision;
+            const renamed = canvasStore.renameCanvas(canvasId, body.title, expectedRev);
+            return sendJson(response, 200, renamed);
+          }
+
+          // DELETE /api/reader/canvases/:id — soft delete
+          if (parts.length === 2 && parts[0] === 'canvases' && request.method === 'DELETE') {
+            const canvasId = decodeURIComponent(parts[1]);
+            const body = await readJson(request);
+            const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision;
+            const result = canvasStore.deleteCanvas(canvasId, expectedRev);
+            return sendJson(response, 200, result);
+          }
+
+          // PATCH /api/reader/canvases/:id/restore — restore soft deleted
+          if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'restore' && request.method === 'PATCH') {
+            const canvasId = decodeURIComponent(parts[1]);
+            const body = await readJson(request);
+            const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined;
+            const restored = canvasStore.restoreCanvas(canvasId, expectedRev);
+            return sendJson(response, 200, restored);
+          }
+
+          // GET /api/reader/canvases/:id/links — get links
+          if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'links' && request.method === 'GET') {
+            const canvasId = decodeURIComponent(parts[1]);
+            return sendJson(response, 200, canvasStore.getCanvasLinks(canvasId));
+          }
+
+          // POST /api/reader/canvases/:id/links — add link
+          if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'links' && request.method === 'POST') {
+            const canvasId = decodeURIComponent(parts[1]);
+            const body = await readJson(request);
+            const createdLink = canvasStore.addCanvasLink(canvasId, body);
+            return sendJson(response, 201, createdLink);
+          }
+
+          // DELETE /api/reader/canvases/:id/links/:linkId — remove link
+          if (parts.length === 4 && parts[0] === 'canvases' && parts[2] === 'links' && request.method === 'DELETE') {
+            const linkId = decodeURIComponent(parts[3]);
+            return sendJson(response, 200, canvasStore.removeCanvasLink(linkId));
+          }
+
+          // POST /api/reader/canvases/:id/assets — upload image asset
+          if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'assets' && request.method === 'POST') {
+            const canvasId = decodeURIComponent(parts[1]);
+            const body = await readJson(request);
+            const buffer = Buffer.from(body.dataBase64, 'base64');
+            const asset = canvasStore.saveCanvasAsset(canvasId, {
+              originalName: body.originalName || 'image.png',
+              mimeType: body.mimeType || 'image/png',
+              buffer,
+            });
+            return sendJson(response, 201, asset);
+          }
+
+          // GET /api/reader/canvases/:id/assets/:assetId — serve asset
+          if (parts.length === 4 && parts[0] === 'canvases' && parts[2] === 'assets' && request.method === 'GET') {
+            const canvasId = decodeURIComponent(parts[1]);
+            const assetId = decodeURIComponent(parts[3]);
+            const { meta, buffer } = canvasStore.getCanvasAsset(canvasId, assetId);
+            response.statusCode = 200;
+            response.setHeader('Content-Type', meta.mimeType);
+            response.setHeader('Content-Length', meta.sizeBytes);
+            response.setHeader('X-Content-Type-Options', 'nosniff');
+            response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            response.end(buffer);
+            return;
+          }
+
+          // GET /api/reader/canvases/:id/export — export canvas
+          if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'export' && request.method === 'GET') {
+            const canvasId = decodeURIComponent(parts[1]);
+            return sendJson(response, 200, canvasStore.exportCanvas(canvasId));
+          }
+
+          // POST /api/reader/canvases/:id/recover — recover canvas from external file
+          if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'recover' && request.method === 'POST') {
+            const canvasId = decodeURIComponent(parts[1]);
+            return sendJson(response, 200, canvasStore.recoverCanvasFromExternal(canvasId));
           }
 
           return sendJson(response, 404, { error: 'Reader route not found' });

@@ -14,10 +14,13 @@ import { ReaderSidebar } from './reader-sidebar';
 import { ReaderViewport } from './reader-viewport';
 import { ReaderStatus } from './reader-status';
 import { ReaderSettingsDialog } from './reader-settings-dialog';
+import { ReadWatchCanvas, CanvasList } from '@/components/canvas';
 
 export function ReaderShell() {
   const {
     snapshot,
+    itemId,
+    readerStatus,
     next,
     prev,
     toggleBookmark,
@@ -25,6 +28,11 @@ export function ReaderShell() {
     setActiveSidebar,
     isSettingsOpen,
     setIsSettingsOpen,
+    isCanvasOpen,
+    setIsCanvasOpen,
+    activeCanvasId,
+    setActiveCanvasId,
+    mobileViewTab,
   } = useReader();
 
   const themeClass =
@@ -119,6 +127,8 @@ export function ReaderShell() {
     }
   };
 
+  const bookTitle = snapshot.metadata?.title || readerStatus?.candidates[0]?.name || 'Book';
+
   return (
     <div
       className={`flex flex-col h-screen w-screen overflow-hidden bg-background text-foreground select-none transition-colors duration-150 ${themeClass}`}
@@ -130,7 +140,64 @@ export function ReaderShell() {
 
       <div className="flex-1 relative flex overflow-hidden">
         <ReaderSidebar />
-        <ReaderViewport />
+
+        {/* Reader Viewport Pane */}
+        <div
+          className={`h-full overflow-hidden transition-all duration-150 ${
+            isCanvasOpen
+              ? mobileViewTab === 'canvas'
+                ? 'hidden md:flex md:w-1/2 min-w-[320px] border-r border-border'
+                : 'flex flex-1 md:w-1/2 min-w-[320px] border-r border-border'
+              : 'flex-1'
+          }`}
+        >
+          <ReaderViewport />
+        </div>
+
+        {/* Beside-Reader Canvas Workspace (Phase 10 — P10-T006) */}
+        {isCanvasOpen && (
+          <div
+            className={`h-full overflow-hidden bg-surface transition-all duration-150 ${
+              mobileViewTab === 'reader'
+                ? 'hidden md:flex md:w-1/2 min-w-[320px]'
+                : 'flex flex-1 md:w-1/2 min-w-[320px]'
+            }`}
+          >
+            {activeCanvasId ? (
+              <ReadWatchCanvas
+                canvasId={activeCanvasId}
+                bookTitle={bookTitle}
+                itemId={itemId}
+                isBesideReader={true}
+                onClose={() => setActiveCanvasId(null)}
+              />
+            ) : (
+              <div className="flex flex-col h-full w-full">
+                <div className="p-3 border-b border-border bg-surface flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-foreground">Canvas Notes</span>
+                    <span className="text-[11px] text-muted-foreground font-mono">({bookTitle})</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCanvasOpen(false)}
+                    className="text-xs text-muted-foreground hover:text-foreground p-1 rounded"
+                    title="Close Canvas"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <CanvasList
+                    itemId={itemId}
+                    bookTitle={bookTitle}
+                    onSelectCanvas={(id) => setActiveCanvasId(id)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <ReaderStatus />

@@ -50,6 +50,12 @@ export interface ReaderContextValue {
   setIsSettingsOpen: (open: boolean) => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
   isCurrentLocationBookmarked: boolean;
+  isCanvasOpen: boolean;
+  setIsCanvasOpen: (open: boolean) => void;
+  activeCanvasId: string | null;
+  setActiveCanvasId: (id: string | null) => void;
+  mobileViewTab: 'reader' | 'canvas';
+  setMobileViewTab: (tab: 'reader' | 'canvas') => void;
 
   // Actions
   goTo: (location: DocumentLocation) => Promise<void>;
@@ -95,6 +101,9 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
   const [snapshot, setSnapshot] = useState<ReaderSessionSnapshot>(() => session.snapshot);
   const [activeSidebar, setActiveSidebar] = useState<SidebarTab>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
+  const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
+  const [mobileViewTab, setMobileViewTab] = useState<'reader' | 'canvas'>('reader');
   const [readerStatus, setReaderStatus] = useState<ReaderStatus | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -351,6 +360,12 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
     setActiveSidebar,
     isSettingsOpen,
     setIsSettingsOpen,
+    isCanvasOpen,
+    setIsCanvasOpen,
+    activeCanvasId,
+    setActiveCanvasId,
+    mobileViewTab,
+    setMobileViewTab,
     containerRef,
     isCurrentLocationBookmarked,
     goTo,

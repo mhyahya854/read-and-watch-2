@@ -9,7 +9,7 @@ Verified against official upstream repository metadata on 2026-09-08. License co
 | Foliate-JS | Pinned vendored reflowable engine | `https://github.com/johnfactotum/foliate-js` | MIT | Yes, vendored under `App/forks/foliate-js/` | Pinned commit `78914aef4466eb960965702401634c2cb348e9b1`; core reflowable modules only; zero modifications to upstream code |
 | PDF.js | Production PDF runtime engine | `https://github.com/mozilla/pdf.js` | Apache-2.0 | Yes, pinned package `pdfjs-dist@4.10.38` | Pinned exact package `pdfjs-dist@4.10.38`; worker served locally from controlled app assets; zero Mozilla viewer chrome |
 | pdf-lib | Derived export tool | `https://github.com/Hopding/pdf-lib` | MIT | npm dependency present; unused | Keep only when a verified export task needs it; otherwise remove in phase scope |
-| Excalidraw | Book-linked canvas engine | `https://github.com/excalidraw/excalidraw` | MIT | No | Pin package/source and review assets/notices in Phase 10 |
+| Excalidraw | Book-linked canvas engine | `https://github.com/excalidraw/excalidraw` | MIT | Yes, pinned package `@excalidraw/excalidraw@0.18.1` | Pinned exact package `@excalidraw/excalidraw@0.18.1`; fonts and locales served locally via `/api/reader/excalidraw-assets/`; zero cloud/CDN dependency |
 | React Flow / xyflow | Structured graph tool | `https://github.com/xyflow/xyflow` | MIT | No | Adopt only for topology-dependent Phase 13 work |
 | Mermaid | Text-defined diagrams | `https://github.com/mermaid-js/mermaid` | MIT | Placeholder only | Research and pin only when Phase 13 authorizes integration |
 | Calibre | Feature/reference system | `https://github.com/kovidgoyal/calibre` | GPL-3.0 | No | Reference concepts only; no canonical DB or wholesale embedding |

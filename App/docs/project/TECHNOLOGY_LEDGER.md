@@ -30,9 +30,12 @@ Use only for new annotated/exported derivatives where suitable. It is not a PDF 
 
 ## Excalidraw
 
-Relationship: `BOOK-LINKED HANDWRITTEN / DRAWN NOTES ENGINE`
+Relationship: `BOOK-LINKED HANDWRITTEN / DRAWN NOTES ENGINE (PINNED PACKAGE)`
 
-Use for handwriting, free drawing, sketches, arrows, shapes, text, safe images/excerpts, book-linked canvases, and deep links to passages/pages. Do not use it as the normal highlight engine, document renderer, canonical UI/database, or cloud-storage dependency. Read & Watch owns persistence.
+Capabilities: Handwriting, free drawing, sketches, arrows, lines, rectangles, ellipses, text, selection, safe image/excerpt insertion, and local canvas scene representation encapsulated behind Read & Watch `ReadWatchCanvas`.
+
+Pinned exact package: `@excalidraw/excalidraw@0.18.1` (MIT). Bundled fonts (Virgil, Cascadia, ComicShanns, Excalifont, Assistant, Lilita, Nunito, Xiaolai, Liberation) and localization assets are served 100% locally from the pinned package via `/api/reader/excalidraw-assets/` without CDN reliance. Collaboration, cloud storage, room servers, and external analytics are strictly disabled (`isCollaborating: false`). Read & Watch owns canonical identity, book association, SQLite metadata, atomic file-first persistence, revision-guarded concurrency, recovery, and bidirectional deep links.
+
 
 ## React Flow / xyflow
 

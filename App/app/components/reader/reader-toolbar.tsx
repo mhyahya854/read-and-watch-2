@@ -19,6 +19,7 @@ import {
   ZoomOut,
   RotateCw,
   SlidersHorizontal,
+  PenTool,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +32,10 @@ export function ReaderToolbar() {
     activeSidebar,
     setActiveSidebar,
     setIsSettingsOpen,
+    isCanvasOpen,
+    setIsCanvasOpen,
+    mobileViewTab,
+    setMobileViewTab,
     isCurrentLocationBookmarked,
     goBack,
     goForward,
@@ -252,6 +257,48 @@ export function ReaderToolbar() {
             >
               <RotateCw size={14} />
             </Button>
+          </div>
+        )}
+
+        {/* Beside-Reader Canvas Notes Toggle (Phase 10 — P10-T006) */}
+        <Button
+          type="button"
+          variant={isCanvasOpen ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setIsCanvasOpen(!isCanvasOpen)}
+          className="h-8 px-2 sm:px-2.5 text-xs"
+          title="Toggle Canvas Notes Workspace"
+          aria-label="Canvas Notes"
+        >
+          <PenTool size={14} />
+          <span className="hidden md:inline ml-1.5">Canvas</span>
+        </Button>
+
+        {/* Mobile Tab Switcher when Canvas is open on narrow screens */}
+        {isCanvasOpen && (
+          <div className="flex md:hidden items-center bg-surface-muted p-0.5 rounded border border-border text-[10px]">
+            <button
+              type="button"
+              onClick={() => setMobileViewTab('reader')}
+              className={`px-2 py-0.5 rounded font-medium ${
+                mobileViewTab === 'reader'
+                  ? 'bg-surface text-foreground shadow-xs'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              Book
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileViewTab('canvas')}
+              className={`px-2 py-0.5 rounded font-medium ${
+                mobileViewTab === 'canvas'
+                  ? 'bg-surface text-foreground shadow-xs'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              Canvas
+            </button>
           </div>
         )}
 
