@@ -4,16 +4,16 @@
   "canonical_remote": "mhyahya854/read-and-watch-2",
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
-  "current_phase_id": "PHASE-05",
+  "current_phase_id": "PHASE-06",
   "current_phase_status": "NOT_STARTED",
-  "current_task_id": "P05-T001",
-  "last_completed_phase_id": "PHASE-04",
-  "last_verified_local_head": "fc807ebe52ee01d7c9b7af26bffe6123b21cb1a2",
-  "last_verified_remote_head": "fc807ebe52ee01d7c9b7af26bffe6123b21cb1a2",
+  "current_task_id": "P06-T001",
+  "last_completed_phase_id": "PHASE-05",
+  "last_verified_local_head": "SEE_LIVE_GIT_HEAD",
+  "last_verified_remote_head": "SEE_LIVE_GIT_HEAD",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 04 adapter foundation refresh; 569 nodes, 1048 edges, 34 communities, 0 import cycles; integrity clean",
-  "last_ponytail_status": "PASS: Phase 04 adapter foundation complexity audit; zero new runtime dependencies; pure TypeScript with Node 24 native ESM",
+  "last_graphify_status": "PASS: Phase 05 reflowable book engine refresh; 636 nodes, 1269 edges, 29 communities, 0 import cycles; integrity clean",
+  "last_ponytail_status": "PASS: Phase 05 reflowable book engine complexity audit; zero new npm runtime dependencies; clean vendored Foliate-JS core",
   "active_blockers": [],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
@@ -27,5 +27,7 @@
   "phase_03_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_04_content_commit": "fc807ebe52ee01d7c9b7af26bffe6123b21cb1a2",
   "phase_04_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "exact_next_action": "In a fresh invocation, start P05-T001 by acquiring and isolating the reflowable Foliate-JS engine foundation without modifying existing components."
+  "phase_05_content_commit": "SEE_LIVE_GIT_HEAD",
+  "phase_05_closure_commit": "SEE_LIVE_GIT_HEAD",
+  "exact_next_action": "In a fresh invocation, start P06-T001 by researching and pinning PDF.js engine provenance for fixed-layout PDF rendering without modifying existing components."
 }

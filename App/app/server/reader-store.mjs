@@ -200,5 +200,27 @@ export function createReaderStore({
     return { ok: true, name: candidate.name, format: candidate.format };
   }
 
-  return { getStatus, open };
+  function getFile(itemId, selectedCandidateId) {
+    const { candidates } = resolveItem(itemId);
+    if (!candidates.length) fail('No supported local book', 404);
+    if (candidates.length > 1 && !selectedCandidateId) {
+      fail('Choose a book candidate', 400);
+    }
+    const candidate = selectedCandidateId
+      ? candidates.find(({ id }) => id === selectedCandidateId)
+      : candidates[0];
+    if (!candidate) fail('Unknown book candidate', 404);
+    if (!fileReady(candidate.source)) fail('Book file not found', 404);
+    return {
+      source: candidate.source,
+      name: candidate.name,
+      format: candidate.format,
+      sizeBytes: candidate.sizeBytes,
+      candidateId: candidate.id,
+    };
+  }
+
+  return { getStatus, open, getFile, resolveItem };
 }
+
+

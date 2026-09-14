@@ -1,6 +1,20 @@
+import { createReadStream } from 'node:fs';
 import { createReaderStore } from './reader-store.mjs';
 
 const MAX_BODY_BYTES = 16 * 1024;
+const FORMAT_MIME_TYPES = {
+  EPUB: 'application/epub+zip',
+  MOBI: 'application/x-mobipocket-ebook',
+  AZW: 'application/x-mobipocket-ebook',
+  AZW3: 'application/x-mobipocket-ebook',
+  FB2: 'application/x-fictionbook+xml',
+  FBZ: 'application/x-zip-compressed-fb2',
+  CBZ: 'application/vnd.comicbook+zip',
+  PDF: 'application/pdf',
+  TXT: 'text/plain; charset=utf-8',
+  MD: 'text/markdown; charset=utf-8',
+  MARKDOWN: 'text/markdown; charset=utf-8',
+};
 
 function sendJson(response, status, payload) {
   response.statusCode = status;
@@ -58,6 +72,23 @@ export function readerPlugin({
           if (
             parts.length === 3 &&
             parts[0] === 'items' &&
+            parts[2] === 'file' &&
+            request.method === 'GET'
+          ) {
+            const candidateId = url.searchParams.get('candidateId') || undefined;
+            const fileInfo = store.getFile(decodeURIComponent(parts[1]), candidateId);
+            const mime = FORMAT_MIME_TYPES[fileInfo.format] || 'application/octet-stream';
+            response.statusCode = 200;
+            response.setHeader('Content-Type', mime);
+            response.setHeader('Content-Length', fileInfo.sizeBytes);
+            response.setHeader('X-Content-Type-Options', 'nosniff');
+            response.setHeader('Cache-Control', 'private, no-cache');
+            createReadStream(fileInfo.source).pipe(response);
+            return;
+          }
+          if (
+            parts.length === 3 &&
+            parts[0] === 'items' &&
             parts[2] === 'open' &&
             request.method === 'POST'
           ) {
@@ -89,3 +120,4 @@ export function readerPlugin({
     },
   };
 }
+

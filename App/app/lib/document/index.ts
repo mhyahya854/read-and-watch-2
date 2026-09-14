@@ -14,4 +14,7 @@ export * from './session.ts';
 export * from './test-doubles/fake-pdf-adapter.ts';
 export * from './test-doubles/fake-reflowable-adapter.ts';
 export * from './test-doubles/conformance.ts';
+export * from './reflowable-adapter.ts';
+export * from './resource-boundary.ts';
+
 

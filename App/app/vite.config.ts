@@ -136,6 +136,21 @@ export default defineConfig(async () => {
         : {}),
     },
     plugins: [
+      {
+        name: 'foliate-stubs',
+        resolveId(id: string, importer?: string) {
+          if (importer && importer.includes('foliate-js') && (id === './pdf.js' || id === './tts.js')) {
+            return `\0virtual:foliate-stub:${id}`;
+          }
+          return null;
+        },
+        load(id: string) {
+          if (id.startsWith('\0virtual:foliate-stub:')) {
+            return 'export const makePDF = () => { throw new Error("PDF engine handled by Phase 06"); }; export class TTS {} export default {};';
+          }
+          return null;
+        },
+      },
       libraryAssets(),
       libraryPlugin({ libraryDatabasePath }),
       userDataPlugin({ userDataRoot, libraryDatabasePath }),

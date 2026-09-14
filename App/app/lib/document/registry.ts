@@ -81,3 +81,26 @@ export class DocumentAdapterRegistry {
 
 /** Global default registry instance */
 export const defaultAdapterRegistry = new DocumentAdapterRegistry();
+
+import { FoliateReflowableAdapter } from './reflowable-adapter.ts';
+
+export function registerReflowableAdapters(
+  registry: DocumentAdapterRegistry = defaultAdapterRegistry,
+  allowOverwrite = false
+): void {
+  const formats: DocumentFormat[] = ['epub', 'mobi', 'azw', 'azw3', 'fb2', 'cbz'];
+  for (const fmt of formats) {
+    registry.register(
+      {
+        format: fmt,
+        family: 'reflowable',
+        factory: () => new FoliateReflowableAdapter(),
+        displayName: `Foliate ${fmt.toUpperCase()} Adapter`,
+      },
+      allowOverwrite
+    );
+  }
+}
+
+registerReflowableAdapters(defaultAdapterRegistry, true);
+

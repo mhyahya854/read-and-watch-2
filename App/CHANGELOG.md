@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-14 - Phase 05 reflowable book engine
+
+- Pinned official upstream Foliate-JS commit `78914aef4466eb960965702401634c2cb348e9b1` (MIT) and vendored core reflowable rendering modules under `App/forks/foliate-js/` with zero modifications to upstream code.
+- Implemented production `FoliateReflowableAdapter` under `App/app/lib/document/reflowable-adapter.ts` conforming strictly to the canonical `DocumentAdapter` contract with full lifecycle state transitions, layout mode toggling, navigation, search with cancellation, selection, and anchor round-trips.
+- Registered reflowable adapter across EPUB, MOBI, AZW, AZW3, FB2, and CBZ formats in `defaultAdapterRegistry`.
+- Implemented `resource-boundary.ts` defending against Zip-Slip, directory traversal, unsafe resource protocols, and applying `STRICT_READER_CSP`.
+- Added server streaming endpoint `GET /api/reader/items/:id/file` with `X-Content-Type-Options: nosniff` and path containment.
+- Built verification reader interface at `App/app/app/reader/[id]/page.tsx` styled strictly with Phase 03 warm editorial design tokens; zero Foliate UI or branding.
+- Enforced PDF phase boundary: fixed-layout PDF items yield explicit user notices directing to reflowable items, strictly reserving PDF.js for Phase 06.
+- Source Immutability Gate passed: all 8 real local EPUB publications in `Read and Watch - Local Data/Read/Book` verified 100% byte-identical before and after reader operations.
+- Added 16 automated tests covering adapter conformance, resource boundary, format certification, and restore/source immutability (69/69 Node tests passing).
+- Captured 23 responsive screenshots across Desktop, Tablet, and Mobile in `READ_WATCH_DATA_ROOT/visual-review/phase-05/`.
+- Completed Graphify audit (636 nodes, 1269 edges, 29 communities, 0 import cycles) and Ponytail complexity audit.
+
 ## 2026-09-13 - Phase 04 document adapter foundation
 
 - Implemented the format-independent document adapter foundation under `App/app/lib/document/` with zero new runtime dependencies.

@@ -8,11 +8,11 @@ Keep React, TypeScript, the current build stack unless evidence justifies migrat
 
 ## Foliate-JS
 
-Relationship: `ENGINE / POSSIBLE PINNED FORK`
+Relationship: `VENDORED REFLOWABLE ENGINE`
 
-Intended capabilities: EPUB, MOBI, KF8/AZW3, FB2, CBZ, EPUB CFI, reflow, fixed layout, resources, progression, TOC, search primitives, selection, and locations.
+Capabilities: EPUB, MOBI, KF8/AZW3, FB2, CBZ, EPUB CFI, reflow, fixed layout, resources, progression, TOC, search primitives, selection, and locations encapsulated behind Read & Watch `DocumentAdapter`.
 
-Do not adopt Foliate app/demo chrome, library management, branding, experimental PDF as the primary PDF route, or engine-owned canonical user data. Research and pin only in Phase 05.
+Pinned upstream commit `78914aef4466eb960965702401634c2cb348e9b1` (MIT), vendored under `App/forks/foliate-js/` with zero modifications. Foliate app/demo chrome, branding, and engine-owned user data are excluded; all presentation UI is Read & Watch owned. PDF rendering is intentionally omitted and reserved for Phase 06 PDF.js.
 
 ## PDF.js
 

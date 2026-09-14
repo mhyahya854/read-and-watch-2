@@ -257,4 +257,14 @@ The format-independent document adapter foundation is implemented under `App/app
 7. Format-branching enforcement test verifying zero format-conditional branching exists across all presentation components.
 Zero production rendering engines (no Foliate-JS, no PDF.js) were integrated in Phase 04; legacy Readest bridge remains fully preserved.
 
+## D-041 - Phase 05 Reflowable Book Engine Implementation (Foliate-JS)
 
+Status: Accepted
+
+1. **Direct Source Vendoring**: Pinned official upstream repository `https://github.com/johnfactotum/foliate-js` at commit `78914aef4466eb960965702401634c2cb348e9b1` under MIT License (`App/forks/foliate-js/`). Evaluated and rejected the third-party npm package `foliate-js@1.0.1` as unendorsed and missing verification. Vendored only the core reflowable engine files (15 files) with zero modifications to upstream code. Unused dynamic imports (`./pdf.js`, `./tts.js`) are safely resolved via virtual stubs in `vite.config.ts`.
+2. **Production Reflowable Adapter**: Implemented `FoliateReflowableAdapter` conforming strictly to the canonical `DocumentAdapter` contract across EPUB, MOBI, AZW, AZW3, FB2, and CBZ formats. Supports lifecycle states, metadata extraction, hierarchical TOC tree, navigation, reading progression, search with cancellation, selection, text anchors, and layout switching (`paginated` vs `scrolled`).
+3. **Strict Phase Boundary on PDF**: Fixed-layout PDF publications are explicitly rejected by `FoliateReflowableAdapter` and handled by the reader interface with user-safe notices directing to reflowable books, strictly reserving PDF.js integration for Phase 06.
+4. **Resource & Security Boundary**: Implemented `App/app/lib/document/resource-boundary.ts` providing Zip-Slip defense, directory traversal rejection, null-byte prevention, URI scheme validation (rejecting `javascript:`, `vbscript:`, `file:`), and strict iframe Content Security Policy (`STRICT_READER_CSP`).
+5. **Path-Constrained Server Streaming**: Added `GET /api/reader/items/:id/file` with `X-Content-Type-Options: nosniff`, serving verified book bytes directly to the reader runtime via read-only Node streams without intermediate file tampering.
+6. **Source Immutability Gate**: Confirmed that all 8 real local EPUB publications in `Read and Watch - Local Data/Read/Book` remained 100% byte-identical before and after reader operations.
+7. **Read & Watch UI Ownership**: Verification reader interface at `App/app/app/reader/[id]/page.tsx` is built exclusively with Phase 03 design tokens; zero Foliate UI or branding exists in the application.

@@ -381,7 +381,7 @@ Stop after Phase 04. Do not acquire Foliate-JS.
 
 ## PHASE-05 - REFLOWABLE BOOK ENGINE
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -401,19 +401,19 @@ No Foliate UI/branding/library, primary PDF route, engine-owned user storage, OC
 
 ### Checklist
 
-- [ ] P05-T001 Research official upstream/forks, capabilities, maintenance, license, and security; choose and pin exact provenance.
-- [ ] P05-T002 Acquire only the selected source/package and record notices, pin, and changes.
-- [ ] P05-T003 Implement the reflowable adapter and resource boundary.
-- [ ] P05-T004 Implement TOC, navigation, layout modes, progression, search, selection, CFI/location, and restore.
-- [ ] P05-T005 Test each justified format with legal fixtures and available real books.
-- [ ] P05-T006 Verify Read & Watch UI ownership and source-file immutability.
+- [x] P05-T001 Research official upstream/forks, capabilities, maintenance, license, and security; choose and pin exact provenance.
+- [x] P05-T002 Acquire only the selected source/package and record notices, pin, and changes.
+- [x] P05-T003 Implement the reflowable adapter and resource boundary.
+- [x] P05-T004 Implement TOC, navigation, layout modes, progression, search, selection, CFI/location, and restore.
+- [x] P05-T005 Test each justified format with legal fixtures and available real books.
+- [x] P05-T006 Verify Read & Watch UI ownership and source-file immutability.
 
 ### Verification gates
 
-- [ ] P05-G001 Upstream provenance/license and exact pin are complete.
-- [ ] P05-G002 Supported-format capability matrix and adapter conformance pass.
-- [ ] P05-G003 Positions restore and source hashes remain unchanged.
-- [ ] P05-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P05-G001 Upstream provenance/license and exact pin are complete.
+- [x] P05-G002 Supported-format capability matrix and adapter conformance pass.
+- [x] P05-G003 Positions restore and source hashes remain unchanged.
+- [x] P05-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

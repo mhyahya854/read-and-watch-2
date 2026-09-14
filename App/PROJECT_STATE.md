@@ -4,11 +4,29 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-04` - Document Adapter Foundation.
+Last completed phase: `PHASE-05` - Reflowable Book Engine.
 
-Current actionable phase: `PHASE-05` - Reflowable Book Engine (`NOT_STARTED`).
+Current actionable phase: `PHASE-06` - PDF Engine (`NOT_STARTED`).
 
-Exact next task: `P05-T001` - acquire and isolate the reflowable Foliate-JS engine foundation without modifying existing components.
+Exact next task: `P06-T001` - research and pin PDF.js engine provenance for fixed-layout PDF rendering without modifying existing components.
+
+Phase 05 implementation results:
+
+- Pinned official upstream Foliate-JS commit `78914aef4466eb960965702401634c2cb348e9b1` (MIT); recorded in `App/forks/foliate-js/PROVENANCE.md`.
+- Vendored core reflowable rendering modules under `App/forks/foliate-js/` with zero modifications to upstream code. Non-core demo UI, TTS, OPDS, and PDF modules omitted.
+- Implemented `FoliateReflowableAdapter` under `App/app/lib/document/reflowable-adapter.ts` conforming strictly to the canonical `DocumentAdapter` contract with full lifecycle state machine, metadata extraction, hierarchical TOC tree, navigation, text search with cancellation, selection, and text anchor round-trips.
+- Implemented `resource-boundary.ts` enforcing Zip-Slip defense, directory traversal rejection, safe URI scheme validation, and strict reader Content Security Policy (`STRICT_READER_CSP`).
+- Added path-constrained server streaming endpoint `GET /api/reader/items/:id/file` with `X-Content-Type-Options: nosniff` in `reader-vite-plugin.mjs` and `reader-store.mjs`.
+- Implemented minimal verification reader interface at `App/app/app/reader/[id]/page.tsx` styled entirely with Phase 03 design tokens; zero Foliate UI or branding.
+- Enforced strict PDF phase boundary: fixed-layout PDF items yield explicit user notices directing to reflowable items, strictly reserving PDF.js for Phase 06.
+- Source Immutability Gate passed: all 8 real local EPUB publications in `Read and Watch - Local Data/Read/Book` verified 100% byte-identical before and after reader operations.
+- Automated tests: 69/69 Node tests passing (16 new tests covering conformance, resource boundary, format support, and restore/immutability).
+- Visual review: 23 responsive screenshots captured across Desktop (1440x900), Tablet (1024x768), and Mobile (390x844) under `READ_WATCH_DATA_ROOT/visual-review/phase-05/` with `manifest.json` and `REVIEW_INDEX.md`.
+- TypeScript 0 errors, oxlint 0 errors/warnings across 57 files, production build passing cleanly.
+- Graphify: PASS - 636 nodes, 1269 edges, 29 communities, 0 import cycles.
+- Ponytail: PASS - zero new npm dependencies, minimal server streaming surface, zero code bloat.
+
+Starting Phase 05 local/remote HEAD: `a4c7d8f56d8932d4d6f10e4e5bc93b4d12b579f2`.
 
 Phase 04 implementation results:
 
