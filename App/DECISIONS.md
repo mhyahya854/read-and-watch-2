@@ -362,3 +362,25 @@ Status: Accepted
 8. **Reflowable Annotation Portability Strategy**: Documented CFI and fuzzy quote context strategy with honest disclosure of why reflowable annotations cannot be "baked" into EPUB files without container mutation or layout instability.
 9. **Zero Telemetry, Zero Cloud**: 100% offline, local-first operation with standard HTML5 download triggers and zero cloud dependencies.
 
+## D-049 - Phase 13 Knowledge and Diagram System
+
+Status: Accepted
+
+1. **Calibrated 4-Tier Knowledge Tool Selection**: Knowledge tools are selected based on a strict constitution (`KNOWLEDGE_TOOL_SELECTION.md`) defining exact boundaries. (1) Simple native UI (plain text, lists) — default for notes/summaries. (2) Excalidraw (standalone concept canvases) — spatial, freeform, book-linked. (3) React Flow (`@xyflow/react@12.11.6`) — structured semantic topology with typed nodes/edges and deep links. (4) Mermaid (`mermaid@12.0.0`) — code-reviewed, text-defined technical diagrams. No tool encroaches on another's ownership.
+
+2. **React Flow as Transient Client-Side Projection**: React Flow state is derived from canonical `KnowledgeGraphDocument` on mount via `useMemo`. User mutations are buffered in React state. On save, the canonical document is reconstructed and persisted via `PUT /api/knowledge/graphs/:id`. React Flow has zero canonical data ownership; SQLite is the single source of truth.
+
+3. **Mermaid Strict Security Mode**: Mermaid is always initialized with `securityLevel: 'strict'` before any rendering call. SVG output is treated as derived and disposable. The canonical artifact is always the source text stored in `mermaid_documents.source_text`. This prevents XSS via embedded SVG scripts.
+
+4. **Accessible Fallback View**: `ConceptGraphCanvas` provides a complete accessible table/outline fallback view (`viewMode === 'table'`) when React Flow cannot render (SSR, assistive technology, or reduced-motion context). All graph data is readable without the visual canvas.
+
+5. **Read & Watch-Owned Deep Link Resolution**: All deep link resolution is server-side via `POST /api/knowledge/resolve-link`. The resolver queries `items`, `annotations`, and `canvases` tables in the local SQLite database. Supported link types: `item` (library book), `location` (reader position with anchor), `annotation` (specific highlight/note), `notes` (reader notes tab), `canvas` (Excalidraw canvas), `external` (web URL). Unresolved links display a calm `[?]` badge with a descriptive reason — no crashes, no silent failures.
+
+6. **File-First Crash Recovery**: Knowledge graphs and Mermaid diagrams are atomically mirrored to `user-data/knowledge/graphs/:id.json` and `user-data/knowledge/diagrams/:id.json`. `rebuildFromFiles()` can restore rows after SQLite corruption without data loss. Mermaid diagrams also write a `.mermaid` source file for human readability.
+
+7. **Portability Integration**: Knowledge graphs and Mermaid diagrams are included in unified backup bundles (`.rwbackup`) via `server/portability-store.mjs`. Conflict detection and restore preflight cover knowledge entities. Individual `.rwgraph` and `.rwmermaid` export formats are also supported.
+
+8. **Search Integration**: `server/search-store.mjs` `rebuildIndex()` indexes knowledge graph titles/descriptions/node labels and Mermaid diagram titles/source text. Queries use `try/catch` around knowledge table access so older databases without Phase 13 schema degrade gracefully without crash.
+
+9. **Ordinary Notes Remain Untouched**: Standard reading notes, book summaries, and annotations are completely unmodified by Phase 13. The knowledge system is additive; it creates a separate `/knowledge` route and data domain without touching any existing reader, annotation, or notes functionality.
+

@@ -4,11 +4,37 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-12` - Export and Portability.
+Last completed phase: `PHASE-13` - Knowledge and Diagram System.
 
-Current actionable phase: `PHASE-13` - Knowledge and Diagram System (`NOT_STARTED`).
+Current actionable phase: `PHASE-14` - Desktop Native Integration (`NOT_STARTED`).
 
-Exact next task: `P13-T001` - canvas-first knowledge graph architecture and link schema.
+Exact next task: `P14-T001` - desktop packaging framework evaluation and native boundaries.
+
+Phase 13 implementation results:
+
+- Established calibrated 4-tier knowledge tool selection constitution (`docs/project/KNOWLEDGE_TOOL_SELECTION.md`): Native UI < Excalidraw < React Flow < Mermaid.
+- Pinned `@xyflow/react@12.11.6` (MIT) for interactive semantic concept graphs, scoped strictly to `components/knowledge/concept-graph-canvas.tsx` as a transient client-side projection.
+- Pinned `mermaid@12.0.0` (MIT) for text-defined technical diagrams, scoped strictly to `components/knowledge/mermaid-editor.tsx` with enforced `securityLevel: 'strict'`.
+- Implemented canonical SQLite persistence in `server/knowledge-store.mjs`:
+  - DDL tables: `knowledge_graphs`, `knowledge_nodes`, `knowledge_edges`, `mermaid_documents`.
+  - Atomic file-first crash recovery mirrors in `user-data/knowledge/graphs/` and `user-data/knowledge/diagrams/`.
+  - Optimistic concurrency control (`expectedRevision` with 409 Conflict rejection).
+  - Soft-delete lifecycle tracking (`deleted_at_utc`).
+  - Automated crash recovery reconstruction (`rebuildFromFiles()`).
+  - Search invalidation integration (`notifySearchInvalidation()`).
+- Implemented server-side deep link resolution (`resolveDeepLink()`) for 6 reference types: library items, document locations with anchors, annotations with quote preview, reader notes tab, Excalidraw canvases, and external web URLs. Unresolved links display a calm notice without crashing.
+- Built Knowledge Hub dashboard (`app/knowledge/page.tsx`, `components/knowledge/knowledge-hub.tsx`) with 4 tabs: Concept Graphs, Text Diagrams, Standalone Canvases, and Tool Selection Guide.
+- Built accessible alternative table/outline fallback view in `concept-graph-canvas.tsx` ensuring complete readability when visual graph cannot render.
+- Integrated knowledge graphs and diagrams into derived search index (`server/search-store.mjs` FTS5 rebuild blocks 6 & 7).
+- Integrated knowledge entities into Phase 12 portability system: backup bundles (`.rwbackup`), preflight conflict detection, restore application, and standalone `.rwgraph` / `.rwmermaid` exports.
+- Automated tests: **213/213 tests passing** across entire test suite (`npm test`).
+- TypeScript compiler: **0 errors** (`npx tsc --noEmit`).
+- Linter: **0 warnings, 0 errors** (`npm run lint`).
+- Repository hygiene: **PASS** (`check_repository_hygiene.py`).
+- Project governance: **PASS** (`validate_project_state.py`).
+- Graphify audit: **PASS** (`PHASE_13_GRAPHIFY_AUDIT.md`).
+- Ponytail audit: **PASS** (`PHASE_13_PONYTAIL_AUDIT.md`).
+- Respected stop condition: stopped after Phase 13 without beginning desktop packaging.
 
 Phase 12 implementation results:
 

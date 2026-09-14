@@ -866,7 +866,7 @@ Stop after Phase 12. Do not start knowledge graphs.
 
 ## PHASE-13 - KNOWLEDGE AND DIAGRAM SYSTEM
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -886,19 +886,19 @@ No React Flow for ordinary notes/handwriting, no Mermaid as freeform canvas, no 
 
 ### Checklist
 
-- [ ] P13-T001 Define explicit selection criteria for Excalidraw, React Flow, Mermaid, or simple native UI.
-- [ ] P13-T002 Implement standalone concept canvases only if evidence supports them.
-- [ ] P13-T003 Pin and integrate React Flow for meaningful semantic topology.
-- [ ] P13-T004 Pin and integrate Mermaid for text-defined diagrams.
-- [ ] P13-T005 Implement Read & Watch-owned relationships and deep links to source material.
-- [ ] P13-T006 Verify graph/diagram export, persistence, accessibility, and recovery.
+- [x] P13-T001 Define explicit selection criteria for Excalidraw, React Flow, Mermaid, or simple native UI.
+- [x] P13-T002 Implement standalone concept canvases only if evidence supports them.
+- [x] P13-T003 Pin and integrate React Flow for meaningful semantic topology.
+- [x] P13-T004 Pin and integrate Mermaid for text-defined diagrams.
+- [x] P13-T005 Implement Read & Watch-owned relationships and deep links to source material.
+- [x] P13-T006 Verify graph/diagram export, persistence, accessibility, and recovery.
 
 ### Verification gates
 
-- [ ] P13-G001 Each implemented tool has a justified use case and no duplicated ownership.
-- [ ] P13-G002 Semantic graph integrity and deep-link tests pass with no dangling silent failures.
-- [ ] P13-G003 Ordinary notes and annotations remain simple and independent.
-- [ ] P13-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P13-G001 Each implemented tool has a justified use case and no duplicated ownership.
+- [x] P13-G002 Semantic graph integrity and deep-link tests pass with no dangling silent failures.
+- [x] P13-G003 Ordinary notes and annotations remain simple and independent.
+- [x] P13-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

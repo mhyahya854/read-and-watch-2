@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-09-14 - Phase 13 knowledge and diagram system
+
+- Established calibrated 4-tier knowledge tool selection constitution (`docs/project/KNOWLEDGE_TOOL_SELECTION.md`): Native UI < Excalidraw < React Flow < Mermaid.
+- Pinned and integrated `@xyflow/react@12.11.6` (MIT) for interactive semantic concept graphs, scoped strictly to `components/knowledge/concept-graph-canvas.tsx` as a transient client-side projection.
+- Pinned and integrated `mermaid@12.0.0` (MIT) for text-defined technical diagrams, scoped strictly to `components/knowledge/mermaid-editor.tsx` with enforced `securityLevel: 'strict'`.
+- Implemented canonical SQLite persistence in `server/knowledge-store.mjs`:
+  - DDL tables: `knowledge_graphs`, `knowledge_nodes`, `knowledge_edges`, `mermaid_documents`.
+  - Atomic file-first crash recovery mirrors in `user-data/knowledge/graphs/` and `user-data/knowledge/diagrams/`.
+  - Optimistic concurrency control (`expectedRevision` with 409 Conflict rejection).
+  - Soft-delete lifecycle tracking (`deleted_at_utc`).
+  - Automated crash recovery reconstruction (`rebuildFromFiles()`).
+  - Search invalidation integration (`notifySearchInvalidation()`).
+- Implemented server-side deep link resolution (`resolveDeepLink()`) for 6 reference types: library items, document locations with anchors, annotations with quote preview, reader notes tab, Excalidraw canvases, and external web URLs. Unresolved links display a calm notice without crashing.
+- Built Knowledge Hub dashboard (`app/knowledge/page.tsx`, `components/knowledge/knowledge-hub.tsx`) with 4 tabs: Concept Graphs, Text Diagrams, Standalone Canvases, and Tool Selection Guide.
+- Built accessible alternative table/outline fallback view in `concept-graph-canvas.tsx` ensuring complete readability when visual graph cannot render.
+- Integrated knowledge graphs and diagrams into derived search index (`server/search-store.mjs` FTS5 rebuild blocks 6 & 7).
+- Integrated knowledge entities into Phase 12 portability system: backup bundles (`.rwbackup`), preflight conflict detection, restore application, and standalone `.rwgraph` / `.rwmermaid` exports.
+- Added comprehensive automated tests in `tests/knowledge-store.test.mjs` (213/213 test cases passing across suite).
+- Maintained 100% source book immutability across all local books.
+- Recorded D-049 in `DECISIONS.md`; passed Graphify and Ponytail audits (`PHASE_13_GRAPHIFY_AUDIT.md`, `PHASE_13_PONYTAIL_AUDIT.md`).
+- Respected stop condition: stopped after Phase 13 without beginning desktop packaging.
+
 ## 2026-09-14 - Phase 12 export and portability
 
 - Established versioned portable schema family (`PORTABILITY_SCHEMA_VERSION = 1`) in `lib/portability/types.ts`: `read-watch.annotations`, `read-watch.notes`, `read-watch-canvas-export`, `read-watch.library-metadata`, `read-watch.backup`.
