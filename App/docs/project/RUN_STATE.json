@@ -8,8 +8,8 @@
   "current_phase_status": "NOT_STARTED",
   "current_task_id": "P09-T001",
   "last_completed_phase_id": "PHASE-08",
-  "last_verified_local_head": "81a9276c190b4795b7093c55d175d0b73276fde7",
-  "last_verified_remote_head": "81a9276c190b4795b7093c55d175d0b73276fde7",
+  "last_verified_local_head": "68142049842866ccf1b87e0355b279e4abe287f5",
+  "last_verified_remote_head": "68142049842866ccf1b87e0355b279e4abe287f5",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "last_graphify_status": "PASS: Phase 08 legacy Readest parity and retirement; 831 nodes, 1687 edges, 40 communities, 0 import cycles; integrity clean",
@@ -33,7 +33,7 @@
   "phase_06_closure_commit": "SEE_LIVE_GIT_HEAD",
   "phase_07_content_commit": "94aae776f8264aa53a8a8d70cae28e693d3cc0af",
   "phase_07_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "phase_08_content_commit": "PENDING_CONTENT_COMMIT",
+  "phase_08_content_commit": "68142049842866ccf1b87e0355b279e4abe287f5",
   "phase_08_closure_commit": "SEE_LIVE_GIT_HEAD",
   "exact_next_action": "In a fresh invocation, start PHASE-09 P09-T001 for unified annotation foundation."
 }
