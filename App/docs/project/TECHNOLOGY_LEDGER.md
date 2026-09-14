@@ -24,9 +24,9 @@ Pinned exact package: `pdfjs-dist@4.10.38` (Apache-2.0). Worker is served locall
 
 ## pdf-lib
 
-Relationship: `DERIVED PDF EXPORT TOOL`
+Relationship: `DERIVED PDF EXPORT TOOL (PINNED PACKAGE)`
 
-Use only for new annotated/exported derivatives where suitable. It is not a PDF renderer, and originals are never overwritten by default. The dependency is currently installed but unused; Ponytail records it for phase-scoped cleanup or later justified use.
+Pinned exact package: `pdf-lib@1.17.1` (MIT). Official upstream: `https://github.com/Hopding/pdf-lib`. Role: Safe generation of NEW annotated derivative PDFs in Phase 12. Strict boundaries: It is NOT a PDF renderer, NOT a reader, NOT a text extractor, and NOT a canonical annotation engine. Original source PDFs are NEVER mutated or overwritten. All UI rendering and reading remain 100% owned by Mozilla PDF.js behind Read & Watch `PdfAdapter`.
 
 ## Excalidraw
 

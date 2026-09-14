@@ -33,10 +33,15 @@ import {
   BookOpen,
   AlertCircle,
   FileText,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
+import {
+  downloadAnnotationsJson,
+  downloadAnnotationsMarkdown,
+} from '@/lib/portability/client';
 import {
   searchStudy,
   getSearchStatus,
@@ -182,6 +187,28 @@ export function StudyBrowser() {
     }
   };
 
+  const handleExportJson = async () => {
+    try {
+      const book = filterableBooks.find((b) => b.itemId === bookFilter);
+      const titleHint = book ? book.title : 'library-study';
+      await downloadAnnotationsJson(bookFilter || undefined, titleHint);
+      toast.success(`Exported annotations JSON for ${book ? book.title : 'entire library'}.`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to export annotations.');
+    }
+  };
+
+  const handleExportMarkdown = async () => {
+    try {
+      const book = filterableBooks.find((b) => b.itemId === bookFilter);
+      const titleHint = book ? book.title : 'library-study';
+      await downloadAnnotationsMarkdown(bookFilter || undefined, titleHint);
+      toast.success(`Exported Markdown projection for ${book ? book.title : 'entire library'}.`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to export annotations.');
+    }
+  };
+
   const handleClear = () => {
     setQuery('');
     setDebouncedQuery('');
@@ -256,6 +283,29 @@ export function StudyBrowser() {
 
           <div className="flex items-center gap-2">
             <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleExportJson}
+              className="text-xs h-7 gap-1 px-2.5 font-normal"
+              title={bookFilter ? 'Export annotations for filtered book (JSON)' : 'Export all library annotations (JSON)'}
+            >
+              <Download size={12} />
+              <span>Export JSON</span>
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleExportMarkdown}
+              className="text-xs h-7 gap-1 px-2.5 font-normal"
+              title={bookFilter ? 'Export human-readable Markdown notes' : 'Export all library Markdown notes'}
+            >
+              <FileText size={12} />
+              <span>Export MD</span>
+            </Button>
+            <Button
+              type="button"
               variant="secondary"
               size="sm"
               disabled={isRebuilding}

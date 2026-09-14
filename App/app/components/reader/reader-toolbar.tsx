@@ -20,14 +20,28 @@ import {
   RotateCw,
   SlidersHorizontal,
   PenTool,
+  Download,
+  FileJson,
+  FileText,
+  StickyNote,
+  FileDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { useToast } from '@/components/ui/toast';
+import {
+  downloadAnnotationsJson,
+  downloadAnnotationsMarkdown,
+  downloadNotes,
+} from '@/lib/portability/client';
 import { useReader } from './reader-context';
 
 export function ReaderToolbar() {
+  const toast = useToast();
   const {
     snapshot,
+    itemId,
     readerStatus,
     activeSidebar,
     setActiveSidebar,
@@ -56,6 +70,38 @@ export function ReaderToolbar() {
 
   const author = snapshot.metadata?.author;
   const formatBadge = snapshot.metadata?.format || readerStatus?.candidates[0]?.format;
+
+  const handleExportJson = async () => {
+    try {
+      await downloadAnnotationsJson(itemId, title);
+      toast.success('Annotations JSON downloaded.');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Export failed');
+    }
+  };
+
+  const handleExportMarkdown = async () => {
+    try {
+      await downloadAnnotationsMarkdown(itemId, title);
+      toast.success('Annotations Markdown downloaded.');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Export failed');
+    }
+  };
+
+  const handleExportNotes = async () => {
+    try {
+      await downloadNotes(itemId, title);
+      toast.success('Notes & Thoughts JSON downloaded.');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Export failed');
+    }
+  };
+
+  const handleExportAnnotatedPdf = () => {
+    const url = `/api/portability/pdf/${encodeURIComponent(itemId)}/annotated`;
+    window.open(url, '_blank');
+  };
 
   return (
     <header className="h-14 shrink-0 border-b border-border bg-surface px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 z-20">
@@ -301,6 +347,70 @@ export function ReaderToolbar() {
             </button>
           </div>
         )}
+
+        {/* Export Dropdown Menu (Phase 12 — P12-T002 / P12-T003 / P12-T005) */}
+        <DropdownMenu
+          trigger={(open, toggle) => (
+            <Button
+              type="button"
+              variant={open ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={toggle}
+              className="h-8 px-2 sm:px-2.5 text-xs"
+              title="Export Annotations, Notes, or Derivative"
+              aria-label="Export Menu"
+            >
+              <Download size={14} />
+              <span className="hidden lg:inline ml-1.5">Export</span>
+            </Button>
+          )}
+        >
+          {(close) => (
+            <div className="py-1">
+              <DropdownMenuItem
+                onClick={() => {
+                  close();
+                  void handleExportJson();
+                }}
+              >
+                <FileJson size={13} className="text-amber-500" />
+                <span>Export Annotations (JSON)</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  close();
+                  void handleExportMarkdown();
+                }}
+              >
+                <FileText size={13} className="text-blue-500" />
+                <span>Export Annotations (Markdown)</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  close();
+                  void handleExportNotes();
+                }}
+              >
+                <StickyNote size={13} className="text-purple-500" />
+                <span>Export Notes &amp; Thoughts (JSON)</span>
+              </DropdownMenuItem>
+
+              {formatBadge === 'PDF' && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    close();
+                    handleExportAnnotatedPdf();
+                  }}
+                >
+                  <FileDown size={13} className="text-emerald-500" />
+                  <span>Export Annotated PDF</span>
+                </DropdownMenuItem>
+              )}
+            </div>
+          )}
+        </DropdownMenu>
 
         {/* Reader Settings Drawer Trigger */}
         <Button

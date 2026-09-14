@@ -15,6 +15,7 @@ import { readerPlugin } from './server/reader-vite-plugin.mjs';
 import { userDataPlugin } from './server/user-data-vite-plugin.mjs';
 import { searchPlugin } from './server/search-vite-plugin.mjs';
 import { createSearchStore } from './server/search-store.mjs';
+import { portabilityPlugin } from './server/portability-vite-plugin.mjs';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
@@ -167,6 +168,12 @@ export default defineConfig(async () => {
         searchStore,
       }),
       searchPlugin({ searchStore }),
+      portabilityPlugin({
+        libraryDatabasePath,
+        libraryRoot,
+        userDataRoot,
+        searchStore,
+      }),
       vinext(),
       sites(),
       cloudflare({

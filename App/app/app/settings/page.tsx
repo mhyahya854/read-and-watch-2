@@ -1,9 +1,12 @@
 import { StaticProductPage } from '@/components/static-product-page';
+import { PortabilitySettings } from '@/components/settings/portability-settings';
 
 export default function SettingsPage() {
   return (
     <StaticProductPage title="Settings" eyebrow="Local application">
       <div className="space-y-8">
+        <PortabilitySettings />
+
         <section className="space-y-3">
           <h2 className="font-editorial text-xl font-semibold text-foreground">
             Library &amp; Storage
