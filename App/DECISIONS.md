@@ -320,3 +320,17 @@ Status: Accepted
 8. **surfaceMarkup PDF-Only**: The `surfaceMarkup` capability (pen, line, arrow, rectangle, ellipse, text-box) is present only in `STANDARD_PDF_CAPABILITIES`. Reflowable books explicitly exclude this capability — freehand geometry cannot survive dynamic reflow.
 9. **Named Bookmarks via Phase 07 Model**: The existing `Bookmark` model (Phase 07) with its `label` field satisfies the named bookmark requirement. No duplicate annotation store for bookmarks.
 10. **Zero New Dependencies**: Phase 09 uses only Node.js built-ins (`node:sqlite`, `node:crypto`, `node:fs`, `node:path`). No new npm packages added.
+
+## D-046 - Phase 10 Book-Linked Excalidraw Notes
+
+Status: Accepted
+
+1. **Read & Watch Canvas Ownership**: Read & Watch owns the canonical canvas document schema (`CANVAS_SCHEMA_VERSION = 1`), metadata, bidirectional deep links, history, conflicts, export, and outer shell. `@excalidraw/excalidraw` is strictly the client-side visual drawing engine.
+2. **Pinned Upstream & Zero Cloud**: Pinned exact release `@excalidraw/excalidraw@0.18.1` (MIT license). All static assets (fonts, locales, data) are hosted locally and served from `/api/reader/excalidraw-assets/*`. Zero calls to excalidraw.com, Firebase, unpkg, or third-party CDNs; 100% offline functionality.
+3. **Dual-Layer File-First Persistence**: Canvases are recorded in SQLite (`canvases`, `canvas_links`, `canvas_assets`) and external file-first documents at `user-data/canvases/:canvasId/canvas.json` via atomic `.tmp` rename writes. Bounded history snapshots (`history/rev-*.json`, cap 50) and a recovery mirror (`recovery.json`) provide crash safety.
+4. **Optimistic Concurrency Control**: Mutations enforce `expectedRevision` checks. Mismatches return HTTP 409 Conflict, alerting the user via an interactive "Reload Latest" UI banner to prevent silent data clobbering.
+5. **Multiple Canvases & Standalone Workspaces**: Supports arbitrary numbers of canvases per book (`itemId` reference) as well as unattached standalone canvases (`itemId = null`).
+6. **Bidirectional Deep Links**: Canvas elements link directly to book locations and Phase 09 annotation IDs via `canvas_links`. Floating link badges allow immediate jumps to reading locations; book items surface linked canvases.
+7. **Beside-Reader Split & Full-Screen Workspaces**: Responsive split layout with 320px minimum pane widths preserves active reader engine and unsaved drawing state. Narrow viewports switch via a mobile "Book | Canvas" tab bar. Full-screen routes (`/canvas-notes/:id`, `/canvas-notes`) offer dedicated canvas workspaces.
+8. **Portable Standalone Export/Restore**: Standardized `.rwcanvas` JSON bundle packages metadata, scene elements, links, and embedded assets for offline transport and restoration.
+9. **Source Book Immutability**: Source books remain 100% read-only and byte-identical. All canvas notes, links, and assets reside exclusively in `user-data`.

@@ -684,7 +684,7 @@ Stop after Phase 09. Do not integrate Excalidraw.
 
 ## PHASE-10 - BOOK-LINKED EXCALIDRAW NOTES
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -704,20 +704,20 @@ No normal text-highlighting role, document rendering, Excalidraw cloud canonical
 
 ### Checklist
 
-- [ ] P10-T001 Pin Excalidraw package/source and record license, assets, version, and integration boundary.
-- [ ] P10-T002 Design Read & Watch-owned canvas schema, stable IDs, storage, history, conflicts, and recovery.
-- [ ] P10-T003 Implement book attachment and multiple canvases per book.
-- [ ] P10-T004 Implement pen, free drawing, arrows, shapes, text, and safe image/excerpt insertion.
-- [ ] P10-T005 Implement canvas-object-to-book and highlight-to-canvas deep links.
-- [ ] P10-T006 Implement beside-reader and full-screen workflows.
-- [ ] P10-T007 Implement export/restore and verify no cloud dependency.
+- [x] P10-T001 Pin Excalidraw package/source and record license, assets, version, and integration boundary.
+- [x] P10-T002 Design Read & Watch-owned canvas schema, stable IDs, storage, history, conflicts, and recovery.
+- [x] P10-T003 Implement book attachment and multiple canvases per book.
+- [x] P10-T004 Implement pen, free drawing, arrows, shapes, text, and safe image/excerpt insertion.
+- [x] P10-T005 Implement canvas-object-to-book and highlight-to-canvas deep links.
+- [x] P10-T006 Implement beside-reader and full-screen workflows.
+- [x] P10-T007 Implement export/restore and verify no cloud dependency.
 
 ### Verification gates
 
-- [ ] P10-G001 Persistence/recovery/conflict/export tests pass with original books unchanged.
-- [ ] P10-G002 Bidirectional deep links survive reopen, book movement, and supported location changes.
-- [ ] P10-G003 UI and storage remain Read & Watch-owned.
-- [ ] P10-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P10-G001 Persistence/recovery/conflict/export tests pass with original books unchanged.
+- [x] P10-G002 Bidirectional deep links survive reopen, book movement, and supported location changes.
+- [x] P10-G003 UI and storage remain Read & Watch-owned.
+- [x] P10-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

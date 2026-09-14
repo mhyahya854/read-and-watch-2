@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-14 - Phase 10 book-linked Excalidraw notes
+
+- Pinned official upstream release `@excalidraw/excalidraw@0.18.1` (MIT license) with verified React 19 compatibility.
+- Designed and implemented canonical Read & Watch canvas schema (`CANVAS_SCHEMA_VERSION = 1`) in `lib/canvas/types.ts`: `ReadWatchCanvasDocument`, `CanvasMetadata`, `CanvasLinkRecord`, `CanvasAssetMeta`, `ExcalidrawSceneData`.
+- Implemented runtime validation, URL sanitization, and MIME checks in `lib/canvas/validation.ts`.
+- Implemented in-memory bounded history (`CanvasHistory`) capped at 50 revisions in `lib/canvas/history.ts`.
+- Implemented file-first SQLite persistence in `server/canvas-store.mjs` with tables `canvases`, `canvas_links`, `canvas_assets`, atomic `.tmp` rename writes, optimistic concurrency control (409 Conflict), crash recovery mirror (`recovery.json`), bounded revision snapshots (cap 50), and standalone `.rwcanvas` export/import.
+- Implemented 100% offline asset serving in `server/reader-vite-plugin.mjs` serving Excalidraw fonts and assets from `/api/reader/excalidraw-assets/*` with zero external CDN requests.
+- Added 18 canvas REST API endpoints covering list, create, update, delete, restore, recovery, links, assets, and export.
+- Built interactive client canvas components in `components/canvas/read-watch-canvas.tsx` and `canvas-list.tsx` supporting pen, highlighter, arrows, shapes, text, image uploads, quoted excerpts, and deep link navigation cards.
+- Integrated Beside-Reader split mode in `components/reader/reader-shell.tsx` and `reader-toolbar.tsx` with responsive 320px minimum pane widths, preserving active reader engine and canvas state without remounting, plus mobile tab switching.
+- Added standalone canvas library route (`/canvas-notes`) and full-screen canvas workspace route (`/canvas-notes/[id]`).
+- Added 15 comprehensive unit and integration tests in `tests/canvas-store.test.mjs` (151/151 total tests passing).
+- Maintained 100% source book immutability across all local books.
+- Recorded D-046 in `DECISIONS.md`, passed Graphify and Ponytail audits.
+
 ## 2026-09-14 - Phase 09 unified annotation foundation
 
 - Implemented unified Read & Watch annotation system covering all 13 annotation types across PDF (text marks + vector drawing) and reflowable books (text marks only).
