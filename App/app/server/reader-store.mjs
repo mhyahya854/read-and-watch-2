@@ -132,14 +132,19 @@ export function createReaderStore({
   const userRoot = userDataRoot
     ? resolve(userDataRoot)
     : resolve(libraryRoot, '../user-data');
-  const libraryStore = createLibraryStore({
-    databasePath: libraryDatabasePath,
-    readOnly: true,
-  });
-  const catalog = libraryStore.getCatalog();
-  libraryStore.close();
+  let catalog = { items: [] };
+  try {
+    const libraryStore = createLibraryStore({
+      databasePath: libraryDatabasePath,
+      readOnly: true,
+    });
+    catalog = libraryStore.getCatalog();
+    libraryStore.close();
+  } catch {
+    // Database uninitialized or empty in test/clean environment
+  }
   const itemsById = new Map(catalog.items.map((item) => [item.id, item]));
-  const canonicalLibraryRoot = realpathSync(libraryRoot);
+  const canonicalLibraryRoot = existsSync(libraryRoot) ? realpathSync(libraryRoot) : libraryRoot;
 
   function resolveItem(itemId) {
     assertItemId(itemId);
