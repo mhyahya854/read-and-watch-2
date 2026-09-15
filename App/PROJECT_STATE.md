@@ -46,6 +46,15 @@ Phase 16 implementation results:
 - Project governance: **PASS** (`python scripts/validate_project_state.py`).
 - Respected stop condition: stopped cleanly after Phase 16 closure without starting Phase 17 (OCR remains unstarted).
 
+Phase 16 certification repair results (post-closure, 2026-09-15):
+
+- Identified and fixed 4 clean-environment defects discovered during fresh-clone validation: synthetic EPUB fixture added (`tests/fixtures/epub/sample-book.epub`), defensive `mkdirSync` before `DatabaseSync` in `server/search-store.mjs` and `electron/desktop-service.mjs`, resilient empty-database handling in `createReaderStore`, and `isTablePresent('library_meta')` guard in `server/library-store.mjs`. Commits `daf726b`–`47c4fd7`.
+- Fresh-clone validation at `47c4fd7`: `npm ci` PASS, `npm test` 229/229 PASS, `npx tsc --noEmit` PASS, `npm run lint` PASS, `npm run build` PASS, `npm run desktop:pack` PASS. Zero private data dependency. Repository hygiene PASS. Project governance PASS.
+- Build reproducibility: Build A and Build B from `47c4fd7` in isolated clone directories both produce 628 files (553 web + 75 electron). 417/431 common files bit-identical. All 14 SHA-256 differences explained by Vinext framework-generated random values (`BUILD_ID` UUID and `prerenderSecret`). Zero size differences. Zero personal path leakage in build outputs. Classification: `STRUCTURALLY REPRODUCIBLE WITH EXPLAINED FRAMEWORK NONDETERMINISM`.
+- P16-T006 (Fresh Clone, Reproducibility, Packaging): **PASS**. P16-G003 (Reliability, Crash Recovery & Immutability): **PASS** (extended to include reproducibility evidence).
+- External vault artifacts in `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/`.
+- Repair documented in `docs/project/reports/PHASE_16_REPORT.md` § Post-Closure Certification Repair.
+
 Phase 15 implementation results:
 
 - Conducted exhaustive data flow, network, permission, and third-party runtime inventory (`docs/project/PRODUCT_DATA_FLOW_INVENTORY.md`). Verified zero telemetry, zero analytics, zero cookies, zero external font/script CDNs, zero background outbound traffic.

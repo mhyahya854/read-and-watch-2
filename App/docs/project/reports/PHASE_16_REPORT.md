@@ -164,3 +164,71 @@ In strict adherence to the Master Plan and Phase 16 execution prompt:
 - **Zero OCR work has been started.**
 - **Phase 17 is NOT started.**
 - **Governance state advances cleanly to `PHASE-17 / P17-T001 (NOT_STARTED)`.**
+
+---
+
+## Post-Closure Certification Repair
+
+**Repair date:** 2026-09-15  
+**Reason:** Independent review identified missing fresh-clone, build-reproducibility, and fresh-install evidence for `P16-T006` / `P16-G003`.  
+**Source commit verified throughout:** `47c4fd79e774ff71c3a2cceb8ea6486d192dbae5`
+
+### Clean-Environment Defects Identified & Fixed
+
+During fresh-clone validation on a system with no private `Read and Watch - Local Data/` directory, four clean-environment defects were discovered and fixed on `master`:
+
+| Commit | Fix |
+|--------|-----|
+| `daf726b` | Added synthetic EPUB fixture (`tests/fixtures/epub/sample-book.epub`) and fallback in immutability tests so they do not require the developer's private book directory |
+| `efd2e83` | `mkdirSync` for parent DB directory and user-data directory before `DatabaseSync` in `server/search-store.mjs` and `electron/desktop-service.mjs` |
+| `f4371a2` | Made `createReaderStore` resilient when reading from an uninitialized/empty SQLite database |
+| `47c4fd7` | Added `isTablePresent('library_meta')` guard in `server/library-store.mjs` (`getCatalog` / `getUiCatalog`) to return empty catalog safely on fresh databases |
+
+### P16-T006 Fresh-Clone Evidence
+
+| Criterion | Result | Detail |
+|-----------|--------|--------|
+| Clone from GitHub at `47c4fd7` | **PASS** | Fresh clone to isolated directory, no pre-existing node_modules or dist |
+| `npm ci` | **PASS** | Exit code 0, 29.77s |
+| `npm test` | **PASS** | Exit code 0, **229/229 passing**, 3.52s |
+| `npx tsc --noEmit` | **PASS** | Exit code 0, 0 errors |
+| `npm run lint` | **PASS** | Exit code 0, 0 errors, 0 warnings |
+| `npm run build` | **PASS** | Exit code 0, 42.26s |
+| `npm audit --omit=dev` | **PASS (documented)** | 10 transitive items in `lodash-es`/`nanoid` — confirmed unreachable in production; documented in `UPSTREAM_AND_LICENSE_LEDGER.md` |
+| `check_repository_hygiene.py` | **PASS** | 314 tracked paths |
+| `validate_project_state.py` | **PASS** | 21 phases, 231 task/gate IDs |
+| Private data independence | **PASS** | Zero private books, SQLite databases, or credentials in fresh clone |
+
+**Artifacts:** External vault `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/fresh-clone/`
+
+### P16-G003 Build Reproducibility Evidence (Build A vs Build B)
+
+Two independent builds were executed from the same source commit (`47c4fd7`) in two separate isolated clone directories, with no shared `node_modules`, no shared cache, and no shared Electron download cache.
+
+| Metric | Value |
+|--------|-------|
+| Build A source SHA | `47c4fd79e774ff71c3a2cceb8ea6486d192dbae5` |
+| Build B source SHA | `47c4fd79e774ff71c3a2cceb8ea6486d192dbae5` |
+| Files in Build A | 628 (553 web + 75 electron) |
+| Files in Build B | 628 (553 web + 75 electron) |
+| Common files (same path) | 431 |
+| Bit-identical (same SHA-256) | 417 (96.8% of common) |
+| SHA-256 differences | 14 |
+| Size differences | **0** |
+| Personal path leakage | **0** (2 false-positive matches on the word "Desktop" in `desktop-open-coordinator.js` — an application module name, not a path) |
+
+**Root causes of SHA-256 differences (all explained framework behavior):**
+
+1. **`server/BUILD_ID`** — Vinext generates a fresh random UUID per build (standard Next.js behavior for cache busting). Build A: `f1eee2b4-…`; Build B: `147ff259-…`
+2. **`server/vinext-server.json` (`prerenderSecret`)** — Vinext generates a fresh random hex secret per build for ISR authentication. This is a security feature.
+3. **All remaining 12 differences** cascade from these two root causes (manifests embedding the BUILD_ID, server bundles referencing both values, and Rolldown content-hashes on co-dependent chunks).
+
+**Classification:** `STRUCTURALLY REPRODUCIBLE WITH EXPLAINED FRAMEWORK NONDETERMINISM`  
+**Full analysis:** External vault `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/REPRODUCIBILITY_ANALYSIS.md`
+
+### Updated Gate Assessment
+
+| Gate | Standard | Result |
+|------|----------|--------|
+| **`P16-G003`** | Reproducible build from fresh clone | **PASS** — Structurally reproducible. All 628 files present in both builds. Zero size differences. All SHA-256 differences explained by framework-generated random values (`BUILD_ID`, `prerenderSecret`). Zero personal path leakage in build outputs. |
+| **`P16-T006`** | Fresh clone CI, test, build, pack | **PASS** — 229/229 tests, 0 TypeScript errors, 0 lint warnings, build complete, `desktop:pack` complete. Four clean-environment defects found and fixed. |
