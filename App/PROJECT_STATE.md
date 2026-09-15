@@ -49,9 +49,15 @@ Phase 16 implementation results:
 Phase 16 certification repair results (post-closure, 2026-09-15):
 
 - Identified and fixed 4 clean-environment defects discovered during fresh-clone validation: synthetic EPUB fixture added (`tests/fixtures/epub/sample-book.epub`), defensive `mkdirSync` before `DatabaseSync` in `server/search-store.mjs` and `electron/desktop-service.mjs`, resilient empty-database handling in `createReaderStore`, and `isTablePresent('library_meta')` guard in `server/library-store.mjs`. Commits `daf726b`–`47c4fd7`.
-- Fresh-clone validation at `47c4fd7`: `npm ci` PASS, `npm test` 229/229 PASS, `npx tsc --noEmit` PASS, `npm run lint` PASS, `npm run build` PASS, `npm run desktop:pack` PASS. Zero private data dependency. Repository hygiene PASS. Project governance PASS.
+- Fresh-clone validation at `47c4fd7`: `npm ci` PASS, `npm test` 229/229 PASS, `npx tsc --noEmit` PASS, `npm run lint` PASS, `npm run build` PASS, `npm run desktop:pack` PASS. Zero private data dependency. Repository hygiene PASS (314 paths). Project governance PASS (21 phases, 231 IDs).
 - Build reproducibility: Build A and Build B from `47c4fd7` in isolated clone directories both produce 628 files (553 web + 75 electron). 417/431 common files bit-identical. All 14 SHA-256 differences explained by Vinext framework-generated random values (`BUILD_ID` UUID and `prerenderSecret`). Zero size differences. Zero personal path leakage in build outputs. Classification: `STRUCTURALLY REPRODUCIBLE WITH EXPLAINED FRAMEWORK NONDETERMINISM`.
-- P16-T006 (Fresh Clone, Reproducibility, Packaging): **PASS**. P16-G003 (Reliability, Crash Recovery & Immutability): **PASS** (extended to include reproducibility evidence).
+- NSIS installer generated: `Read & Watch Setup 0.1.0.exe`, 195,706,134 bytes, SHA-256 `FBAA12C9EB86146E802FEA28BC16E4CAB0D97B4E328A15B7420CF94428F87CE3`, zero personal path leakage in binary.
+- Clean Windows installation: **BLOCKED** — Windows Sandbox not available (not enabled), no VirtualBox, no VMware, no clean VM found on this machine. Installer is built and verified but cannot be installed in a genuine clean environment without user action (enable Sandbox or provide a clean VM/machine).
+- Graphify rerun on repaired source: **PASS** — Zero new import cycles, zero new privilege edges, graph topology unchanged (1,464 nodes, 3,343 edges, 60 communities). Delta documented in `docs/project/reports/PHASE_16_GRAPHIFY_AUDIT.md` §5.
+- Ponytail rerun on repaired source: **PASS** — Zero new dependencies, zero speculative abstractions. Delta documented in `docs/project/reports/PHASE_16_PONYTAIL_AUDIT.md` §6.
+- P16-T006 (Fresh Clone, Reproducibility, Packaging): Fresh-clone and reproducibility PASS. Fresh Windows install: BLOCKED.
+- P16-G003: Crash/transaction/backup/immutability/fresh-clone/reproducibility all PASS. Fresh Windows install: BLOCKED.
+- Phase 16 remains COMPLETE with the install gate documented as BLOCKED. Phase 17 remains NOT_STARTED.
 - External vault artifacts in `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/`.
 - Repair documented in `docs/project/reports/PHASE_16_REPORT.md` § Post-Closure Certification Repair.
 

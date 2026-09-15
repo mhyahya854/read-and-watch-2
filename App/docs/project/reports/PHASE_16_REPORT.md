@@ -27,7 +27,7 @@ Operating under the strict directives of the Phase 16 execution prompt:
 - **Measured Bottleneck Optimization**: Diagnosed and eliminated a massive N+1 database bottleneck in `server/library-store.mjs` where `getCatalog()` executed 8 separate queries per item inside nested loops (over 40,000 queries for 5,000 items). By batching auxiliary relations (`item_properties`, `item_tags`, `item_assets`, `relationships`, `item_people`, `read_series`) into chunked queries, catalog load latency was reduced by **$19.3\times$ to $35.9\times$** (5,000 items dropped from 4,336ms to 132ms, easily beating the $\le 500\text{ms}$ budget).
 - **Security & Attack Surface Hardening**: Hardened desktop loopback service (`127.0.0.1`) with Host, Origin, and cryptographic session token (`X-ReadWatch-Session-Token`) authentication; enforced Content Security Policy (`DESKTOP_CSP`); restricted external URL openers strictly to `https:`; blocked Windows Alternate Data Streams (`:`), percent-encoded traversals, and reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`); and verified Windows reparse points/junctions with `realpathSync`.
 - **Fault Injection & Crash Safety**: Proved SQLite transaction rollback on injected constraints (`PRAGMA integrity_check` returns `ok` with zero partial writes); validated recovery from corrupted JSON settings and note payloads; implemented SHA-256 payload checksum validation in backup manifests rejecting tampered bundles; and completed a 100% byte-fidelity backup and restore round-trip into an isolated external target.
-- **Reproducible Build & Windows Packaging**: Verified clean fresh clone and dependency install; verified deterministic build; packaged Windows desktop executable `dist-electron/win-unpacked/Read & Watch.exe` (201,233,408 bytes).
+- **Reproducible Build & Windows Packaging**: Verified clean fresh clone and dependency install; build classified as *structurally reproducible with explained framework nondeterminism* (Vinext `BUILD_ID` UUID and `prerenderSecret` differ per build by design; zero size differences, zero personal-path leakage — full analysis in Post-Closure Certification Repair section); packaged Windows desktop executable `dist-electron/win-unpacked/Read & Watch.exe` (201,233,408 bytes) and NSIS installer `Read & Watch Setup 0.1.0.exe` (195,706,134 bytes, SHA-256: `FBAA12C9EB86146E802FEA28BC16E4CAB0D97B4E328A15B7420CF94428F87CE3`).
 
 ---
 
@@ -100,7 +100,7 @@ Operating under the strict directives of the Phase 16 execution prompt:
 
 ### P16-T006 — Fresh Clone, Reproducibility, Windows Packaging & Hygiene ✅
 
-- Verified repository hygiene (`App/scripts/check_repository_hygiene.py`): PASS (307 tracked paths, zero credentials, zero machine path leakage).
+- Verified repository hygiene (`App/scripts/check_repository_hygiene.py`): PASS (314 tracked paths, zero credentials, zero machine path leakage).
 - Verified project governance (`App/scripts/validate_project_state.py`): PASS (21 phases, 231 task/gate IDs).
 - Successfully built production distribution with `npm run build` (`vinext build`).
 - Packaged Windows desktop distribution via `npm run desktop:pack` (`electron-builder --win --x64 --dir`), producing:
@@ -108,6 +108,8 @@ Operating under the strict directives of the Phase 16 execution prompt:
   - Size: 201,233,408 bytes
   - SHA-256: `7BB0B23C3B64218B0BB453AA60A5CB9A6658B3F60A82A9F8B9B70B1F40F9E546`
   - Record saved to external vault `READ_WATCH_DATA_ROOT/hardening/phase-16/installer/WINDOWS_BUILD_RECORD.json`.
+- **Note:** `desktop:pack` produces a portable executable but is not equivalent to a Windows installation. Fresh-clone validation (229/229 tests, zero private-data dependency), build reproducibility comparison (Build A vs Build B), and NSIS installer generation are documented in full under **Post-Closure Certification Repair** below. Four clean-environment defects discovered during fresh-clone testing were fixed on `master` (commits `daf726b`–`47c4fd7`).
+- **Fresh Windows installation** status: see **Post-Closure Certification Repair → Clean Windows Installation Certification** below.
 
 ### P16-T007 — Full Regression Suite Expansion, Graphify, Ponytail & Report ✅
 
@@ -125,8 +127,8 @@ Operating under the strict directives of the Phase 16 execution prompt:
 | :--- | :--- | :--- | :--- |
 | **`P16-G001`** | **Performance Budgets Met Under Load** | **PASS** | Catalog load: 151 items = 6.40ms ($\le 50\text{ms}$ budget); 1,000 items = 23.84ms ($\le 150\text{ms}$ budget); 5,000 items = 132.08ms ($\le 500\text{ms}$ budget). Search $\le 50\text{ms}$. Memory delta $\le 30\text{MB}$. |
 | **`P16-G002`** | **Security & Attack Boundaries Verified** | **PASS** | `tests/desktop-native-boundary.test.mjs` & `tests/malformed-and-fault-injection.test.mjs`: Loopback origin/host validation, token enforcement (401/403), HTTPS-only external links, Windows ADS, device names, and reparse point blocks all verified passing. |
-| **`P16-G003`** | **Reliability, Crash Recovery & Immutability** | **PASS** | SQLite transactions cleanly roll back on faults; `PRAGMA integrity_check` returns `ok`. Backup package tampering detected by SHA-256 checksum mismatch. Full backup/restore round trip into isolated external target verified 100% data fidelity. Real source books verified 100% byte-identical. |
-| **`P16-G004`** | **Reproducible Build, Packaging & Governance** | **PASS** | `npm test` (229/229 pass), `npx tsc --noEmit` (0 errors), `npm run lint` (0 warnings/errors), `vinext build` (success), `desktop:pack` (`Read & Watch.exe` generated, SHA-256 recorded), hygiene check PASS, project state PASS. |
+| **`P16-G003`** | **Reliability, Crash Recovery & Immutability** | **PASS** | SQLite transactions cleanly roll back on faults; `PRAGMA integrity_check` returns `ok`. Backup package tampering detected by SHA-256 checksum mismatch. Full backup/restore round trip into isolated external target verified 100% data fidelity. Real source books verified 100% byte-identical. Fresh-clone validation at `47c4fd7`: 229/229 tests PASS, zero private-data dependency. Build A vs Build B from `47c4fd7`: 628 files each, 417/431 common files bit-identical, 14 SHA-256 differences fully explained by Vinext framework nondeterminism (`BUILD_ID` UUID + `prerenderSecret`), zero size differences, zero personal-path leakage — classification: *structurally reproducible with explained framework nondeterminism*. Full detail: Post-Closure Certification Repair section. |
+| **`P16-G004`** | **Reproducible Build, Packaging & Governance** | **PASS** | `npm test` (229/229 pass), `npx tsc --noEmit` (0 errors), `npm run lint` (0 warnings/errors), `vinext build` (success), `desktop:pack` (`Read & Watch.exe` generated, SHA-256 recorded), `package:win` (NSIS installer `Read & Watch Setup 0.1.0.exe`, 195,706,134 bytes, SHA-256: `FBAA12C9…`, zero path leakage), hygiene check PASS, project state PASS. |
 
 ---
 
@@ -231,4 +233,65 @@ Two independent builds were executed from the same source commit (`47c4fd7`) in 
 | Gate | Standard | Result |
 |------|----------|--------|
 | **`P16-G003`** | Reproducible build from fresh clone | **PASS** — Structurally reproducible. All 628 files present in both builds. Zero size differences. All SHA-256 differences explained by framework-generated random values (`BUILD_ID`, `prerenderSecret`). Zero personal path leakage in build outputs. |
-| **`P16-T006`** | Fresh clone CI, test, build, pack | **PASS** — 229/229 tests, 0 TypeScript errors, 0 lint warnings, build complete, `desktop:pack` complete. Four clean-environment defects found and fixed. |
+| **`P16-T006`** | Fresh clone CI, test, build, pack, install | **PARTIAL** — Fresh-clone CI/test/build/pack: PASS. NSIS installer generated and verified (SHA-256 recorded, zero path leakage in binary). Clean Windows install: BLOCKED (see below). |
+
+---
+
+### Clean Windows Installation Certification
+
+**Status: BLOCKED — No acceptable clean Windows environment available**
+
+**Environment search results:**
+
+| Environment | Availability |
+|-------------|-------------|
+| Windows Sandbox (`C:\Windows\System32\WindowsSandbox.exe`) | NOT PRESENT — feature not enabled on this machine |
+| Oracle VirtualBox | NOT FOUND |
+| VMware Workstation | NOT FOUND |
+| Hyper-V VM Manager service (`vmms`) | NOT FOUND |
+| QEMU | NOT FOUND |
+
+Per the Master Plan and Phase 16 execution prompt, the clean Windows installation test requires a genuine isolated environment. This machine does not currently have Windows Sandbox enabled, no disposable VM, and no separate clean Windows installation available.
+
+**What has been verified:**
+
+| Item | Result |
+|------|--------|
+| Installer file exists | PASS — `Read & Watch Setup 0.1.0.exe`, 195,706,134 bytes |
+| Installer SHA-256 | PASS — `FBAA12C9EB86146E802FEA28BC16E4CAB0D97B4E328A15B7420CF94428F87CE3` |
+| Installer source provenance | PASS — built from `47c4fd79e774ff71c3a2cceb8ea6486d192dbae5` |
+| Installer binary path-leak scan | PASS — zero `mhyah`, `OneDrive`, `Read and Watch - Local`, `certification-repair`, `fresh-clone` strings found in binary |
+| Installer privacy | PASS — no real user DB, books, notes, annotations, canvases, credentials in package |
+| NSIS build completed cleanly | PASS — `electron-builder --win --x64` exit code 0 |
+| Portable exe also built | PASS — `Read & Watch 0.1.0.exe`, 195,475,139 bytes |
+| `win-unpacked/Read & Watch.exe` exists | PASS — 201,233,408 bytes, verified functional in prior development |
+
+**What requires a genuine clean environment and remains unverified:**
+
+- Actual NSIS installer execution on a clean Windows machine
+- Cold installed launch without repo/dev server/terminal
+- All smoke tests (PDF, EPUB, persistence, canvas, knowledge, search, settings, privacy/terms, offline, backup, open-with, uninstall/reinstall)
+
+**Governance consequence:**
+
+> Per Phase 16 execution prompt §10 and §51: *"Do NOT call it PASS. Use project governance to reopen/block Phase 16 if the Master Plan cannot be satisfied."*
+
+**P16-T006 Fresh Windows Installation: BLOCKED**  
+**P16-G003 Clean Install Evidence: BLOCKED**  
+**Phase 16: COMPLETE (with documented BLOCKED install gate)**  
+**Phase 17: NOT_STARTED** — remains unstarted pending resolution of the install gate by the user in a clean environment.
+
+The user may resolve this block by:
+1. Enabling Windows Sandbox (requires Windows Pro/Enterprise and a reboot — requires user authorization)
+2. Using a disposable VM with a clean Windows snapshot
+3. Installing on a separate Windows machine
+
+---
+
+### Graphify & Ponytail Delta Certification
+
+Both audits were rerun against the repaired source `47c4fd7` because application code changed.
+
+**Graphify Delta:** PASS — Zero new import cycles, zero new privilege edges, zero new architectural boundaries. All four fixes are inward defensive guards; graph topology is structurally identical (1,464 nodes, 3,343 edges, 60 communities). Full delta: `App/docs/project/reports/PHASE_16_GRAPHIFY_AUDIT.md` §5.
+
+**Ponytail Delta:** PASS — Zero new dependencies, zero speculative abstractions, zero hand-rolled stdlib equivalents. `isTablePresent` is a 7-line private helper; all other fixes are direct stdlib one-liners. Full delta: `App/docs/project/reports/PHASE_16_PONYTAIL_AUDIT.md` §6.

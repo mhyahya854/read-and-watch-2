@@ -52,3 +52,55 @@
 | **Catalog Query Latency Reduction** | $\ge 2\times$ | **$19.3\times$ to $35.9\times$** | **PASS** |
 
 **Conclusion:** Lean already. Ship.
+
+---
+
+## 6. Post-Closure Certification Repair Delta
+
+**Rerun date:** 2026-09-15  
+**Source SHA:** `47c4fd79e774ff71c3a2cceb8ea6486d192dbae5`  
+**Trigger:** Four clean-environment defects fixed after original Phase 16 Ponytail run. Source changed; audit rerun required.
+
+### Areas Inspected
+
+The four changed files were reviewed for:
+- Unnecessary helper abstractions
+- Duplicate DB initialization logic  
+- Duplicate empty-state handling
+- Duplicate directory-creation helpers
+- One-use wrappers
+- Generic initialization frameworks
+
+### Findings
+
+| Location | Change | Ponytail Assessment |
+|----------|--------|---------------------|
+| `server/search-store.mjs` L86 | `mkdirSync(dirname(databasePath), {recursive:true})` before `DatabaseSync` | **PASS** — one-liner in the correct location; same pattern used by 6 other stores; no abstraction added |
+| `electron/desktop-service.mjs` L109,L114 | Two `mkdirSync` calls before store creation | **PASS** — direct stdlib calls; wrapped in `try/catch {}` inline; no wrapper function created |
+| `server/reader-store.mjs` L136-L145 | `try { createLibraryStore + getCatalog } catch { }` with fallback to `{ items: [] }` | **PASS** — 8-line guard block; no new function, no abstraction layer; error message in comment |
+| `server/library-store.mjs` L31-L39 | Private `isTablePresent(tableName)` helper | **PASS** — 7-line private helper; not exported; called at two related call sites; well-scoped |
+
+### Abstractions Rejected
+
+No `DatabaseBootstrapManager`, `EnvironmentInitializationService`, `EmptyStoreAdapter`, `FirstRunInitializer`, or similar premature abstractions were introduced. The fixes use the minimum code necessary.
+
+### Code Removed
+
+None. The fixes are additive; no existing code was removed or refactored beyond the minimum required.
+
+### Scoreboard (Delta)
+
+| Metric | Target | Result |
+|--------|--------|--------|
+| New runtime dependencies | 0 | **PASS** (0) |
+| New dev dependencies | 0 | **PASS** (0) |
+| Speculative abstractions added | 0 | **PASS** (0) |
+| Reinvented stdlib (hand-rolled `mkdirSync`, etc.) | 0 | **PASS** (0) |
+| OCR / AI expansion | 0 | **PASS** (0) |
+| Defensive clean-environment guards preserved | Required | **PASS** (all 4 guards retained) |
+
+### Conclusion
+
+**Ponytail Delta: PASS**
+
+The four clean-environment fixes add no bloat, no speculative abstractions, and no new dependencies. Each fix uses the minimum code appropriate to its module. The `isTablePresent` helper in `library-store.mjs` is the most complex addition — a 7-line private function called at two related sites — and is well-justified given that both `getCatalog` and `getUiCatalog` need the guard. Lean already. Ship.

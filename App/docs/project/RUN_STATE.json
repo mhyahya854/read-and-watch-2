@@ -12,12 +12,15 @@
   "last_verified_remote_head": "fc271eb",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 16 hardening architecture mapping; 1,464 nodes, 60 communities, 10 god nodes, zero dependency bloat, 100% boundary containment, zero OCR leakage",
-  "last_ponytail_status": "PASS: Phase 16 anti-bloat review; stdlib-first optimizations, batch SQL queries, native crypto/realpathSync, zero new dependencies, lean security primitives",
-  "active_blockers": [],
+  "last_graphify_status": "PASS: Phase 16 hardening architecture mapping + certification repair delta; 1,464 nodes, 3,343 edges, 60 communities, 10 god nodes; zero new cycles, zero new privilege edges from 4 clean-environment fixes (47c4fd7)",
+  "last_ponytail_status": "PASS: Phase 16 anti-bloat review + certification repair delta; stdlib-first optimizations, batch SQL queries, native crypto/realpathSync, zero new dependencies, lean security primitives; 4 clean-environment fixes add no bloat (47c4fd7)",
+  "active_blockers": [
+    "P16-T006 Fresh Windows Installation: BLOCKED — Windows Sandbox not enabled on this machine, no VirtualBox/VMware/clean VM found. NSIS installer is built, verified, and privacy-clean. Install gate requires user to enable Windows Sandbox or provide a clean VM/separate machine."
+  ],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
-    "Visual reviews use the centralized external data directory outside Git to protect repository hygiene."
+    "Visual reviews use the centralized external data directory outside Git to protect repository hygiene.",
+    "Phase 16 clean Windows installation gate is BLOCKED pending availability of a genuine clean Windows environment."
   ],
   "phase_01_content_commit": "4e738ff8e83a48e0258169996df87fe5df726485",
   "phase_01_closure_commit": "SEE_LIVE_GIT_HEAD",
@@ -51,5 +54,5 @@
   "phase_15_closure_commit": "e908ffd",
   "phase_16_content_commit": "f95f69c",
   "phase_16_closure_commit": "c8e8727",
-  "exact_next_action": "PHASE-16 complete. Stop condition reached. Do not begin Phase 17."
+  "exact_next_action": "Phase 16 certification: fresh-clone/reproducibility/Graphify/Ponytail/report-consistency all complete. Clean Windows install gate BLOCKED — enable Windows Sandbox or provide a clean VM, then run the NSIS installer and execute smoke tests. Phase 17 remains NOT_STARTED."
 }
