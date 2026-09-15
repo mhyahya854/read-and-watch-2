@@ -13,8 +13,8 @@
  *     to 'stale' without rolling back canonical writes.
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
   buildFtsQuery,
@@ -81,6 +81,12 @@ export function createSearchStore({
   userDataRoot,
   libraryDatabase = null,
 }) {
+  if (!libraryDatabase && databasePath && databasePath !== ':memory:') {
+    try {
+      mkdirSync(dirname(databasePath), { recursive: true });
+    } catch {}
+  }
+
   const db =
     libraryDatabase ||
     new DatabaseSync(databasePath, {

@@ -9,8 +9,8 @@
  */
 
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { extname, isAbsolute, relative, resolve } from 'node:path';
+import { createReadStream, existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { dirname, extname, isAbsolute, relative, resolve } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 
 export const DESKTOP_CSP = [
@@ -103,6 +103,17 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
 
   const paths = resolveDataPaths({ appRoot, environment: env });
   const { libraryDatabasePath, libraryRoot, userDataRoot } = paths;
+
+  if (libraryDatabasePath && libraryDatabasePath !== ':memory:') {
+    try {
+      mkdirSync(dirname(libraryDatabasePath), { recursive: true });
+    } catch {}
+  }
+  if (userDataRoot) {
+    try {
+      mkdirSync(userDataRoot, { recursive: true });
+    } catch {}
+  }
 
   // Initialize canonical stores
   const searchStore = createSearchStore({
