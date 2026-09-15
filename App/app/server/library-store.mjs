@@ -28,7 +28,25 @@ export function createLibraryStore({ databasePath, readOnly = false, searchStore
     );
   }
 
+  function isTablePresent(tableName) {
+    try {
+      return Boolean(
+        database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(tableName),
+      );
+    } catch {
+      return false;
+    }
+  }
+
   function getCatalog() {
+    if (!isTablePresent('library_meta')) {
+      return {
+        catalogSchemaVersion: 1,
+        generatedFromImportUtc: null,
+        counts: { read: 0, watch: 0, total: 0 },
+        items: [],
+      };
+    }
     const meta = Object.fromEntries(
       database
         .prepare('SELECT key,value_json FROM library_meta')
@@ -140,6 +158,14 @@ export function createLibraryStore({ databasePath, readOnly = false, searchStore
   }
 
   function getUiCatalog() {
+    if (!isTablePresent('library_meta')) {
+      return {
+        schemaVersion: 1,
+        generatedFromImportUtc: null,
+        counts: { read: 0, watch: 0, total: 0 },
+        items: [],
+      };
+    }
     const meta = Object.fromEntries(
       database
         .prepare('SELECT key,value_json FROM library_meta')
