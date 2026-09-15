@@ -21,7 +21,7 @@ import {
   readdirSync,
   unlinkSync,
 } from 'node:fs';
-import { basename, dirname, join, extname } from 'node:path';
+import { basename, dirname, join, extname, isAbsolute, relative, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID, createHash } from 'node:crypto';
 
@@ -126,7 +126,15 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
 
   // Directory resolution
   function canvasDir(canvasId) {
-    return join(userDataRoot, 'canvases', canvasId);
+    if (typeof canvasId !== 'string' || !canvasId.trim() || !/^[a-zA-Z0-9_-]+$/.test(canvasId)) {
+      fail('Invalid canvas ID: unsafe format');
+    }
+    const dir = resolve(userDataRoot, 'canvases', canvasId);
+    const fromBase = relative(resolve(userDataRoot, 'canvases'), dir);
+    if (!fromBase || fromBase.startsWith('..') || isAbsolute(fromBase)) {
+      fail('Unsafe canvas path traversal');
+    }
+    return dir;
   }
 
   function canvasDocPath(canvasId) {

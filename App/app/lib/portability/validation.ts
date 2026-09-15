@@ -32,6 +32,8 @@ export class PortabilityValidationError extends Error {
   }
 }
 
+const WINDOWS_RESERVED_NAMES = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i;
+
 /** Check if a string contains prohibited absolute path or traversal characters. */
 export function assertSafePath(path: string, fieldLabel = 'path'): void {
   if (typeof path !== 'string' || !path.trim()) {
@@ -45,15 +47,29 @@ export function assertSafePath(path: string, fieldLabel = 'path'): void {
   if (/^[a-zA-Z]:/.test(path)) {
     throw new PortabilityValidationError(`Absolute drive path forbidden in ${fieldLabel}: ${path}`);
   }
-  // Disallow absolute unix paths
+  // Disallow Alternate Data Streams (ADS) and colons
+  if (path.includes(':')) {
+    throw new PortabilityValidationError(`Alternate data streams and colons forbidden in ${fieldLabel}: ${path}`);
+  }
+  // Disallow percent-encoded traversal sequences
+  if (/%2e|%2f|%5c/i.test(path)) {
+    throw new PortabilityValidationError(`Percent-encoded path characters forbidden in ${fieldLabel}: ${path}`);
+  }
+  // Disallow absolute unix and UNC paths
   if (path.startsWith('/') || path.startsWith('\\')) {
     throw new PortabilityValidationError(`Root-relative path forbidden in ${fieldLabel}: ${path}`);
   }
-  // Disallow directory traversal
+  // Disallow directory traversal, reserved device names, and trailing dots/spaces
   const segments = path.split(/[/\\]/);
   for (const seg of segments) {
     if (seg === '..' || seg === '.') {
       throw new PortabilityValidationError(`Directory traversal forbidden in ${fieldLabel}: ${path}`);
+    }
+    if (WINDOWS_RESERVED_NAMES.test(seg)) {
+      throw new PortabilityValidationError(`Reserved Windows device name forbidden in ${fieldLabel}: ${seg}`);
+    }
+    if (seg.endsWith('.') || seg.endsWith(' ')) {
+      throw new PortabilityValidationError(`Trailing dot or space forbidden in path segment: ${seg}`);
     }
   }
   // Disallow personal absolute path substrings

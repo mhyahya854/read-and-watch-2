@@ -144,7 +144,7 @@ async function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const parsed = new URL(url);
-      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      if (parsed.protocol === 'https:') {
         void shell.openExternal(url);
       }
     } catch {
@@ -158,7 +158,7 @@ async function createWindow() {
       event.preventDefault();
       try {
         const parsed = new URL(url);
-        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        if (parsed.protocol === 'https:') {
           void shell.openExternal(url);
         }
       } catch {
@@ -278,8 +278,8 @@ ipcMain.handle('desktop:open-external-https', async (_event, url) => {
   if (typeof url !== 'string') return { ok: false, error: 'Invalid URL' };
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      return { ok: false, error: 'Only HTTP and HTTPS links are permitted' };
+    if (parsed.protocol !== 'https:') {
+      return { ok: false, error: 'Only HTTPS links are permitted' };
     }
     await shell.openExternal(url);
     return { ok: true };
@@ -303,7 +303,10 @@ ipcMain.handle('desktop:resolve-open-file', async (_event, filePath) => {
     const canonical = realpathSync(filePath);
     const res = await fetch(`${activeServiceOrigin}/api/desktop/resolve-open-file`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-ReadWatch-Session-Token': desktopServiceInstance?.sessionToken || '',
+      },
       body: JSON.stringify({ path: canonical }),
     });
     return await res.json();

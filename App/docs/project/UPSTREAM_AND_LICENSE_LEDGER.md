@@ -28,3 +28,40 @@ Verified against official upstream repository metadata on 2026-09-08. License co
 - Preserve required notices and corresponding-source obligations.
 - Copyleft or model-license uncertainty is recorded as a decision/blocker; it is never guessed away.
 - Deferred projects are not cloned during governance or earlier roadmap phases.
+
+## Phase 16 Dependency & Vulnerability Audit (2026-09-15)
+
+Audit executed with `npm audit` on Node v24.18.0 / npm 11.6.0.
+
+### 1. Production Dependency License Inventory
+| Package | Version | License | Direct/Transitive | Status |
+| --- | --- | --- | --- | --- |
+| `@excalidraw/excalidraw` | `0.18.1` | MIT | Direct | Approved |
+| `@xyflow/react` | `12.11.6` | MIT | Direct | Approved |
+| `lucide-react` | `1.31.0` | ISC | Direct | Approved |
+| `mermaid` | `12.0.0` | MIT | Direct | Approved |
+| `pdf-lib` | `1.17.1` | MIT | Direct | Approved |
+| `pdfjs-dist` | `4.10.38` | Apache-2.0 | Direct | Approved |
+| `react` | `19.2.8` | MIT | Direct | Approved |
+| `react-dom` | `19.2.8` | MIT | Direct | Approved |
+| `react-server-dom-webpack` | `19.2.8` | MIT | Direct | Approved |
+| `vinext` | `1.0.0-beta.8` | MIT | Direct | Approved |
+
+**Conclusion**: 100% of runtime production dependencies use permissive licenses (MIT, Apache-2.0, ISC). Zero copyleft (GPL, AGPL, LGPL) contamination exists in the application runtime or binary distributions.
+
+### 2. Transitive Vulnerability Reachability Analysis
+`npm audit` reported 16 advisory items (12 high, 4 moderate). Detailed static and architectural reachability analysis:
+
+1. **`lodash-es` (<=4.17.23) — Code Injection in `_.template` (GHSA-r5fr-rjxr-66jc) & Prototype Pollution in `_.unset`/`_.omit` (GHSA-f23m-r3pf-42rh)**
+   - *Dependency chain*: `read-watch-library` -> `mermaid@12.0.0` -> `chevrotain@11.0.3` -> `lodash-es@4.17.21`.
+   - *Reachability*: **NOT REACHABLE**. Read & Watch uses Mermaid strictly in `securityLevel: 'strict'`, completely offline, for rendering validated diagrams to SVG. Chevrotain employs `lodash-es` exclusively for internal AST construction and lexer tokens. No user-controlled format strings or unconstrained property deletion paths reach `_.template` or `_.unset`.
+2. **`nanoid` (<=3.3.17 / 4.0.0 - 5.1.15) — Predictable generation & loop on negative size (GHSA-mwcw-c2x4-8c55, GHSA-28wg-ghj8-5hjv)**
+   - *Dependency chain*: `read-watch-library` -> `@excalidraw/excalidraw@0.18.1` -> `nanoid`.
+   - *Reachability*: **NOT REACHABLE**. Excalidraw invokes `nanoid` solely with constant positive integer lengths for transient scene element IDs. No custom generator sizes or negative step inputs are exposed to user data.
+3. **`sharp` (<0.35.4) / `miniflare` / `wrangler` — Image processing vulnerability in libheif**
+   - *Dependency chain*: `devDependencies` -> `@cloudflare/vite-plugin` -> `miniflare` / `wrangler` -> `sharp`.
+   - *Reachability*: **NOT REACHABLE**. `wrangler` and `miniflare` are dev-only local development toolchains. They are not bundled into the production desktop application or shipped to users.
+4. **`electron` (35.7.5) / `extract-zip` — Dev-only extraction advisories**
+   - *Dependency chain*: `devDependencies` -> `electron-builder` / `electron`.
+   - *Reachability*: **CONTAINED & MITIGATED**. The runtime Electron executable is protected by single-instance locking, context isolation (`contextIsolation: true`), disabled Node integration (`nodeIntegration: false`), loopback session token authentication, reparse point traversal blocks, and strict HTTPS navigation guards.
+

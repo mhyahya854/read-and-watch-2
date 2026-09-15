@@ -9,9 +9,24 @@
  */
 
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { extname, isAbsolute, relative, resolve } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+
+export const DESKTOP_CSP = [
+  "default-src 'self' http://127.0.0.1:*",
+  "script-src 'self' 'wasm-unsafe-eval' blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' blob: data: http://127.0.0.1:*",
+  "font-src 'self' blob: data:",
+  "connect-src 'self' http://127.0.0.1:* blob: data:",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-src 'self' blob: data:",
+  "frame-ancestors 'none'",
+].join('; ');
 
 import { resolveDataPaths } from '../server/data-paths.mjs';
 import { createLibraryStore } from '../server/library-store.mjs';
@@ -162,10 +177,30 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     const decoded = decodeURIComponent(requestPath.split('?')[0] ?? '')
       .replace(/^\/+/, '')
       .replace(/^library-assets\//, '');
+    if (decoded.includes('\0')) {
+      throw new Error('Null byte in path forbidden');
+    }
+    if (decoded.includes(':')) {
+      throw new Error('Alternate data streams forbidden');
+    }
+    const baseName = decoded.split(/[/\\]/).pop() || '';
+    const bareName = baseName.split('.')[0].toUpperCase();
+    if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/.test(bareName)) {
+      throw new Error('Windows reserved device name forbidden');
+    }
     const candidate = resolve(libraryRoot, decoded);
     const fromRoot = relative(libraryRoot, candidate);
     if (!fromRoot || fromRoot.startsWith('..') || isAbsolute(fromRoot)) {
       throw new Error('Unsafe library asset path');
+    }
+    if (existsSync(candidate)) {
+      const canonicalLibRoot = existsSync(libraryRoot) ? realpathSync(libraryRoot) : libraryRoot;
+      const real = realpathSync(candidate);
+      const realFromRoot = relative(canonicalLibRoot, real);
+      if (!realFromRoot || realFromRoot.startsWith('..') || isAbsolute(realFromRoot)) {
+        throw new Error('Unsafe library asset reparse point');
+      }
+      return real;
     }
     return candidate;
   }
@@ -204,6 +239,14 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     }
 
     if (pathname === '/api/desktop/resolve-open-file' && method === 'POST') {
+      const token = req.headers['x-readwatch-session-token'];
+      if (!token) {
+        return sendJson(res, 401, { error: 'Unauthorized: missing session token' });
+      }
+      if (token !== sessionToken) {
+        return sendJson(res, 403, { error: 'Forbidden: invalid session token' });
+      }
+
       const body = await readJsonBody(req);
       const filePath = body?.path;
       if (!filePath || typeof filePath !== 'string' || !existsSync(filePath)) {
@@ -538,8 +581,36 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     return false;
   }
 
+  function isAllowedHost(hostHeader) {
+    if (!hostHeader) return true;
+    const host = hostHeader.replace(/:\d+$/, '').toLowerCase();
+    return host === '127.0.0.1' || host === 'localhost' || host === '[::1]' || host === '::1';
+  }
+
+  function isAllowedOrigin(originHeader) {
+    if (!originHeader) return true;
+    try {
+      const u = new URL(originHeader);
+      const host = u.hostname.toLowerCase();
+      return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
+    } catch {
+      return false;
+    }
+  }
+
   const server = createServer(async (req, res) => {
     try {
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', DESKTOP_CSP);
+
+      if (!isAllowedHost(req.headers.host)) {
+        return sendJson(res, 403, { error: 'Forbidden: untrusted host' });
+      }
+      if (!isAllowedOrigin(req.headers.origin)) {
+        return sendJson(res, 403, { error: 'Forbidden: untrusted origin' });
+      }
+
       const url = new URL(req.url ?? '/', `http://127.0.0.1`);
       const pathname = url.pathname;
 
@@ -596,7 +667,7 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     } catch (err) {
       console.error('[desktop-service] Unhandled error:', err);
       if (!res.headersSent) {
-        sendJson(res, 500, { error: err.message || 'Internal Server Error' });
+        sendJson(res, 500, { error: 'Internal Server Error' });
       }
     }
   });

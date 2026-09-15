@@ -791,12 +791,45 @@ export function createPortabilityStore({
     };
   }
 
-  // -------------------------------------------------------------------------
-  // P12-T007: Import & Restore Validation & Execution
-  // -------------------------------------------------------------------------
+  function verifyBackupChecksums(validated) {
+    const checksums = validated.manifest?.checksums;
+    if (!checksums) return;
+
+    if (checksums.librarySha256) {
+      const computed = sha256String(JSON.stringify(validated.library.items));
+      if (computed !== checksums.librarySha256) {
+        throw new Error(`Backup tampering detected: library items checksum mismatch`);
+      }
+    }
+
+    if (checksums.annotationsSha256) {
+      const computed = sha256String(JSON.stringify({
+        annotations: validated.annotations.annotations,
+        bookmarks: validated.annotations.bookmarks || [],
+      }));
+      if (computed !== checksums.annotationsSha256) {
+        throw new Error(`Backup tampering detected: annotations checksum mismatch`);
+      }
+    }
+
+    if (checksums.notesSha256) {
+      const computed = sha256String(JSON.stringify(validated.notes.notes));
+      if (computed !== checksums.notesSha256) {
+        throw new Error(`Backup tampering detected: notes checksum mismatch`);
+      }
+    }
+
+    if (checksums.canvasesSha256) {
+      const computed = sha256String(JSON.stringify(validated.canvases));
+      if (computed !== checksums.canvasesSha256) {
+        throw new Error(`Backup tampering detected: canvases checksum mismatch`);
+      }
+    }
+  }
 
   function preflightRestore(backupPackage) {
     const validated = validateBackupPackage(backupPackage);
+    verifyBackupChecksums(validated);
     const conflicts = [];
     const warnings = [];
 
@@ -937,6 +970,7 @@ export function createPortabilityStore({
 
   function applyRestore(backupPackage, { conflictResolution = 'skip' } = {}) {
     const validated = validateBackupPackage(backupPackage);
+    verifyBackupChecksums(validated);
 
     const restoredCounts = {
       items: 0,

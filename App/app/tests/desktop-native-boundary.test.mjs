@@ -14,6 +14,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
@@ -187,11 +188,14 @@ test('P14-T003: Internal desktop service starts on 127.0.0.1, serves stores, and
     const searchData = await searchRes.json();
     assert.ok(searchData.status !== undefined || searchData.schemaVersion !== undefined);
 
-    // 4. Resolve Open-With File
+    // 4. Resolve Open-With File (with valid session token)
     const samplePdf = resolve(appRoot, 'tests', 'fixtures', 'pdf', 'sample-alice.pdf');
     const resolveRes = await fetch(`${instance.origin}/api/desktop/resolve-open-file`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-ReadWatch-Session-Token': instance.sessionToken,
+      },
       body: JSON.stringify({ path: samplePdf }),
     });
     assert.equal(resolveRes.status, 200);
@@ -200,10 +204,53 @@ test('P14-T003: Internal desktop service starts on 127.0.0.1, serves stores, and
     assert.equal(resolveData.file.name, 'sample-alice.pdf');
     assert.ok(resolveData.file.hash.length === 64, 'Must compute SHA-256 hash');
 
-    // 5. Negative test on nonexistent file
-    const badFileRes = await fetch(`${instance.origin}/api/desktop/resolve-open-file`, {
+    // 5. Negative test: Missing session token must return 401
+    const missingTokenRes = await fetch(`${instance.origin}/api/desktop/resolve-open-file`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: samplePdf }),
+    });
+    assert.equal(missingTokenRes.status, 401, 'Missing session token must return 401');
+
+    // 6. Negative test: Invalid session token must return 403
+    const badTokenRes = await fetch(`${instance.origin}/api/desktop/resolve-open-file`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-ReadWatch-Session-Token': 'bad-token-12345',
+      },
+      body: JSON.stringify({ path: samplePdf }),
+    });
+    assert.equal(badTokenRes.status, 403, 'Invalid session token must return 403');
+
+    // 7. Negative test: Disallowed Origin header must return 403
+    const badOriginRes = await fetch(`${instance.origin}/api/desktop/status`, {
+      headers: { Origin: 'https://malicious-website.com' },
+    });
+    assert.equal(badOriginRes.status, 403, 'Untrusted origin must return 403');
+
+    // 8. Negative test: Disallowed Host header must return 403
+    const badHostStatus = await new Promise((resolveReq) => {
+      const u = new URL(instance.origin);
+      const req = http.request({
+        hostname: u.hostname,
+        port: u.port,
+        path: '/api/desktop/status',
+        headers: { Host: 'evil.com' },
+      }, (res) => {
+        resolveReq(res.statusCode);
+      });
+      req.end();
+    });
+    assert.equal(badHostStatus, 403, 'Untrusted host must return 403');
+
+    // 9. Negative test on nonexistent file
+    const badFileRes = await fetch(`${instance.origin}/api/desktop/resolve-open-file`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-ReadWatch-Session-Token': instance.sessionToken,
+      },
       body: JSON.stringify({ path: 'C:/totally/fake/path.epub' }),
     });
     assert.equal(badFileRes.status, 400);
@@ -229,7 +276,10 @@ test('P14-T007 & P14-G003: Source publications remain 100% byte-identical across
   try {
     const res = await fetch(`${instance.origin}/api/desktop/resolve-open-file`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-ReadWatch-Session-Token': instance.sessionToken,
+      },
       body: JSON.stringify({ path: samplePdf }),
     });
     assert.equal(res.status, 200);

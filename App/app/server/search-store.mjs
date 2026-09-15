@@ -569,8 +569,9 @@ export function createSearchStore({
       // 6. Index Knowledge Graphs
       try {
         const graphs = db.prepare("SELECT * FROM knowledge_graphs WHERE deleted_at_utc IS NULL").all();
+        const nodesStmt = db.prepare("SELECT label, notes FROM knowledge_nodes WHERE graph_id = ? AND deleted_at_utc IS NULL");
         for (const g of graphs) {
-          const nodes = db.prepare("SELECT label, notes FROM knowledge_nodes WHERE graph_id = ? AND deleted_at_utc IS NULL").all(g.id);
+          const nodes = nodesStmt.all(g.id);
           const nodeTexts = nodes.map((n) => `${n.label} ${n.notes}`).join(' ');
           const fullText = [g.title, g.description, nodeTexts].filter(Boolean).join(' ');
           const target = {

@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-09-15 - Phase 16 performance, security, and reliability hardening
+
+- Established frozen performance, reliability, and security benchmark budgets in `docs/project/HARDENING_BENCHMARKS.md`.
+- Generated reproducible synthetic benchmark datasets (151, 1,000, and 5,000 items; 100-page PDF) in external disposable storage outside Git (`READ_WATCH_DATA_ROOT/hardening/phase-16/benchmarks/`).
+- Measured and eliminated N+1 relational query loops in `server/library-store.mjs` via chunked batch fetching (`IN (?, ?, ...)`) across 6 auxiliary relational tables (properties, tags, assets, relationships, people, series):
+  - 151 items: 123.72ms -> 6.40ms (19.3x speedup).
+  - 1,000 items: 856.45ms -> 23.84ms (35.9x speedup).
+  - 5,000 items: 4,336.08ms -> 132.08ms (32.8x speedup, beating the 500ms budget).
+- Optimized FTS5 search statement preparation with lazy cached statement reuse in `server/search-store.mjs`.
+- Security boundary hardening across desktop service and portability layers:
+  - Loopback service validation (`electron/desktop-service.mjs`): strict `Host` and `Origin` whitelist rejection (403 Forbidden for non-local origins).
+  - Content Security Policy (CSP): injected strict `DESKTOP_CSP` headers (`default-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws:;`).
+  - Session token authentication: required `X-ReadWatch-Session-Token` on sensitive desktop endpoints (`/api/desktop/resolve-open-file`).
+  - Sanitized 500 server error responses with zero private filesystem path leaks.
+  - Hardened path traversal defenses (`safeLibraryFile` in `desktop-service.mjs` and `assertSafePath` in `lib/portability/validation.ts`) with reparse point resolution (`realpathSync`), Alternate Data Stream (`:`) rejection, Windows device name defense (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`), and percent-encoded sequence blocking.
+  - Strict regex containment (`^[a-zA-Z0-9_-]+$`) on canvas identifiers in `server/canvas-store.mjs`.
+- Added tamper-evident backup verification with cryptographic SHA-256 payload checksum validation (`verifyBackupChecksums`) in `server/portability-store.mjs` for preflight and restore.
+- Expanded automated regression suite with `tests/malformed-and-fault-injection.test.mjs` (7 tests), expanding total test coverage to 229 passing tests across 32 suites.
+- Completed comprehensive dependency, license, and reachability audit (`docs/project/UPSTREAM_AND_LICENSE_LEDGER.md` and `docs/project/TECHNOLOGY_LEDGER.md`): 100% permissive runtime dependencies (MIT, Apache-2.0, ISC) with zero copyleft contamination.
+- Validated reproducible build and Windows desktop packaging: `npm run build` and `npm run desktop:pack` producing `dist-electron/win-unpacked/Read & Watch.exe` (201,233,408 bytes, SHA-256 recorded in external ledger).
+- Authored Phase 16 Graphify AST audit (`docs/project/reports/PHASE_16_GRAPHIFY_AUDIT.md`) and Ponytail audit (`docs/project/reports/PHASE_16_PONYTAIL_AUDIT.md`).
+- Authored comprehensive Phase 16 completion report (`docs/project/reports/PHASE_16_REPORT.md`).
+- Recorded Decision D-052 in `DECISIONS.md`.
+- All 229 automated tests pass with 0 failures; repository hygiene and project governance checks pass.
+- Respected stop condition: stopped cleanly after Phase 16 closure without starting Phase 17 (OCR remains unstarted).
+
 ## 2026-09-15 - Phase 15 privacy, terms, settings, and product polish
 
 - Conducted whole-product data flow, network, permission, and third-party inventory (`docs/project/PRODUCT_DATA_FLOW_INVENTORY.md`). Verified zero telemetry, zero analytics, zero cookies, zero external font/script CDNs, zero background outbound traffic.

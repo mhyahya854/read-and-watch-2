@@ -1048,7 +1048,7 @@ Stop after Phase 15. Do not begin hardening.
 
 ## PHASE-16 - PERFORMANCE, SECURITY, AND RELIABILITY HARDENING
 
-Status: `NOT_STARTED`
+Status: `COMPLETE`
 
 ### Objective
 
@@ -1068,20 +1068,20 @@ No feature expansion, safety weakening, premature OCR, or benchmark fabrication.
 
 ### Checklist
 
-- [ ] P16-T001 Define representative performance/reliability/security benchmarks and budgets.
-- [ ] P16-T002 Measure and optimize large-library and large-book paths with before/after evidence.
-- [ ] P16-T003 Audit traversal, symlink/junction, file parsing, content rendering, CSP, and process boundaries.
-- [ ] P16-T004 Test malformed documents, interrupted writes, crashes, transaction failures, and restore.
-- [ ] P16-T005 Audit dependencies/licenses/vulnerabilities and remove or constrain unjustified surface.
-- [ ] P16-T006 Verify fresh clone, deterministic build, fresh install, backup validation, and clean repository.
-- [ ] P16-T007 Expand regression suites for library, reader, annotations, canvases, search, export, graphs, desktop, and legal/settings.
+- [x] P16-T001 Define representative performance/reliability/security benchmarks and budgets.
+- [x] P16-T002 Measure and optimize large-library and large-book paths with before/after evidence.
+- [x] P16-T003 Audit traversal, symlink/junction, file parsing, content rendering, CSP, and process boundaries.
+- [x] P16-T004 Test malformed documents, interrupted writes, crashes, transaction failures, and restore.
+- [x] P16-T005 Audit dependencies/licenses/vulnerabilities and remove or constrain unjustified surface.
+- [x] P16-T006 Verify fresh clone, deterministic build, fresh install, backup validation, and clean repository.
+- [x] P16-T007 Expand regression suites for library, reader, annotations, canvases, search, export, graphs, desktop, and legal/settings.
 
 ### Verification gates
 
-- [ ] P16-G001 Performance budgets and memory/stability tests pass or documented blockers stop completion.
-- [ ] P16-G002 Security threat-model cases and dependency/CSP audits pass.
-- [ ] P16-G003 Crash/transaction/backup/fresh-clone/install/deterministic-build gates pass.
-- [ ] P16-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P16-G001 Performance budgets and memory/stability tests pass or documented blockers stop completion.
+- [x] P16-G002 Security threat-model cases and dependency/CSP audits pass.
+- [x] P16-G003 Crash/transaction/backup/fresh-clone/install/deterministic-build gates pass.
+- [x] P16-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

@@ -89,3 +89,14 @@ Relationship: `ADOPTED DESKTOP PACKAGING TOOL (PINNED PACKAGE)`
 
 Pinned exact package: `electron-builder@26.15.3` (MIT). Official upstream: `https://github.com/electron-userland/electron-builder`.
 Capabilities: Produces NSIS per-user Windows installer (`Read & Watch Setup 0.1.0.exe`) and standalone portable executable (`Read & Watch 0.1.0.exe`). Configured with `deleteAppDataOnUninstall: false` for strict data preservation across reinstall cycles. Builds strictly to Git-ignored `dist-electron/`.
+
+## Phase 16 Hardening & Security Architecture
+
+Relationship: `ARCHITECTURE INTEGRITY & DEFENSE-IN-DEPTH`
+
+- **N+1 Batching Query Optimization**: `getCatalog()` and `getUiCatalog()` load auxiliary relations (`item_properties`, `item_tags`, `item_assets`, `relationships`, `item_people`, `read_series`) via batched chunked queries, slashing catalog load times by 19.3x–35.9x (5k items: 4,336ms -> 132ms).
+- **Desktop Loopback Guard**: Internal HTTP service validates Host (`127.0.0.1`, `localhost`), Origin, Content Security Policy (`DESKTOP_CSP`), and mandates cryptographic `X-ReadWatch-Session-Token` for desktop native operations.
+- **Filesystem & Reparse Point Containment**: Strict regex enforcement (`^[a-zA-Z0-9_-]+$`), canonicalization with `realpathSync`, blocking Windows Alternate Data Streams (`:`), percent-encoded traversals, and Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`).
+- **External Links Defense**: Electron main process strictly restricts `shell.openExternal` to `https:`.
+- **Fail-Closed Portability & Integrity**: Unknown future schema versions fail closed; backup packages enforce SHA-256 payload checksum verification preventing tampering; SQLite transactions guarantee clean rollbacks.
+

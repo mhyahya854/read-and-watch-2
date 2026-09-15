@@ -11,6 +11,9 @@ This ledger is a sanitized index. Detailed evidence remains under the external d
 | HIST-GRAPH | Prior application graph | SUPERSEDED BY BOOTSTRAP REFRESH | External Graphify history retained; current audit is in the bootstrap report |
 | LEGACY-T4 | Old Readest-centric annotations plan | SUPERSEDED - NOT COMPLETE | Historical unchecked checklist retained in `TASKS.md`; do not execute |
 | PHASE-13 | Knowledge and Diagram System | CERTIFIED | 213/213 tests pass; knowledge-store.test.mjs; PHASE_13_REPORT.md; Graphify + Ponytail audits; lint/tsc/hygiene PASS |
+| PHASE-14 | Desktop Native Integration | CERTIFIED | 222/222 tests pass; desktop-native-boundary.test.mjs; PHASE_14_REPORT.md; Electron 35.7.5 packaging; hygiene PASS |
+| PHASE-15 | Privacy, Terms, Settings, and Product Polish | CERTIFIED | 222/222 tests pass; settings-store.test.mjs; PHASE_15_REPORT.md; Graphify + Ponytail audits; hygiene PASS |
+| PHASE-16 | Performance, Security, and Reliability Hardening | CERTIFIED | 229/229 tests pass; malformed-and-fault-injection.test.mjs; PHASE_16_REPORT.md; Graphify + Ponytail audits; packaging/hygiene PASS |
 
 ## Repository separation certification
 
@@ -61,3 +64,16 @@ Legacy Task 4 remains historically accurate but incomplete. It is superseded bec
 - Search integration: FTS5 index covers knowledge graph titles/nodes and Mermaid diagram source text.
 - 213/213 tests pass; lint 0 errors; TypeScript 0 errors; hygiene PASS.
 - Phase 13 stop condition respected: no desktop packaging started.
+
+## Phase 16 certification
+
+- Frozen performance, reliability, and security budgets in `docs/project/HARDENING_BENCHMARKS.md`.
+- Batch SQL query optimization in `server/library-store.mjs` eliminated N+1 query loops, accelerating 5,000 item loads from 4,336ms to 132ms (32.8x speedup).
+- Loopback service hardened with strict Host and Origin checking, CSP headers, session token authentication, and path-leak-sanitized error handling.
+- Path traversal defenses hardened with `realpathSync` reparse point verification, Alternate Data Stream (`:`) rejection, and Windows reserved device name validation.
+- Tamper-evident backup checksum verification (`verifyBackupChecksums`) added to `server/portability-store.mjs`.
+- Expanded automated test suite with `tests/malformed-and-fault-injection.test.mjs` (229/229 tests pass).
+- Full dependency, license, and reachability audit verified 100% permissive runtime dependencies with zero copyleft contamination.
+- Windows desktop packaging verified producing `dist-electron/win-unpacked/Read & Watch.exe` (201,233,408 bytes).
+- Phase 16 Graphify and Ponytail audits certified clean architecture and zero dependency bloat.
+- Phase 16 stop condition respected: zero OCR and no Phase 17 execution.

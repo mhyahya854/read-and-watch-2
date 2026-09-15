@@ -4,11 +4,47 @@ Bootstrap and historical foundation: COMPLETE and CERTIFIED.
 
 Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
-Last completed phase: `PHASE-15` - Privacy, Terms, Settings, and Product Polish.
+Last completed phase: `PHASE-16` - Performance, Security, and Reliability Hardening.
 
-Current actionable phase: `PHASE-16` - Performance, Security, and Reliability Hardening (`NOT_STARTED`).
+Current actionable phase: `PHASE-17` - OCR Foundation - Late Phase (`NOT_STARTED`).
 
-Exact next task: Stop condition reached. Do not begin Phase 16.
+Exact next task: Stop condition reached. Do not begin Phase 17.
+
+Phase 16 implementation results:
+
+- Frozen performance, reliability, and security budgets and test specifications in `docs/project/HARDENING_BENCHMARKS.md`.
+- Generated reproducible synthetic benchmark fixtures (151, 1,000, and 5,000 catalog items; 100-page benchmark PDF) strictly outside Git in `READ_WATCH_DATA_ROOT/hardening/phase-16/benchmarks/`.
+- Measured and eliminated N+1 database queries in `server/library-store.mjs` via chunked batch fetching (`IN (?, ?, ...)`) across 6 auxiliary relational tables (properties, tags, assets, relationships, people, series). Achieved dramatic speedups:
+  - 151 items: 123.72ms -> 6.40ms (19.3x speedup)
+  - 1,000 items: 856.45ms -> 23.84ms (35.9x speedup)
+  - 5,000 items: 4,336.08ms -> 132.08ms (32.8x speedup, beating the 500ms budget)
+- Optimized FTS5 search statement preparation with lazy cached statement reuse in `server/search-store.mjs`.
+- Security boundary hardening across desktop service and portability layers:
+  - Loopback service validation (`electron/desktop-service.mjs`): strict `Host` and `Origin` whitelist rejection (403 Forbidden for non-local origins).
+  - CSP enforcement: injected strict `DESKTOP_CSP` headers (`default-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws:;`).
+  - Session token authentication: required `X-ReadWatch-Session-Token` on sensitive desktop endpoints (`/api/desktop/resolve-open-file`).
+  - Sanitized 500 server error responses with zero private filesystem path leaks.
+  - Hardened path traversal defenses (`safeLibraryFile` in `desktop-service.mjs` and `assertSafePath` in `lib/portability/validation.ts`) with reparse point resolution (`realpathSync`), Alternate Data Stream (`:`) rejection, Windows device name defense (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`), and percent-encoded sequence blocking.
+  - Strict regex containment (`^[a-zA-Z0-9_-]+$`) on canvas identifiers in `server/canvas-store.mjs`.
+- Implemented tamper-evident backup verification:
+  - Cryptographic SHA-256 payload checksum validation (`verifyBackupChecksums`) in `server/portability-store.mjs` for both preflight inspection and restore application.
+- Expanded automated regression suite (`tests/malformed-and-fault-injection.test.mjs`):
+  - 7 comprehensive tests covering malformed/truncated JSON resilience, future schema rejection, corrupted book rejection, SQLite transaction rollback with integrity check validation, atomic write `.tmp` recovery, backup tampering detection, and full round-trip restore into an isolated external target.
+  - Total automated test count expanded from 222 to 229 passing tests.
+- Completed comprehensive dependency, license, and reachability audit (`docs/project/UPSTREAM_AND_LICENSE_LEDGER.md` and `docs/project/TECHNOLOGY_LEDGER.md`):
+  - 100% permissive production runtime dependencies (MIT, Apache-2.0, ISC) with zero copyleft contamination.
+  - Reachability analysis for 16 dev/optional audit findings confirmed zero production reachability.
+- Validated reproducible build and Windows desktop packaging:
+  - Clean `npm run build` and `npm run desktop:pack` producing `dist-electron/win-unpacked/Read & Watch.exe` (201,233,408 bytes, SHA-256 recorded in external ledger).
+- Authored Phase 16 Graphify AST audit (`docs/project/reports/PHASE_16_GRAPHIFY_AUDIT.md`) and Ponytail audit (`docs/project/reports/PHASE_16_PONYTAIL_AUDIT.md`).
+- Authored comprehensive Phase 16 completion report (`docs/project/reports/PHASE_16_REPORT.md`).
+- Recorded Decision D-052 in `DECISIONS.md`.
+- Automated tests: **229/229 tests passing** across 32 suites (`npm test`).
+- TypeScript compiler: **0 errors** (`npx tsc --noEmit`).
+- Linter: **0 warnings, 0 errors** (`npm run lint`).
+- Repository hygiene: **PASS** (`python scripts/check_repository_hygiene.py`).
+- Project governance: **PASS** (`python scripts/validate_project_state.py`).
+- Respected stop condition: stopped cleanly after Phase 16 closure without starting Phase 17 (OCR remains unstarted).
 
 Phase 15 implementation results:
 

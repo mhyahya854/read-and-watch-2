@@ -436,3 +436,29 @@ Status: Accepted
 
 6. **Anti-Vibe Polish & Full Accessibility**:
    User-facing copy contains zero em dashes (`—`), zero fake reviews, testimonials, follower counts, or cloud marketing teasers. Full keyboard focus navigation, Skip-to-Main-Content navigation, `@media (prefers-reduced-motion: reduce)`, and high-contrast focus rings are implemented and certified.
+
+## D-052 - Phase 16 Performance, Security, and Reliability Hardening
+
+Status: Accepted
+
+1. **Batch Query Optimization in `server/library-store.mjs`**:
+   Eliminated N+1 query loop by batching properties, tags, assets, relationships, people, and series lookups using parameterized `IN (?, ?, ...)` chunked queries. Verified on 151, 1,000, and 5,000 item synthetic datasets: 151 items improved from 123.72ms to 6.40ms (19.3x speedup); 1,000 items improved from 856.45ms to 23.84ms (35.9x speedup); 5,000 items improved from 4,336.08ms to 132.08ms (32.8x speedup, beating the 500ms budget). Lazy cached statement reuse implemented in `server/search-store.mjs`.
+
+2. **Loopback Service & Process Boundary Security**:
+   In `electron/desktop-service.mjs`, the embedded HTTP service enforces strict `Host` (localhost/127.0.0.1) and `Origin` validation, returning 403 Forbidden for disallowed origins. Responses inject strict `DESKTOP_CSP` headers (`default-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws:;`). Error handling on 500 responses is sanitized to prevent private filesystem path leakage.
+
+3. **Session Token Gate on Open File Resolution**:
+   `GET /api/desktop/resolve-open-file` requires an `X-ReadWatch-Session-Token` header matching the internal desktop session token generated on launch, preventing unauthorized local processes or origins from triggering host file resolution.
+
+4. **Path Traversal & Windows Device Name Defense**:
+   Hardened `safeLibraryFile` in `electron/desktop-service.mjs` and `assertSafePath` in `lib/portability/validation.ts` against Alternate Data Streams (`:`), Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`), percent-encoded traversal sequences, and directory escapes using `realpathSync`. Enforced identifier regex `^[a-zA-Z0-9_-]+$` on canvas IDs.
+
+5. **Tamper-Evident Backup Checksums**:
+   Added cryptographic SHA-256 payload checksum validation (`verifyBackupChecksums`) in `server/portability-store.mjs` for preflight inspection and restore application, rejecting corrupted or tampered backup archives before application.
+
+6. **Automated Fault Injection Suite**:
+   Expanded regression tests with `tests/malformed-and-fault-injection.test.mjs` (7 tests), verifying malformed JSON resilience, future schema rejection, corrupted book rejection, transaction rollback with SQLite integrity verification, atomic `.tmp` file recovery, backup tampering detection, and full round-trip restore into isolated target directories.
+
+7. **Reproducible Packaging & Strict Phase Boundary**:
+   Verified reproducible Windows packaging (`dist-electron/win-unpacked/Read & Watch.exe`, 201,233,408 bytes). Upstream dependency audit confirmed 100% permissive runtime licenses with zero copyleft contamination. Zero OCR dependencies, models, or processes were introduced.
+

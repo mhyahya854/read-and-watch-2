@@ -38,20 +38,65 @@ export function createLibraryStore({ databasePath, readOnly = false, searchStore
     const rows = database
       .prepare('SELECT * FROM items ORDER BY source_order')
       .all();
-    const propertyStatement = database.prepare(
-      'SELECT * FROM item_properties WHERE item_id=? ORDER BY namespace,source_order',
-    );
-    const tagStatement = database.prepare(
-      'SELECT t.name FROM item_tags it JOIN tags t ON t.id=it.tag_id WHERE it.item_id=? ORDER BY it.position',
-    );
-    const mediaStatement = database.prepare(
-      "SELECT a.display_name,a.relative_path,a.extension FROM item_assets a JOIN asset_roles r ON r.asset_id=a.id AND r.role='catalog_media' WHERE a.item_id=? ORDER BY a.source_order",
-    );
-    const relationshipStatement = database.prepare(
-      'SELECT target_item_id FROM relationships WHERE source_item_id=? AND target_item_id IS NOT NULL ORDER BY position',
-    );
+
+    const propRows = database
+      .prepare('SELECT item_id, namespace, property_key, value_json FROM item_properties ORDER BY namespace, source_order')
+      .all();
+    const propsByItem = new Map();
+    for (const p of propRows) {
+      let list = propsByItem.get(p.item_id);
+      if (!list) {
+        list = [];
+        propsByItem.set(p.item_id, list);
+      }
+      list.push(p);
+    }
+
+    const tagRows = database
+      .prepare('SELECT it.item_id, t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id ORDER BY it.position')
+      .all();
+    const tagsByItem = new Map();
+    for (const t of tagRows) {
+      let list = tagsByItem.get(t.item_id);
+      if (!list) {
+        list = [];
+        tagsByItem.set(t.item_id, list);
+      }
+      list.push(t.name);
+    }
+
+    const mediaRows = database
+      .prepare("SELECT a.item_id, a.display_name, a.relative_path, a.extension FROM item_assets a JOIN asset_roles r ON r.asset_id = a.id AND r.role = 'catalog_media' ORDER BY a.source_order")
+      .all();
+    const mediaByItem = new Map();
+    for (const m of mediaRows) {
+      let list = mediaByItem.get(m.item_id);
+      if (!list) {
+        list = [];
+        mediaByItem.set(m.item_id, list);
+      }
+      list.push({
+        name: m.display_name,
+        path: m.relative_path,
+        extension: m.extension,
+      });
+    }
+
+    const relRows = database
+      .prepare('SELECT source_item_id, target_item_id FROM relationships WHERE target_item_id IS NOT NULL ORDER BY position')
+      .all();
+    const relsByItem = new Map();
+    for (const r of relRows) {
+      let list = relsByItem.get(r.source_item_id);
+      if (!list) {
+        list = [];
+        relsByItem.set(r.source_item_id, list);
+      }
+      list.push(r.target_item_id);
+    }
+
     const items = rows.map((row) => {
-      const properties = propertyStatement.all(row.id);
+      const properties = propsByItem.get(row.id) || [];
       const internal = Object.fromEntries(
         properties
           .filter(({ namespace }) => namespace === 'catalog_internal')
@@ -76,19 +121,13 @@ export function createLibraryStore({ databasePath, readOnly = false, searchStore
         type: row.item_type,
         status: row.status,
         added: row.source_added,
-        tags: tagStatement.all(row.id).map(({ name }) => name),
+        tags: tagsByItem.get(row.id) || [],
         summary: row.summary,
         cover: internal.cover ?? null,
         preview: internal.preview ?? null,
         notionProperties,
-        media: mediaStatement.all(row.id).map((media) => ({
-          name: media.display_name,
-          path: media.relative_path,
-          extension: media.extension,
-        })),
-        relationshipIds: relationshipStatement
-          .all(row.id)
-          .map(({ target_item_id }) => target_item_id),
+        media: mediaByItem.get(row.id) || [],
+        relationshipIds: relsByItem.get(row.id) || [],
       };
     });
     const read = items.filter(({ collection }) => collection === 'read').length;
@@ -101,52 +140,147 @@ export function createLibraryStore({ databasePath, readOnly = false, searchStore
   }
 
   function getUiCatalog() {
-    const catalog = getCatalog();
-    const itemStatement = database.prepare(
-      'SELECT rating,revision,provenance_kind,updated_at_utc FROM items WHERE id=?',
+    const meta = Object.fromEntries(
+      database
+        .prepare('SELECT key,value_json FROM library_meta')
+        .all()
+        .map((row) => [row.key, parse(row.value_json)]),
     );
-    const peopleStatement = database.prepare(
-      `SELECT ip.role,p.display_name FROM item_people ip
-       JOIN people p ON p.id=ip.person_id
-       WHERE ip.item_id=? ORDER BY ip.role,ip.position`,
-    );
-    const seriesStatement = database.prepare(
-      `SELECT s.name,rs.position FROM read_series rs
-       JOIN series s ON s.id=rs.series_id WHERE rs.item_id=?`,
-    );
-    const customStatement = database.prepare(
-      `SELECT namespace,property_key,value_json FROM item_properties
-       WHERE item_id=? AND namespace NOT IN ('catalog_internal','notion')
-       ORDER BY namespace,source_order,property_key`,
-    );
+    const rows = database
+      .prepare('SELECT * FROM items ORDER BY source_order')
+      .all();
 
+    const propRows = database
+      .prepare('SELECT item_id, namespace, property_key, value_json FROM item_properties ORDER BY namespace, source_order, property_key')
+      .all();
+    const propsByItem = new Map();
+    for (const p of propRows) {
+      let list = propsByItem.get(p.item_id);
+      if (!list) {
+        list = [];
+        propsByItem.set(p.item_id, list);
+      }
+      list.push(p);
+    }
+
+    const tagRows = database
+      .prepare('SELECT it.item_id, t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id ORDER BY it.position')
+      .all();
+    const tagsByItem = new Map();
+    for (const t of tagRows) {
+      let list = tagsByItem.get(t.item_id);
+      if (!list) {
+        list = [];
+        tagsByItem.set(t.item_id, list);
+      }
+      list.push(t.name);
+    }
+
+    const mediaRows = database
+      .prepare("SELECT a.item_id, a.display_name, a.relative_path, a.extension FROM item_assets a JOIN asset_roles r ON r.asset_id = a.id AND r.role = 'catalog_media' ORDER BY a.source_order")
+      .all();
+    const mediaByItem = new Map();
+    for (const m of mediaRows) {
+      let list = mediaByItem.get(m.item_id);
+      if (!list) {
+        list = [];
+        mediaByItem.set(m.item_id, list);
+      }
+      list.push({
+        name: m.display_name,
+        path: m.relative_path,
+        extension: m.extension,
+      });
+    }
+
+    const relRows = database
+      .prepare('SELECT source_item_id, target_item_id FROM relationships WHERE target_item_id IS NOT NULL ORDER BY position')
+      .all();
+    const relsByItem = new Map();
+    for (const r of relRows) {
+      let list = relsByItem.get(r.source_item_id);
+      if (!list) {
+        list = [];
+        relsByItem.set(r.source_item_id, list);
+      }
+      list.push(r.target_item_id);
+    }
+
+    const peopleRows = database
+      .prepare('SELECT ip.item_id, ip.role, p.display_name FROM item_people ip JOIN people p ON p.id = ip.person_id ORDER BY ip.role, ip.position')
+      .all();
+    const peopleByItem = new Map();
+    for (const p of peopleRows) {
+      let list = peopleByItem.get(p.item_id);
+      if (!list) {
+        list = [];
+        peopleByItem.set(p.item_id, list);
+      }
+      list.push(p);
+    }
+
+    const seriesRows = database
+      .prepare('SELECT rs.item_id, s.name, rs.position FROM read_series rs JOIN series s ON s.id = rs.series_id')
+      .all();
+    const seriesByItem = new Map();
+    for (const s of seriesRows) {
+      seriesByItem.set(s.item_id, { name: s.name, position: s.position });
+    }
+
+    const items = rows.map((row) => {
+      const properties = propsByItem.get(row.id) || [];
+      const internal = {};
+      const notionProperties = {};
+      const customProperties = {};
+      for (const p of properties) {
+        if (p.namespace === 'catalog_internal') {
+          internal[p.property_key] = parse(p.value_json);
+        } else if (p.namespace === 'notion') {
+          notionProperties[p.property_key] = parse(p.value_json);
+        } else {
+          customProperties[p.property_key] = parse(p.value_json);
+        }
+      }
+
+      const people = peopleByItem.get(row.id) || [];
+      const series = seriesByItem.get(row.id) || null;
+
+      return {
+        id: row.id,
+        title: row.title,
+        collection: row.collection,
+        itemPath: row.item_path,
+        type: row.item_type,
+        status: row.status,
+        added: row.source_added,
+        tags: tagsByItem.get(row.id) || [],
+        summary: row.summary,
+        cover: internal.cover ?? null,
+        preview: internal.preview ?? null,
+        notionProperties,
+        media: mediaByItem.get(row.id) || [],
+        relationshipIds: relsByItem.get(row.id) || [],
+        rating: row.rating,
+        revision: row.revision,
+        provenanceKind: row.provenance_kind,
+        updatedAt: row.updated_at_utc,
+        authors: people
+          .filter(({ role }) => role === 'author')
+          .map(({ display_name }) => display_name),
+        creators: people
+          .filter(({ role }) => role === 'creator')
+          .map(({ display_name }) => display_name),
+        series: series ? { name: series.name, position: series.position } : null,
+        customProperties,
+      };
+    });
+
+    const read = items.filter(({ collection }) => collection === 'read').length;
     return {
-      ...catalog,
-      items: catalog.items.map((item) => {
-        const row = itemStatement.get(item.id);
-        const people = peopleStatement.all(item.id);
-        const series = seriesStatement.get(item.id) ?? null;
-        const customProperties = Object.fromEntries(
-          customStatement
-            .all(item.id)
-            .map(({ property_key, value_json }) => [property_key, parse(value_json)]),
-        );
-        return {
-          ...item,
-          rating: row.rating,
-          revision: row.revision,
-          provenanceKind: row.provenance_kind,
-          updatedAt: row.updated_at_utc,
-          authors: people
-            .filter(({ role }) => role === 'author')
-            .map(({ display_name }) => display_name),
-          creators: people
-            .filter(({ role }) => role === 'creator')
-            .map(({ display_name }) => display_name),
-          series: series ? { name: series.name, position: series.position } : null,
-          customProperties,
-        };
-      }),
+      schemaVersion: meta.catalog_schema_version,
+      generatedFromImportUtc: meta.generated_from_import_utc,
+      counts: { read, watch: items.length - read, total: items.length },
+      items,
     };
   }
 
