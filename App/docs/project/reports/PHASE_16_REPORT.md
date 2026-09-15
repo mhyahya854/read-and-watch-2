@@ -13,6 +13,7 @@
 - Desktop Boundary Suite: `App/app/tests/desktop-native-boundary.test.mjs`
 - Audits: `App/docs/project/reports/PHASE_16_GRAPHIFY_AUDIT.md`, `App/docs/project/reports/PHASE_16_PONYTAIL_AUDIT.md`
 - Packaging Artifact: `dist-electron/win-unpacked/Read & Watch.exe` (SHA-256: `7BB0B23C3B64218B0BB453AA60A5CB9A6658B3F60A82A9F8B9B70B1F40F9E546`)
+- Content Commit: `f95f69c`
 
 ---
 
