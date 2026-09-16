@@ -8,7 +8,7 @@ Last completed phase: `PHASE-16` - Performance, Security, and Reliability Harden
 
 Current actionable phase: `PHASE-17` - OCR Foundation - Late Phase (`NOT_STARTED`).
 
-Exact next task: Stop condition reached. Do not begin Phase 17.
+Exact next task: Pre-Phase-17 cross-platform desktop gate active. Windows certified. Establish cross-platform packaging architecture, then certify Arch Linux, Ubuntu LTS, and macOS in order. Do not begin P17-T001 or OCR until all platform gates pass.
 
 Phase 16 implementation results:
 
@@ -58,6 +58,15 @@ Phase 16 certification repair results (post-closure, 2026-09-15):
 - P16-T006 (Fresh Clone, Reproducibility, Packaging, Clean Install): Fresh-clone, reproducibility, packaging, and clean Windows install all **PASS**.
 - P16-G003: Crash/transaction/backup/immutability/fresh-clone/reproducibility/clean-install all **PASS**.
 - Phase 16 is **COMPLETE and FULLY CERTIFIED**. All active blockers cleared. Phase 17 remains strictly **NOT_STARTED**.
+- Durable Cross-Platform Desktop Architecture established (`App/packaging/`):
+  - Canonical Architecture: ONE shared application codebase (`App/app/`), THREE thin distribution layers (`packaging/windows/`, `packaging/linux/`, `packaging/macos/`).
+  - Desktop Release Targets: Windows (NSIS, portable), Linux (Arch `.pkg.tar.zst`, Ubuntu/Debian `.deb`, AppImage), macOS (Apple Silicon arm64, Intel x64, `.dmg`, `.app`).
+  - Pre-OCR Platform Certification Sequence (Hard Gate before Phase 17):
+    1. Windows — **PASS** (Certified via isolated clean Windows 11 Pro VirtualBox VM; all 30 points pass)
+    2. Arch Linux — `NOT_STARTED` (Clean Arch Linux VirtualBox VM)
+    3. Ubuntu LTS — `NOT_STARTED` (Clean Ubuntu 24.04 LTS VirtualBox VM)
+    4. macOS — `NOT_STARTED` (Apple-backed runner / authentic macOS hardware)
+    5. Phase 17 OCR Foundation — Sequenced strictly behind full 4-platform certification. Specification: `docs/project/CROSS_PLATFORM_DESKTOP_CERTIFICATION.md`.
 - External vault artifacts in `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/` (`vm/` and `fresh-install/`).
 - Repair documented in `docs/project/reports/PHASE_16_REPORT.md` § Clean Windows Installation Certification.
 

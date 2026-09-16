@@ -13,7 +13,27 @@ tmp/
 # Application build output and dependencies
 app/node_modules/
 app/dist/
+app/dist-electron/
 app/.vite/
+
+# Cross-platform packaging build outputs and generated packages
+packaging/**/dist/
+packaging/**/out/
+*.AppImage
+*.deb
+*.rpm
+*.pkg.tar.zst
+*.dmg
+*.pkg
+*.msi
+*.exe
+*.vdi
+*.vmdk
+*.vbox
+*.iso
+*.p12
+*.pfx
+*.provisionprofile
 
 # Local environment files
 .env

@@ -1107,6 +1107,23 @@ The full non-OCR product passes defined performance, security, recovery, and rep
 
 Stop after Phase 16. OCR remains unstarted.
 
+### Mandatory Pre-Phase-17 Cross-Platform Desktop Certification Gate
+
+Phase 17 (OCR Foundation) may NOT begin until cross-platform desktop packaging and certification are 100% complete across all required platforms:
+
+1. **Windows Certification:** **PASS** (Certified via clean Windows 11 Pro VirtualBox VM; all gates pass).
+2. **Arch Linux Certification:** `NOT_STARTED` (Clean Arch Linux VirtualBox VM).
+3. **Ubuntu LTS Certification:** `NOT_STARTED` (Clean Ubuntu 24.04 LTS VirtualBox VM).
+4. **macOS Certification:** `NOT_STARTED` (Apple-backed runner / authentic macOS hardware).
+
+Current status:
+- Windows: PASS
+- Arch Linux: NOT_STARTED
+- Ubuntu LTS: NOT_STARTED
+- macOS: NOT_STARTED
+
+Therefore, `PHASE-17` and task `P17-T001` remain strictly `NOT_STARTED` until all preceding platform certification stages are certified. Specification: `docs/project/CROSS_PLATFORM_DESKTOP_CERTIFICATION.md`.
+
 ## PHASE-17 - OCR FOUNDATION - LATE PHASE
 
 Status: `NOT_STARTED`

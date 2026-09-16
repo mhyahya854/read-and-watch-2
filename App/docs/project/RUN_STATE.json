@@ -18,7 +18,8 @@
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
     "Visual reviews and certification evidence use the centralized external data directory outside Git to protect repository hygiene.",
-    "Windows Sandbox is unavailable on the current Windows 11 Home host; Phase 16 clean-install certification was completed successfully using an isolated Windows 11 Pro VirtualBox VM."
+    "Windows Sandbox is unavailable on the current Windows 11 Home host; Phase 16 clean-install certification was completed successfully using an isolated Windows 11 Pro VirtualBox VM.",
+    "Pre-Phase-17 cross-platform desktop gate active: Windows is certified; Arch Linux, Ubuntu LTS, and macOS certifications must complete before Phase 17 OCR begins."
   ],
   "phase_01_content_commit": "4e738ff8e83a48e0258169996df87fe5df726485",
   "phase_01_closure_commit": "SEE_LIVE_GIT_HEAD",
@@ -52,5 +53,5 @@
   "phase_15_closure_commit": "e908ffd",
   "phase_16_content_commit": "f95f69c",
   "phase_16_closure_commit": "c8e8727",
-  "exact_next_action": "Phase 16 is fully certified, including clean Windows installation via an isolated Windows 11 Pro VirtualBox VM. Stop. PHASE-17 / P17-T001 remains NOT_STARTED."
+  "exact_next_action": "Pre-Phase-17 cross-platform desktop gate active. Windows certified. Establish cross-platform packaging architecture, then certify Arch Linux, Ubuntu LTS, and macOS in order. Do not begin P17-T001 or OCR until all platform gates pass."
 }
