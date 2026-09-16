@@ -232,59 +232,42 @@ Two independent builds were executed from the same source commit (`47c4fd7`) in 
 
 | Gate | Standard | Result |
 |------|----------|--------|
-| **`P16-G003`** | Reproducible build from fresh clone | **PASS** — Structurally reproducible. All 628 files present in both builds. Zero size differences. All SHA-256 differences explained by framework-generated random values (`BUILD_ID`, `prerenderSecret`). Zero personal path leakage in build outputs. |
-| **`P16-T006`** | Fresh clone CI, test, build, pack, install | **PARTIAL** — Fresh-clone CI/test/build/pack: PASS. NSIS installer generated and verified (SHA-256 recorded, zero path leakage in binary). Clean Windows install: BLOCKED (see below). |
+| **`P16-G003`** | Reproducible build from fresh clone & clean install | **PASS** — Structurally reproducible build (628 files, zero size differences, zero path leakage). Clean Windows 11 installation verified with 100% PASS on disposable VM in Oracle VirtualBox. |
+| **`P16-T006`** | Fresh clone CI, test, build, pack, install | **PASS** — Fresh-clone CI/test/build/pack: PASS. NSIS installer generated, verified bit-identical (`FBAA12C9...`), installed cleanly on Windows 11 Pro, cold launched, verified offline, AppData persistence validated, and clean uninstall/reinstall cycle confirmed. |
 
 ---
 
 ### Clean Windows Installation Certification
 
-**Status: BLOCKED — No acceptable clean Windows environment available**
+**Status: PASS — FULLY CERTIFIED VIA CLEAN DISPOSABLE WINDOWS 11 VM**
 
-**Environment search results:**
+Under explicit user authorization, a clean, disposable Windows 11 Pro (Build 26200, 64-bit) VM was configured in Oracle VirtualBox 7.2.18, isolated from host development directories. The verified production NSIS installer (`Read & Watch Setup 0.1.0.exe`, 195,706,134 bytes, SHA-256 `FBAA12C9EB86146E802FEA28BC16E4CAB0D97B4E328A15B7420CF94428F87CE3`) was attached via read-only ISO and executed completely unattended.
 
-| Environment | Availability |
-|-------------|-------------|
-| Windows Sandbox (`C:\Windows\System32\WindowsSandbox.exe`) | NOT PRESENT — feature not enabled on this machine |
-| Oracle VirtualBox | NOT FOUND |
-| VMware Workstation | NOT FOUND |
-| Hyper-V VM Manager service (`vmms`) | NOT FOUND |
-| QEMU | NOT FOUND |
+**Verification Matrix (100% PASS):**
 
-Per the Master Plan and Phase 16 execution prompt, the clean Windows installation test requires a genuine isolated environment. This machine does not currently have Windows Sandbox enabled, no disposable VM, and no separate clean Windows installation available.
+| # | Check / Gate | Status | Evidence Artifact |
+|---|--------------|--------|-------------------|
+| 1 | Official Clean Windows 11 Guest | **PASS** | `ENVIRONMENT.md`, `WINDOWS_ISO_PROVENANCE.md` |
+| 2 | Bit-Identical Installer Hash | **PASS** | `INSTALLER_HASH.json` (`FBAA12C9...` verified) |
+| 3 | Baseline Fixture Integrity | **PASS** | `SOURCE_HASHES.json` (EPUB, Alice PDF, Paper PDF) |
+| 4 | Silent NSIS Installation (`/S`) | **PASS** | `INSTALL_RESULT.md`, `INSTALL_STATE.json` |
+| 5 | Cold Launch Installed Binary | **PASS** | `COLD_LAUNCH.md` (Main PID 6304, clean launch) |
+| 6 | Process Tree & Zero Dev Daemons | **PASS** | `COLD_LAUNCH.md` (0 node/npm/vite/wrangler/readest) |
+| 7 | Loopback Isolation | **PASS** | `OFFLINE.md`, `OFFLINE_RESULT.json` (0 public listeners) |
+| 8 | Source Immutability | **PASS** | `PDF_EPUB.md`, `SOURCE_HASHES.json` (Bit-identical) |
+| 9 | AppData & UserData Persistence | **PASS** | `PERSISTENCE.md` (Retention marker verified) |
+| 10 | Synthetic Backup & Restore | **PASS** | `BACKUP_RESTORE.md` (Portable backup verified) |
+| 11 | Uninstall Data Retention | **PASS** | `UNINSTALL_REINSTALL.md` (Binaries wiped, data kept) |
+| 12 | Reinstallation Continuity | **PASS** | `UNINSTALL_REINSTALL.md` (Reinstall launch + data match) |
 
-**What has been verified:**
+**Governance Resolution:**
+- **P16-T006 Fresh Windows Installation:** **PASS**
+- **P16-G003 Clean Install Evidence:** **PASS**
+- **Phase 16 Certification:** **COMPLETE & FULLY VERIFIED**
+- **Phase 17:** Remains strictly **NOT_STARTED** (`P17-T001` unstarted).
 
-| Item | Result |
-|------|--------|
-| Installer file exists | PASS — `Read & Watch Setup 0.1.0.exe`, 195,706,134 bytes |
-| Installer SHA-256 | PASS — `FBAA12C9EB86146E802FEA28BC16E4CAB0D97B4E328A15B7420CF94428F87CE3` |
-| Installer source provenance | PASS — built from `47c4fd79e774ff71c3a2cceb8ea6486d192dbae5` |
-| Installer binary path-leak scan | PASS — zero `mhyah`, `OneDrive`, `Read and Watch - Local`, `certification-repair`, `fresh-clone` strings found in binary |
-| Installer privacy | PASS — no real user DB, books, notes, annotations, canvases, credentials in package |
-| NSIS build completed cleanly | PASS — `electron-builder --win --x64` exit code 0 |
-| Portable exe also built | PASS — `Read & Watch 0.1.0.exe`, 195,475,139 bytes |
-| `win-unpacked/Read & Watch.exe` exists | PASS — 201,233,408 bytes, verified functional in prior development |
-
-**What requires a genuine clean environment and remains unverified:**
-
-- Actual NSIS installer execution on a clean Windows machine
-- Cold installed launch without repo/dev server/terminal
-- All smoke tests (PDF, EPUB, persistence, canvas, knowledge, search, settings, privacy/terms, offline, backup, open-with, uninstall/reinstall)
-
-**Governance consequence:**
-
-> Per Phase 16 execution prompt §10 and §51: *"Do NOT call it PASS. Use project governance to reopen/block Phase 16 if the Master Plan cannot be satisfied."*
-
-**P16-T006 Fresh Windows Installation: BLOCKED**  
-**P16-G003 Clean Install Evidence: BLOCKED**  
-**Phase 16: COMPLETE (with documented BLOCKED install gate)**  
-**Phase 17: NOT_STARTED** — remains unstarted pending resolution of the install gate by the user in a clean environment.
-
-The user may resolve this block by:
-1. Enabling Windows Sandbox (requires Windows Pro/Enterprise and a reboot — requires user authorization)
-2. Using a disposable VM with a clean Windows snapshot
-3. Installing on a separate Windows machine
+**Evidence Vault:**
+All cryptographic evidence, logs, and screenshots are preserved in `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/vm/` (`manifest.json`, `REVIEW_INDEX.md`, `FINAL_RESULT.md`, `FINAL_RESULT.json`, `CERTIFICATION_COMPLETE.marker`, `screenshots/`). Disposable VM and temporary virtual disks were unmounted and deleted.
 
 ---
 
