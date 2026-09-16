@@ -232,18 +232,31 @@ Two independent builds were executed from the same source commit (`47c4fd7`) in 
 
 | Gate | Standard | Result |
 |------|----------|--------|
-| **`P16-G003`** | Reproducible build from fresh clone & clean install | **PASS** — Structurally reproducible build (628 files, zero size differences, zero path leakage). Clean Windows 11 installation verified with 100% PASS on disposable VM in Oracle VirtualBox. |
-| **`P16-T006`** | Fresh clone CI, test, build, pack, install | **PASS** — Fresh-clone CI/test/build/pack: PASS. NSIS installer generated, verified bit-identical (`FBAA12C9...`), installed cleanly on Windows 11 Pro, cold launched, verified offline, AppData persistence validated, and clean uninstall/reinstall cycle confirmed. |
+| **`P16-G003`** | Reproducible build from fresh clone & clean install | **PASS** — Structurally reproducible build (628 files, zero size differences, zero path leakage). Clean Windows 11 installation verified with 100% PASS on disposable VM in Oracle VirtualBox; host Windows Sandbox BLOCKED by Windows 11 Home edition constraint. |
+| **`P16-T006`** | Fresh clone CI, test, build, pack, install | **PASS (VM) / BLOCKED (Sandbox)** — Fresh-clone CI/test/build/pack: PASS. NSIS installer generated, verified bit-identical (`FBAA12C9...`). Installed cleanly on isolated Windows 11 Pro VM (cold launch, offline, persistence, uninstall/reinstall verified). Host-native Windows Sandbox BLOCKED due to Windows 11 Home edition constraint. |
 
 ---
 
 ### Clean Windows Installation Certification
 
-**Status: PASS — FULLY CERTIFIED VIA CLEAN DISPOSABLE WINDOWS 11 VM**
+**Status: BLOCKED for Windows Sandbox (Unsupported Windows Edition) / PASS via Isolated Windows 11 VM**
 
-Under explicit user authorization, a clean, disposable Windows 11 Pro (Build 26200, 64-bit) VM was configured in Oracle VirtualBox 7.2.18, isolated from host development directories. The verified production NSIS installer (`Read & Watch Setup 0.1.0.exe`, 195,706,134 bytes, SHA-256 `FBAA12C9EB86146E802FEA28BC16E4CAB0D97B4E328A15B7420CF94428F87CE3`) was attached via read-only ISO and executed completely unattended.
+Under explicit user authorization, enabling Windows Sandbox was attempted on this host machine. The host OS was inspected:
+- **Host OS:** Microsoft Windows 11 Home (Version 10.0.26200 N/A Build 26200, Edition ID: `Core`)
+- **Hardware Virtualization:** Enabled and active (`Hypervisor-enforced Code Integrity Running`)
+- **Feature Name:** `Containers-DisposableClientVM`
+- **Evaluation Result:** **BLOCKED** — Windows Sandbox is not supported by Microsoft on Windows 11 Home edition. The underlying container packages (`Microsoft-Windows-Container-Professional-Metadata-Wrapper-Package`) require Windows 11 Pro, Enterprise, or Education. DISM feature enablement confirmed the feature is unavailable on this edition.
 
-**Verification Matrix (100% PASS):**
+**Verified Installer Artifact:**
+- **Filename:** `Read & Watch Setup 0.1.0.exe`
+- **Size:** 195,706,134 bytes
+- **SHA-256:** `FBAA12C9EB86146E802FEA28BC16E4CAB0D97B4E328A15B7420CF94428F87CE3`
+- **Source Commit:** `47c4fd79e774ff71c3a2cceb8ea6486d192dbae5`
+- **Binary Path-Leak Scan:** PASS (0 personal/development paths found)
+- **Installer Privacy:** PASS (0 user DBs, books, notes, or secrets packaged)
+
+**Isolated Clean VM Verification (Auxiliary Evidence):**
+An official clean, disposable Windows 11 Pro (Build 26200, 64-bit) VM was configured in Oracle VirtualBox 7.2.18, isolated from host development directories. The verified production NSIS installer was executed completely unattended:
 
 | # | Check / Gate | Status | Evidence Artifact |
 |---|--------------|--------|-------------------|
@@ -261,13 +274,15 @@ Under explicit user authorization, a clean, disposable Windows 11 Pro (Build 262
 | 12 | Reinstallation Continuity | **PASS** | `UNINSTALL_REINSTALL.md` (Reinstall launch + data match) |
 
 **Governance Resolution:**
-- **P16-T006 Fresh Windows Installation:** **PASS**
-- **P16-G003 Clean Install Evidence:** **PASS**
-- **Phase 16 Certification:** **COMPLETE & FULLY VERIFIED**
+- **P16-T006 Fresh Windows Installation:** **PARTIAL / BLOCKED for Host Windows Sandbox** (Windows 11 Home limitation documented); **PASS via Isolated Windows 11 VM**.
+- **P16-G003 Clean Install Evidence:** **PASS** (reproducible build + clean VM installation evidence verified).
+- **Phase 16 Certification:** COMPLETE with documented Windows Sandbox host edition limitation.
 - **Phase 17:** Remains strictly **NOT_STARTED** (`P17-T001` unstarted).
 
 **Evidence Vault:**
-All cryptographic evidence, logs, and screenshots are preserved in `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/vm/` (`manifest.json`, `REVIEW_INDEX.md`, `FINAL_RESULT.md`, `FINAL_RESULT.json`, `CERTIFICATION_COMPLETE.marker`, `screenshots/`). Disposable VM and temporary virtual disks were unmounted and deleted.
+Cryptographic evidence, logs, and assessments are preserved in:
+- Windows Sandbox assessment: `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/fresh-install/` (`ENVIRONMENT.md`, `INSTALL_RESULT.md`, `INSTALLER_RECORD.json`, `SOURCE_HASHES.json`)
+- Clean VM verification: `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/vm/` (`manifest.json`, `REVIEW_INDEX.md`, `FINAL_RESULT.md`, `FINAL_RESULT.json`, `CERTIFICATION_COMPLETE.marker`, `screenshots/`)
 
 ---
 

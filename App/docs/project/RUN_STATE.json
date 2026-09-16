@@ -14,10 +14,13 @@
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "last_graphify_status": "PASS: Phase 16 hardening architecture mapping + certification repair delta; 1,464 nodes, 3,343 edges, 60 communities, 10 god nodes; zero new cycles, zero new privilege edges from 4 clean-environment fixes (47c4fd7)",
   "last_ponytail_status": "PASS: Phase 16 anti-bloat review + certification repair delta; stdlib-first optimizations, batch SQL queries, native crypto/realpathSync, zero new dependencies, lean security primitives; 4 clean-environment fixes add no bloat (47c4fd7)",
-  "active_blockers": [],
+  "active_blockers": [
+    "P16-T006 Clean Windows Installation: Windows Sandbox is BLOCKED because host OS is Windows 11 Home (Build 26200, Core SKU), which does not support Windows Sandbox (Containers-DisposableClientVM requires Windows Pro/Enterprise/Education)."
+  ],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
-    "Visual reviews and VM certification evidence use the centralized external data directory outside Git to protect repository hygiene."
+    "Visual reviews and certification evidence use the centralized external data directory outside Git to protect repository hygiene.",
+    "Windows Sandbox is unsupported on Windows 11 Home edition (Core SKU); clean Windows installation was verified via isolated clean VM."
   ],
   "phase_01_content_commit": "4e738ff8e83a48e0258169996df87fe5df726485",
   "phase_01_closure_commit": "SEE_LIVE_GIT_HEAD",
@@ -51,5 +54,5 @@
   "phase_15_closure_commit": "e908ffd",
   "phase_16_content_commit": "f95f69c",
   "phase_16_closure_commit": "c8e8727",
-  "exact_next_action": "Phase 16 clean Windows VM certification is 100% complete and fully verified. Stop condition reached. Do not begin Phase 17."
+  "exact_next_action": "Windows Sandbox clean install is BLOCKED (Windows 11 Home edition unsupported). Phase 16 complete with documented install blocker; Phase 17 remains NOT_STARTED. Stop."
 }
