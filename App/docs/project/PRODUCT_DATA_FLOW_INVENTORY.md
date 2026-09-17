@@ -166,3 +166,46 @@ This data flow inventory reflects the verified, measured implementation of Read 
 - Claims of zero telemetry map to the measured absence of analytics code and network requests.
 - Claims of source immutability map to read-only document adapters and automated SHA-256 regression tests.
 - Claims of non-silent updates map to the absence of automated update polling.
+
+## Portable library root, discovery and Raw intake (foundation slice)
+
+Added by the user-authorized portable-library foundation slice. No later slice is
+claimed by this section.
+
+**Selected portable library.** The durable library is the selected library folder
+itself: `<root>/Read`, `<root>/Watch`, `<root>/Raw`. Runtime-only data stays under
+`<root>/App` (`state`, `user-data`, `search`, `ocr`, `backups`, `exports`).
+`app/server/data-paths.mjs` exposes `dataRoot`, `readRoot`, `watchRoot`, `rawRoot`,
+`runtimeAppRoot`, `stateRoot`, `searchRoot`, `userDataRoot`, the two shared
+evidence roots, and the retained legacy `libraryRoot`. Canonical content is never
+copied into `App/library`.
+
+**Root validation and initialization.** `app/server/portable-library.mjs`
+validates a root (absolute, outside the Git repository, contained, no traversal or
+symlink escape) and initializes only the missing of `Read`, `Watch`, `Raw`. It is
+idempotent, never overwrites, never moves and never deletes; a file occupying a
+required folder path fails with `REQUIRED_FOLDER_PATH_IS_FILE`.
+
+**Discovery.** Canonical titles are `<collection>/<category>/<title folder>/`
+containing exactly one Markdown file whose base name equals the folder name.
+Approved Read categories are Books, Study Materials, Manuals & Reference,
+Documents, Other; approved Watch categories are Anime, Movies, Series,
+Documentaries, Specials, Other. `Source Imports`, `Administration`,
+`Filesystem_Inventory*`, `Raw Export Records`, shared evidence and audit folders
+are excluded. Discovery returns structured diagnostics and never mutates
+Markdown, and it does not populate the runtime database.
+
+**Measured against the real library.** 145 Read titles, 74 Watch titles, 219
+total, 0 diagnostics — identical before and after initialization. The only
+filesystem change was creating the missing empty `Raw/` folder. No `App/state`
+directory and no database were created.
+
+**Raw.** Offline intake foundation only: recursive enumeration returning relative
+path, byte size and extension, with no hashing on startup, no OCR, no
+classification and no network access. Content promotion, the intake form, artwork
+enrichment and database/search rebuild remain future slices.
+
+**Privacy mapping.** The selected root is user-chosen and never committed; no
+machine-specific path appears in source or tests; committed tests are synthetic
+fixtures only; Raw performs zero external requests, which is asserted by a
+committed test that inspects the module for any network access.

@@ -643,3 +643,66 @@ Status: Accepted (2026-09-17, explicit user authority)
 9. **This run is not benchmark evidence.** No accuracy, CER, WER, speed, or VRAM
    figure is claimed. P17-T004 and P17-T007 stay open, Phase 18 stays
    `NOT_STARTED`, and no platform certification was started.
+
+## D-056 - Portable selected library root, organized discovery, and offline Raw intake
+
+Status: Accepted
+
+User-authorized maintenance/integration prerequisite executed while Phase 17
+remains `IN_PROGRESS` with `P17-T004` still the current task. It changes no
+governance state and completes no phase task.
+
+1. **The selected library folder is the durable portable library.** A selected
+   root contains `Read/`, `Watch/` and `Raw/`; `App/` beneath the same root holds
+   runtime-only state (database, user data, search, OCR, backups, exports). The
+   default root convention is the repository sibling
+   `Read and Watch - Local Data Only`, but normal operation must not depend on
+   that default — `READ_WATCH_DATA_ROOT` and an explicit selected root both take
+   precedence, and no machine-specific path is committed.
+
+2. **Canonical content is never duplicated into `App/library`.** That location is
+   legacy managed-library compatibility only. The two-folders-plus-`App`
+   assumption is superseded by the three-folder model.
+
+3. **Root initialization is fail-safe and idempotent.** Only missing folders are
+   created, one at a time. Existing content is never overwritten, moved, renamed
+   or deleted. A file occupying a required folder path raises
+   `REQUIRED_FOLDER_PATH_IS_FILE` rather than being replaced. Unknown root content
+   is preserved and left alone.
+
+4. **A canonical title is one category folder containing exactly one Markdown
+   file whose base name equals the folder name.** The old sanitized-hyphenated
+   `item.md` convention is no longer required of the portable library and stays
+   supported only for legacy managed-library items. `Source Imports`,
+   `Administration`, `Filesystem_Inventory*`, `Raw Export Records`, shared
+   evidence folders and audit directories are never title sources.
+
+5. **One discovery implementation, structured diagnostics.** Discovery,
+   validation and initialization live in `app/server/portable-library.mjs`.
+   Failures are returned as coded diagnostics with a collection, category,
+   relative path, plain-language problem and a safe suggested action. No parallel
+   scanner or second path-resolution system may be introduced.
+
+6. **Long paths fail loudly or succeed correctly — never silently.** Paths are
+   stat-ed and read through the Windows extended-length form. A real 260-character
+   path previously produced blank metadata in a scanner; the same class of defect
+   must now surface as an explicit error. The application does not enable
+   `LongPathsEnabled` automatically.
+
+7. **Raw is offline by construction.** The foundation exposes cheap recursive
+   enumeration (relative path, size, extension) with no hashing on startup, no
+   OCR, no classification and no network access. Deeper analysis will be an
+   explicit, separate operation.
+
+8. **The filesystem is the portable source of truth.** Losing local SQLite must
+   not lose the library: a fresh installation must be able to select an existing
+   library folder and rebuild runtime state from `Read/` and `Watch/`. Database
+   population, Markdown write-back, Raw intake UI, artwork enrichment and search
+   migration are explicitly deferred to later authorized slices.
+
+9. **Real-library validation was read-only except for one authorized creation.**
+   Discovery reported 145 Read and 74 Watch titles (219 total, 0 diagnostics)
+   both before and after initialization; `App/state` was not created, no database
+   was opened, and Read/Watch file counts, folder counts, byte totals and a sample
+   file hash were identical before and after. The only mutation was creating the
+   missing empty `Raw/` folder.
