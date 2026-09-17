@@ -6,9 +6,23 @@ Legacy Task 4: SUPERSEDED - DO NOT EXECUTE.
 
 Last completed phase: `PHASE-16` - Performance, Security, and Reliability Hardening.
 
-Current actionable phase: `PHASE-17` - OCR Foundation - Late Phase (`NOT_STARTED`).
+Current actionable phase: `PHASE-17` - OCR Foundation - Late Phase (`IN_PROGRESS`).
 
-Exact next task: Pre-Phase-17 cross-platform desktop gate active. Windows certified. Establish cross-platform packaging architecture, then certify Arch Linux, Ubuntu LTS, and macOS in order. Do not begin P17-T001 or OCR until all platform gates pass.
+Exact next task: P17-T002 - build the representative, lawful, private OCR benchmark corpus and ground-truth protocol. Phase 17 OCR foundation is implemented and tested; benchmark evidence, real-engine verification, and reader-side search wiring remain outstanding. Do not start the post-OCR cross-platform certification stages yet.
+
+Phase 17 implementation results (2026-09-17, in progress):
+
+- Adopted the corrected durable sequence by explicit user authority: Phase 16 (Windows baseline) then Phase 17 OCR foundation then Phase 18 OCR verification, and only then the four cross-platform certification stages followed by final release certification. The permanent Windows/Linux/macOS requirement is unchanged and the historical Windows Stage 1 certification is preserved.
+- Forked both authorised upstream engines under the project account without modifying them: `mhyahya854/Unlimited-OCR` (fork of `baidu/Unlimited-OCR`) and `mhyahya854/PaddleOCR` (fork of `PaddlePaddle/PaddleOCR`). Both forks track upstream `main` at the same commit as the official upstream head; no upstream source, directory, class, or history was renamed, reorganised, or rewritten.
+- Implemented a Read & Watch-owned OCR provider contract with explicit structured states (engine/model not installed, unsupported hardware or platform, runtime unavailable, update failed, OCR failed, cancelled, unauthorised language) and explicit language routing: English to Unlimited-OCR, Arabic and Urdu to PP-OCRv5 Arabic-script recognition. No silent engine substitution exists.
+- Implemented the usable-native-text decision gate first: pages whose PDF.js text layer is usable never invoke OCR. Native text always wins; only pages with no usable text layer are OCR candidates, and the source PDF is never altered.
+- Implemented a supervised OCR runtime boundary outside the Node dependency tree (JSON-lines child process, session token, in-band cancellation, timeouts, guaranteed teardown so app shutdown leaves no orphan process). No public listener and no Docker requirement.
+- Implemented the canonical OCR result schema (rawText, displayText, canonicalText, searchText, blocks, boxes, page index, language, provider, engine revision, model revision, confidence with honest "not supplied" reporting, source hash, timestamp, settings provenance) and a derived cache bound to the source hash, engine revision, model revision, language, and settings.
+- Implemented the Arabic tashkeel requirement: display text is never Unicode-normalised (NFC reorders Arabic combining marks) and harakat are preserved; a separate diacritic-insensitive search key is derived for matching only. The official PP-OCRv5 Arabic dictionary (`ppocr/utils/dict/ppocrv5_arabic_dict.txt`) was inspected and confirmed to contain fatha, damma, kasra, shadda, sukun, all three tanween marks, superscript alef, Quranic marks, and the Urdu-specific letters used by both languages.
+- Implemented transactional one-click engine updates: resolve official upstream revision, stage into a new version directory, verify artifact integrity, run staged health checks and smoke fixtures, validate the adapter contract, then atomically switch an activation pointer; otherwise keep the current revision, record the failure, and allow retry. Rollback to the previous revision is supported, and symbolic links are not used for activation.
+- Added an OCR section to the existing Settings surface (enable, default language, update policy, per-provider status, installed revision, model revision, hardware/runtime notes, check for update, update, install, rollback, update all) plus a derived, clearly marked selectable OCR text overlay for pages without native text.
+- Automated evidence: `npm test` 297 -> 303 passing tests; OCR suites cover routing, the native-text gate, tashkeel preservation, source immutability, cache invalidation, update staging/activation/rollback, corrupted-download rejection, cancellation, no-orphan shutdown, offline-only recognition, provenance, and settings-reset data safety.
+- Real-engine smoke testing is hardware-bound: Unlimited-OCR upstream documents NVIDIA GPU/CUDA inference only and this host has no CUDA device, so English real-engine verification is BLOCKED BY CURRENT HARDWARE. No accuracy, speed, CER, WER, or tashkeel-accuracy number is claimed anywhere.
 
 Phase 16 implementation results:
 
@@ -62,13 +76,13 @@ Phase 16 certification repair results (post-closure, 2026-09-15):
   - Canonical Architecture: ONE shared application codebase (`App/app/`), THREE thin distribution layers (`packaging/windows/`, `packaging/linux/`, `packaging/macos/`).
   - Desktop Release Targets: Windows (NSIS, portable), Linux (Arch `.pkg.tar.zst`, Ubuntu/Debian `.deb`, AppImage), macOS (Apple Silicon arm64, Intel x64, `.dmg`, `.app`).
   - Pre-OCR Platform Certification Sequence (Hard Gate before Phase 17):
-    1. Windows — **PASS** (Certified via isolated clean Windows 11 Pro VirtualBox VM; all 30 points pass)
-    2. Arch Linux — `NOT_STARTED` (Clean Arch Linux VirtualBox VM)
-    3. Ubuntu LTS — `NOT_STARTED` (Clean Ubuntu 24.04 LTS VirtualBox VM)
-    4. macOS — `NOT_STARTED` (Apple-backed runner / authentic macOS hardware)
+    1. Windows — **CERTIFIED** (30/30 Invariants Passed, 0 Failures). Certified inside clean isolated Windows 11 Pro Build 26200 VirtualBox reference VM (`ReadWatch-Windows-CrossPlatform-30`). Artifact: `Read & Watch Setup 0.1.0.exe` (252,674,455 bytes, SHA-256 `E2A9F16EC02214B50479AF89BDB7ED2DE5FA78C203A3C27D5F4DE181E9793F09`, Git commit `ada8b20205cfe3e51e461b0bc6e249e9b14d7408`). Complete evidence vault archived in `READ_WATCH_DATA_ROOT/cross-platform/windows/evidence/`. Formal report: `docs/project/reports/WINDOWS_CROSS_PLATFORM_CERTIFICATION.md`.
+    2. Arch Linux — `NOT_STARTED` (Clean Arch Linux VirtualBox VM; native pacman `.pkg.tar.zst` + `.AppImage`)
+    3. Ubuntu LTS — `NOT_STARTED` (Clean Ubuntu 24.04 LTS VirtualBox VM; Debian `.deb` + `.AppImage`)
+    4. macOS — `NOT_STARTED` (Apple-backed runner / authentic macOS hardware; signed `.dmg` + `.app`)
     5. Phase 17 OCR Foundation — Sequenced strictly behind full 4-platform certification. Specification: `docs/project/CROSS_PLATFORM_DESKTOP_CERTIFICATION.md`.
-- External vault artifacts in `READ_WATCH_DATA_ROOT/hardening/phase-16/certification-repair/` (`vm/` and `fresh-install/`).
-- Repair documented in `docs/project/reports/PHASE_16_REPORT.md` § Clean Windows Installation Certification.
+- External vault artifacts in `READ_WATCH_DATA_ROOT/cross-platform/windows/evidence/` (30 invariant JSONs, results manifest, summary report, execution trace log, completion marker).
+- Windows certification documented in `docs/project/reports/WINDOWS_CROSS_PLATFORM_CERTIFICATION.md` and `docs/project/CROSS_PLATFORM_DESKTOP_CERTIFICATION.md`.
 
 Phase 15 implementation results:
 

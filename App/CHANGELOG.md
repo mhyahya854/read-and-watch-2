@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-09-17 - Phase 17 OCR foundation, authorised providers, and transactional engine updates
+
+- Corrected the durable sequencing by explicit user authority: Phase 16 (Windows baseline) then Phase 17 OCR foundation then Phase 18 OCR verification, and only then the four cross-platform certification stages (Windows regression, Arch Linux, Ubuntu LTS, macOS) followed by final release certification. The permanent Windows/Linux/macOS requirement is unchanged and the historical Windows Stage 1 certification is preserved.
+- Forked both authorised upstream engines under the project GitHub account without source modification: `mhyahya854/Unlimited-OCR` and `mhyahya854/PaddleOCR`. Both forks currently track upstream `main` at the same commit as official upstream head.
+- Added a Read & Watch-owned OCR provider contract (`App/app/server/ocr/ocr-contract.mjs`) with structured capability states and explicit language routing: English to Baidu Unlimited-OCR, Arabic and Urdu to PaddleOCR PP-OCRv5 Arabic-script recognition. No engine substitution and no fabricated capability.
+- Added the usable-native-text decision gate (`native-text-gate.mjs`) so pages with usable embedded PDF text never invoke OCR.
+- Added a supervised OCR runtime boundary (`runtime-bridge.mjs`) that keeps Python engine packages out of the Node/Electron dependency tree, enforces a per-session token, supports in-band cancellation and timeouts, and guarantees teardown so no orphan runtime survives app shutdown.
+- Added the canonical OCR result schema and derived, source-hash-bound cache (`ocr-store.mjs`) plus Arabic text representations (`text-representations.mjs`): `rawText` untouched, `displayText` preserving harakat without Unicode reordering, `searchText` as a separate diacritic-insensitive index key.
+- Added a transactional engine update manager (`update-manager.mjs`): stage, integrity-verify, health-check and smoke-test in isolation, validate the adapter contract, then atomically switch a portable activation pointer; failed updates keep the working revision, and rollback restores the previous one.
+- Added an OCR section to Settings with per-provider status, installed and model revisions, hardware/runtime notes, install, check for update, update, rollback, and update-all, plus an explicitly marked selectable OCR text overlay for pages without native text.
+- Added the Read & Watch-owned Python engine driver (`server/ocr/driver/engine_driver.py`) as the only place upstream OCR Python APIs are touched. It makes no network call during recognition; user documents are never uploaded anywhere.
+- OCR is off by default and every OCR artifact lives under the external data root; no model weights, runtimes, page images, or OCR output are committed.
+- Tests: 297 -> 303 passing (`npm test`). New suites cover routing, the native-text gate, tashkeel preservation, source immutability, cache invalidation, update staging/activation/rollback, corrupted-download rejection, cancellation, no-orphan shutdown, offline-only recognition, provenance, settings-reset data safety, and the OCR HTTP surface.
+- Honest limits carried forward: real-engine smoke verification for Unlimited-OCR is BLOCKED BY CURRENT HARDWARE (no CUDA device on this host, matching upstream's documented NVIDIA-only inference path); benchmark corpus, accuracy metrics, and the reader-side merge of OCR text into book-local search remain outstanding as P17-T002, P17-T004, and P17-T007. No accuracy, speed, VRAM, CER, or WER figure is claimed.
+
+## 2026-09-17 - Windows Cross-Platform Desktop Certification (30/30 Invariants Passed)
+
+- Completed formal Stage 1 cross-platform contract certification for Windows desktop inside a clean, isolated reference VM (`ReadWatch-Windows-CrossPlatform-30`, Windows 11 Pro 64-bit Build 26200.5050 in Oracle VirtualBox 7.2.18).
+- Achieved **100% PASS (30/30 Invariants Passed, 0 Failures)** in automated guest suite execution (`192 seconds` runtime).
+- Packaged and verified canonical NSIS installer `Read & Watch Setup 0.1.0.exe` (252,674,455 bytes, SHA-256 `E2A9F16EC02214B50479AF89BDB7ED2DE5FA78C203A3C27D5F4DE181E9793F09`, Git commit `ada8b20205cfe3e51e461b0bc6e249e9b14d7408`).
+- Verified all 30 invariants across 10 categories: Canonical Source Provenance, Artifact Integrity, Clean Silent Installation, Cold Launch Autonomy, No Repository Dependency, No Dev-Server Dependency, No External Node Daemon, Process Tree Conformance, Loopback Service Isolation, PDF Engine Functionality, Reflowable EPUB Functionality, Annotation Persistence, Bookmark Persistence, Notes and Thoughts Persistence, Canvas Functionality, Knowledge Graph Functionality, Strict Mermaid Diagram Rendering, Library Metadata Search, Global FTS5 Study Search, Settings Persistence, Settings Reset Data Safety Hard Gate, In-App Privacy Route, In-App Terms Route, OS File Associations ("Open With"), Single-Instance Forwarding, Offline Core Guarantee, Tamper-Evident Backup, Deterministic Restore, Source Immutability (bit-identical book fixtures), and Uninstall User Data Retention.
+- Resolved key runtime and headless automation edge cases:
+  - Bypassed host network SYN drop timeouts by switching to direct host-side VHD physical sector extraction (`extract_30point_evidence.py`).
+  - Addressed Windows 11 App Install Control / SmartScreen headless interception via direct Win32 `CreateProcess` (`UseShellExecute = $false`).
+  - Eliminated NSIS uninstaller mutex collision during silent reinstall via `_?=$installDir` in-place execution and process cleanup.
+  - Factored shared portability constants and schemas into pure ESM `server/portability-schema.mjs` for standalone production execution.
+- Extracted and archived 33 authentic evidence artifacts in `READ_WATCH_DATA_ROOT/cross-platform/windows/evidence/`.
+- Authored formal certification report: `docs/project/reports/WINDOWS_CROSS_PLATFORM_CERTIFICATION.md`.
+- Updated governance ledger: `docs/project/CROSS_PLATFORM_DESKTOP_CERTIFICATION.md` and `PROJECT_STATE.md`.
+- Next target in pre-Phase-17 platform sequence: Stage 2: Arch Linux (`NOT_STARTED`). Phase 17 (OCR Foundation) remains strictly sequenced behind all platform gates.
+
 ## 2026-09-15 - Phase 16 performance, security, and reliability hardening
 
 - Established frozen performance, reliability, and security benchmark budgets in `docs/project/HARDENING_BENCHMARKS.md`.

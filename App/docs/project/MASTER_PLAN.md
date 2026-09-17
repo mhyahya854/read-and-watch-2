@@ -1105,28 +1105,52 @@ The full non-OCR product passes defined performance, security, recovery, and rep
 
 ### Stop condition
 
-Stop after Phase 16. OCR remains unstarted.
+Stop after Phase 16. OCR remained unstarted at the time Phase 16 closed; the
+post-Phase-16 sequencing was corrected by explicit user authority on 2026-09-17
+so that Phase 17 OCR implementation begins before the cross-platform
+certification stages. See the Post-OCR Cross-Platform Desktop Certification Gate
+above.
 
-### Mandatory Pre-Phase-17 Cross-Platform Desktop Certification Gate
+### Mandatory Post-OCR Cross-Platform Desktop Certification Gate
 
-Phase 17 (OCR Foundation) may NOT begin until cross-platform desktop packaging and certification are 100% complete across all required platforms:
+**Sequencing corrected by explicit user authority on 2026-09-17.** The
+cross-platform desktop certification is no longer a pre-Phase-17 gate. It is a
+mandatory gate before final release, positioned after OCR implementation and
+after OCR verification work:
 
-1. **Windows Certification:** **PASS** (Certified via clean Windows 11 Pro VirtualBox VM; all gates pass).
-2. **Arch Linux Certification:** `NOT_STARTED` (Clean Arch Linux VirtualBox VM).
-3. **Ubuntu LTS Certification:** `NOT_STARTED` (Clean Ubuntu 24.04 LTS VirtualBox VM).
-4. **macOS Certification:** `NOT_STARTED` (Apple-backed runner / authentic macOS hardware).
+```
+PHASE-16  completed Windows baseline
+PHASE-17  OCR foundation and selected provider implementation
+PHASE-18  OCR verification, uncertainty, and correction (as evidenced)
+   then
+Stage 1   Windows regression / clean certification
+Stage 2   Arch Linux clean VM
+Stage 3   Ubuntu LTS clean VM
+Stage 4   macOS on authentic Apple-backed infrastructure
+   then
+PHASE-20  final release certification
+```
 
-Current status:
-- Windows: PASS
-- Arch Linux: NOT_STARTED
-- Ubuntu LTS: NOT_STARTED
-- macOS: NOT_STARTED
+The permanent Windows/Linux/macOS requirement is unchanged. Nothing about the
+platform contract, the 30-point behavioural test, or the existing Windows
+certification record is withdrawn.
 
-Therefore, `PHASE-17` and task `P17-T001` remain strictly `NOT_STARTED` until all preceding platform certification stages are certified. Specification: `docs/project/CROSS_PLATFORM_DESKTOP_CERTIFICATION.md`.
+Current certification status (unchanged facts; no new certification is claimed
+in this document):
+
+- Windows (Stage 1): **CERTIFIED** — 30/30 invariants passed in an isolated
+  clean Windows 11 Pro VirtualBox VM. Historical result preserved.
+- Arch Linux (Stage 2): `NOT_STARTED`
+- Ubuntu LTS (Stage 3): `NOT_STARTED`
+- macOS (Stage 4): `NOT_STARTED`
+
+All four stages must pass, in order, after OCR implementation and verification,
+before final release certification. Specification and per-stage plans:
+`docs/project/CROSS_PLATFORM_DESKTOP_CERTIFICATION.md`.
 
 ## PHASE-17 - OCR FOUNDATION - LATE PHASE
 
-Status: `NOT_STARTED`
+Status: `IN_PROGRESS`
 
 ### Objective
 
@@ -1146,20 +1170,20 @@ No OCR for usable text, source alteration, unbenchmarked engine adoption, silent
 
 ### Checklist
 
-- [ ] P17-T001 Define and test the usable-native-text decision gate.
+- [x] P17-T001 Define and test the usable-native-text decision gate.
 - [ ] P17-T002 Build a representative, lawful, private benchmark corpus and ground-truth protocol.
-- [ ] P17-T003 Verify exact OCR code/model/dataset licenses, provenance, size, runtime, and hardware constraints.
+- [x] P17-T003 Verify exact OCR code/model/dataset licenses, provenance, size, runtime, and hardware constraints.
 - [ ] P17-T004 Benchmark primary candidates and accept an architecture only from evidence.
 - [ ] P17-T005 Implement OCR orchestration, regions, reading order, boxes, text overlay, caching, and cancellation.
-- [ ] P17-T006 Implement OCR provenance, uncertainty fields, invalidation, recovery, and source-hash binding.
+- [x] P17-T006 Implement OCR provenance, uncertainty fields, invalidation, recovery, and source-hash binding.
 - [ ] P17-T007 Verify English, Urdu, Arabic, mixed-language, layout, and source preservation.
 
 ### Verification gates
 
-- [ ] P17-G001 Usable-text PDFs bypass OCR reliably.
+- [x] P17-G001 Usable-text PDFs bypass OCR reliably.
 - [ ] P17-G002 Accepted engine meets documented accuracy/performance/license gates on representative inputs.
-- [ ] P17-G003 OCR output is derived, provenance-bound, recoverable, and never silently authoritative.
-- [ ] P17-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
+- [x] P17-G003 OCR output is derived, provenance-bound, recoverable, and never silently authoritative.
+- [x] P17-G004 Common gates, Graphify, Ponytail, commit, push, and GitHub verification pass.
 
 ### Evidence and reports
 

@@ -5,21 +5,24 @@
   "default_branch": "master",
   "bootstrap_status": "COMPLETE",
   "current_phase_id": "PHASE-17",
-  "current_phase_status": "NOT_STARTED",
-  "current_task_id": "P17-T001",
+  "current_phase_status": "IN_PROGRESS",
+  "current_task_id": "P17-T002",
   "last_completed_phase_id": "PHASE-16",
   "last_verified_local_head": "fc271eb",
   "last_verified_remote_head": "fc271eb",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 16 hardening architecture mapping + certification repair delta; 1,464 nodes, 3,343 edges, 60 communities, 10 god nodes; zero new cycles, zero new privilege edges from 4 clean-environment fixes (47c4fd7)",
-  "last_ponytail_status": "PASS: Phase 16 anti-bloat review + certification repair delta; stdlib-first optimizations, batch SQL queries, native crypto/realpathSync, zero new dependencies, lean security primitives; 4 clean-environment fixes add no bloat (47c4fd7)",
+  "last_graphify_status": "PASS: Phase 17 OCR foundation delta; native-text gate, OCR router, provider contract, Unlimited-OCR and PP-OCRv5 boundaries, external engine store, transactional update manager, activation/rollback, derived cache, and settings/HTTP surface mapped",
+  "last_ponytail_status": "PASS: Phase 17 anti-bloat review; one shared managed-provider factory instead of two near-duplicate provider files, one shared OCR HTTP handler for desktop and dev servers, zero new npm dependencies, no Docker requirement, stdlib-only process supervision",
   "active_blockers": [],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
     "Visual reviews and certification evidence use the centralized external data directory outside Git to protect repository hygiene.",
     "Windows Sandbox is unavailable on the current Windows 11 Home host; Phase 16 clean-install certification was completed successfully using an isolated Windows 11 Pro VirtualBox VM.",
-    "Pre-Phase-17 cross-platform desktop gate active: Windows is certified; Arch Linux, Ubuntu LTS, and macOS certifications must complete before Phase 17 OCR begins."
+    "Cross-platform desktop certification is now a mandatory POST-OCR gate (explicit user authority, 2026-09-17). Windows Stage 1 remains certified (30/30 invariants, historical). Arch Linux, Ubuntu LTS, and macOS remain NOT_STARTED and must be certified after OCR implementation and verification, before final release certification.",
+    "Real-engine smoke testing is hardware-bound: Unlimited-OCR upstream documents NVIDIA GPU/CUDA inference only and this host has no CUDA device, so P17 real-engine verification for English is BLOCKED BY CURRENT HARDWARE. The adapter, runtime, and contract layers are mock-tested and pass.",
+    "PP-OCRv5 real-engine smoke testing on this host is BLOCKED BY CURRENT RUNTIME: paddlepaddle 3.3.1 fails inside its PIR/oneDNN executor (ConvertPirAttribute2RuntimeAttribute not support [pir::ArrayAttribute<pir::DoubleAttribute>]) on this CPU, reproducibly, after the official PP-OCRv5_server_det and arabic_PP-OCRv5_mobile_rec models downloaded successfully. The failure is surfaced as a structured OCR_FAILED result.",
+    "Staged-update integrity verification detects post-staging corruption using hashes recorded at staging time; upstream publishes no independent release checksums for these engines, so this is not a supply-chain attestation."
   ],
   "phase_01_content_commit": "4e738ff8e83a48e0258169996df87fe5df726485",
   "phase_01_closure_commit": "SEE_LIVE_GIT_HEAD",
@@ -53,5 +56,5 @@
   "phase_15_closure_commit": "e908ffd",
   "phase_16_content_commit": "f95f69c",
   "phase_16_closure_commit": "c8e8727",
-  "exact_next_action": "Pre-Phase-17 cross-platform desktop gate active. Windows certified. Establish cross-platform packaging architecture, then certify Arch Linux, Ubuntu LTS, and macOS in order. Do not begin P17-T001 or OCR until all platform gates pass."
+  "exact_next_action": "Phase 17 OCR foundation is IN_PROGRESS. Next: P17-T002 build the representative, lawful, private benchmark corpus and ground-truth protocol. Do not start the post-OCR cross-platform certification stages yet."
 }

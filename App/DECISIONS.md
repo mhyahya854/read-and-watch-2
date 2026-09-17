@@ -462,3 +462,28 @@ Status: Accepted
 7. **Reproducible Packaging & Strict Phase Boundary**:
    Verified reproducible Windows packaging (`dist-electron/win-unpacked/Read & Watch.exe`, 201,233,408 bytes). Upstream dependency audit confirmed 100% permissive runtime licenses with zero copyleft contamination. Zero OCR dependencies, models, or processes were introduced.
 
+
+
+## D-053 - Phase 17 OCR Foundation, Upstream Preservation, and Transactional Engine Updates
+
+Status: Accepted (2026-09-17, explicit user authority)
+
+1. **Sequencing correction by explicit user authority:** the cross-platform desktop certification is now a mandatory gate *before final release*, positioned after OCR implementation and OCR verification, instead of a pre-Phase-17 gate. New durable order: PHASE-16 (Windows baseline) -> PHASE-17 (OCR foundation) -> PHASE-18 (OCR verification) -> Stage 1 Windows regression, Stage 2 Arch Linux, Stage 3 Ubuntu LTS, Stage 4 macOS -> PHASE-20 final release certification. Nothing about the permanent Windows/Linux/macOS requirement or the 30-point contract is withdrawn, and no platform certification status is upgraded by this decision.
+
+2. **Selected engines are architecture, not preference:** English routes to Baidu Unlimited-OCR; Arabic and Urdu route to PaddleOCR PP-OCRv5 Arabic-script recognition. The language-to-engine mapping lives in `server/ocr/ocr-contract.mjs` and is not exposed as a user preference. Silent substitution (for example falling back to Tesseract) is prohibited; an unavailable engine yields a structured state instead of text.
+
+3. **Upstream stays upstream:** one fork per engine exists under the project account purely for continuity, inspection, patch escape hatch, and preserved history. The forks carry no source modifications and no renamed directories, classes, or history. Read & Watch adapts around the engines through a provider contract. Completed upstream source is never vendored into `App/app/`. A submodule was deliberately not introduced.
+
+4. **The managed provider factory replaces per-provider duplication:** both engines are driven through one small lifecycle (`managed-provider.mjs`) with three injectable hooks (resolve upstream revision, stage revision, smoke-test staged). Provider-specific files bind metadata only. This is the anti-duplication decision recorded for the Ponytail audit.
+
+5. **OCR stays outside the Node dependency tree:** the engines run as an external, supervised Python runtime under the external data root. Transport is newline-delimited JSON over stdin/stdout with a per-session token. No network listener is created, so there is nothing to secure on localhost and nothing to bind publicly. Docker is not required.
+
+6. **Native text always wins:** the usable-native-text gate runs before any engine consideration. A usable PDF.js text layer bypasses OCR entirely. OCR is a derived-data pipeline that never alters a source document.
+
+7. **Arabic tashkeel is preserved by construction:** `displayText` is deliberately NOT Unicode-normalised, because NFC canonically reorders Arabic combining marks (fatha has a lower combining class than shadda) and would silently change the string a user sees and copies. Harakat are preserved; a separate `searchText` key is derived for diacritic-insensitive matching only and never overwrites `rawText` or `displayText`.
+
+8. **`child_process` is now permitted only inside `server/ocr/`:** the Phase 08 guarantee ("zero child processes anywhere in production code") was scoped to proving the retired Readest reader binary was no longer shelled out to. Phase 17 authorises exactly one narrow exception, the supervised OCR runtime boundary. `tests/no-active-readest.test.mjs` now asserts that no other production module spawns a process, and that the OCR boundary never spawns a shell and never references Readest. `tests/pdf-source-immutability.test.mjs` was re-scoped from "OCR must not exist" to "OCR must not enter the Node dependency tree or the PDF adapter".
+
+9. **Transactional updates with activation pointers, not symlinks:** a candidate revision is staged into its own version directory, integrity-verified, health-checked and smoke-tested in isolation, and only then made live by an atomic JSON activation pointer. A failed update keeps the working revision, records the failure, and permits retry. The previous revision is retained for rollback.
+
+10. **Documented integrity limitation:** hashes are recorded at staging time and re-verified afterwards, which detects post-staging corruption. Upstream publishes no independent release checksums for these engines, so this is not a supply-chain attestation and is not presented as one.

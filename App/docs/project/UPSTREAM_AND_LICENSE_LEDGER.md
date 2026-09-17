@@ -13,7 +13,8 @@ Verified against official upstream repository metadata on 2026-09-08. License co
 | React Flow / xyflow | Structured graph tool | `https://github.com/xyflow/xyflow` | MIT | Yes, pinned package `@xyflow/react@12.11.6` | Adopted in Phase 13 for semantic topology and concept mapping; UI projection only, Read & Watch owns canonical SQLite data |
 | Mermaid | Text-defined diagrams | `https://github.com/mermaid-js/mermaid` | MIT | Yes, pinned package `mermaid@12.0.0` | Adopted in Phase 13 for code-defined diagrams; canonical source text stored in Read & Watch, SVG derived, strict security mode |
 | Calibre | Feature/reference system | `https://github.com/kovidgoyal/calibre` | GPL-3.0 | No | Reference concepts only; no canonical DB or wholesale embedding |
-| PaddleOCR / PaddleOCR-VL | Deferred OCR candidate | `https://github.com/PaddlePaddle/PaddleOCR` | Apache-2.0 for repository code | No | Phase 17 must verify exact code, model, weight, and dataset terms separately |
+| PaddleOCR / PP-OCRv5 | **Adopted** external OCR engine (Arabic + Urdu) | `https://github.com/PaddlePaddle/PaddleOCR` | Apache-2.0 for repository code | No source vendored; external managed runtime | Adopted in Phase 17 for PP-OCRv5 Arabic-script recognition through the Read & Watch provider contract. Fork for continuity only: `https://github.com/mhyahya854/PaddleOCR` (unmodified, tracks upstream `main`). Code licence Apache-2.0 is verified; **model weights are distributed separately under their own model-card terms and are not covered by the repository code licence** |
+| Baidu Unlimited-OCR | **Adopted** external OCR engine (English) | `https://github.com/baidu/Unlimited-OCR` | MIT for repository code | No source vendored; external managed runtime | Adopted in Phase 17 for English OCR through the Read & Watch provider contract. Fork for continuity only: `https://github.com/mhyahya854/Unlimited-OCR` (unmodified, tracks upstream `main`). Model weights are hosted at `https://huggingface.co/baidu/Unlimited-OCR` and carry **their own licence terms, separate from the MIT code licence**; upstream documents Transformers inference on NVIDIA GPU/CUDA only |
 | Tesseract | Deferred OCR validator | `https://github.com/tesseract-ocr/tesseract` | Apache-2.0 | No | Phase 17/18 must verify engine and language-data licensing separately |
 | Urdu/Nastaliq specialist | Deferred benchmark candidate | TBD | UNKNOWN | No | No adoption until official source, license, model provenance, and benchmark evidence exist |
 | Tauri | Desktop candidate (EVALUATED - NOT ADOPTED) | `https://github.com/tauri-apps/tauri` | Apache-2.0 OR MIT per upstream license files | No | Evaluated extensively in Phase 14; rejected in favor of Electron due to Node.js ESM server store dependencies |
@@ -28,6 +29,39 @@ Verified against official upstream repository metadata on 2026-09-08. License co
 - Preserve required notices and corresponding-source obligations.
 - Copyleft or model-license uncertainty is recorded as a decision/blocker; it is never guessed away.
 - Deferred projects are not cloned during governance or earlier roadmap phases.
+
+## Phase 17 OCR Engine Provenance Ledger (verified 2026-09-17)
+
+Verified by direct inspection of the official upstream repositories, not from
+documentation summaries.
+
+| Item | Value |
+| --- | --- |
+| Unlimited-OCR official upstream | `baidu/Unlimited-OCR` (default branch `main`) |
+| Unlimited-OCR upstream head at verification | `d49ff64afffc1f47ab563dc1c589bc2f78808fa4` (2026-07-29) |
+| Unlimited-OCR project fork | `mhyahya854/Unlimited-OCR` |
+| Unlimited-OCR fork head at verification | `d49ff64afffc1f47ab563dc1c589bc2f78808fa4` (identical to upstream; no divergence) |
+| Unlimited-OCR code licence | MIT (repository) |
+| Unlimited-OCR model weights | `baidu/Unlimited-OCR` on Hugging Face; licence recorded separately from the code |
+| Unlimited-OCR runtime | Python 3.12, `torch` 2.10.0, `transformers` 4.57.1 per upstream README; NVIDIA GPU + CUDA 12.9 documented |
+| PaddleOCR official upstream | `PaddlePaddle/PaddleOCR` (default branch `main`) |
+| PaddleOCR upstream head at verification | `dab3fe35379033fdcb2d0e9572fac0b36c9a9ebf` (2026-09-16) |
+| PaddleOCR project fork | `mhyahya854/PaddleOCR` |
+| PaddleOCR fork head at verification | `dab3fe35379033fdcb2d0e9572fac0b36c9a9ebf` (identical to upstream; no divergence) |
+| PaddleOCR code licence | Apache-2.0 (repository) |
+| Arabic/Urdu detection model | `PP-OCRv5_server_det` |
+| Arabic/Urdu recognition model | `arabic_PP-OCRv5_mobile_rec` |
+| Arabic/Urdu dictionary | `ppocr/utils/dict/ppocrv5_arabic_dict.txt` |
+| Fork modification policy | None. Forks are unmodified mirrors kept for continuity, inspection, and patch escape hatch only. Upstream updates are resolved from the official upstream, never from the fork. |
+
+### Model weight licensing note
+
+The repository code licences above (MIT, Apache-2.0) do **not** automatically
+extend to the downloaded model weights. Both engines publish weights separately
+(Hugging Face model card for Unlimited-OCR; PaddlePaddle-hosted inference and
+pretrained archives for PP-OCRv5). Model-card terms must be reviewed before any
+redistribution of weights. Read & Watch does not redistribute either set of
+weights.
 
 ## Phase 16 Dependency & Vulnerability Audit (2026-09-15)
 
@@ -64,4 +98,3 @@ Audit executed with `npm audit` on Node v24.18.0 / npm 11.6.0.
 4. **`electron` (35.7.5) / `extract-zip` — Dev-only extraction advisories**
    - *Dependency chain*: `devDependencies` -> `electron-builder` / `electron`.
    - *Reachability*: **CONTAINED & MITIGATED**. The runtime Electron executable is protected by single-instance locking, context isolation (`contextIsolation: true`), disabled Node integration (`nodeIntegration: false`), loopback session token authentication, reparse point traversal blocks, and strict HTTPS navigation guards.
-
