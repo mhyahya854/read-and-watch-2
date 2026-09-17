@@ -1152,6 +1152,24 @@ before final release certification. Specification and per-stage plans:
 
 Status: `IN_PROGRESS`
 
+### Mandatory Urdu dual-engine rule (explicit user authority, 2026-09-17)
+
+Urdu OCR is a **mandatory multi-engine pipeline**, not an engine-selection
+question and not a Phase 18 selection task. Both engines are required evidence
+sources and both raw outputs must be preserved:
+
+- PP-OCRv5 Arabic-script recognition (PaddleOCR), and
+- the dedicated Urdu Nastaliq specialist
+  `qandeelasim13/urdu-ocr-trocr-si26`.
+
+No fallback chain is authorised: there is no primary/fallback, no backup engine,
+no automatic substitution, and no majority-vote truth. A mandatory engine that
+is unavailable produces a structured failure state, never a substitute. This
+correction changes no phase numbering and starts no new phase; Phase 18 remains
+the later alignment / disagreement / uncertainty / human-review phase, and the
+durable record lives in `DECISIONS.md` (D-054) and
+`docs/project/OCR_BENCHMARK_PROTOCOL.md`.
+
 ### Objective
 
 Add OCR only for PDFs whose native text layer is absent or unusable.
@@ -1171,7 +1189,7 @@ No OCR for usable text, source alteration, unbenchmarked engine adoption, silent
 ### Checklist
 
 - [x] P17-T001 Define and test the usable-native-text decision gate.
-- [ ] P17-T002 Build a representative, lawful, private benchmark corpus and ground-truth protocol.
+- [x] P17-T002 Build a representative, lawful, private benchmark corpus and ground-truth protocol.
 - [x] P17-T003 Verify exact OCR code/model/dataset licenses, provenance, size, runtime, and hardware constraints.
 - [ ] P17-T004 Benchmark primary candidates and accept an architecture only from evidence.
 - [ ] P17-T005 Implement OCR orchestration, regions, reading order, boxes, text overlay, caching, and cancellation.

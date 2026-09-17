@@ -6,14 +6,14 @@
   "bootstrap_status": "COMPLETE",
   "current_phase_id": "PHASE-17",
   "current_phase_status": "IN_PROGRESS",
-  "current_task_id": "P17-T002",
+  "current_task_id": "P17-T004",
   "last_completed_phase_id": "PHASE-16",
   "last_verified_local_head": "fc271eb",
   "last_verified_remote_head": "fc271eb",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
-  "last_graphify_status": "PASS: Phase 17 OCR foundation delta; native-text gate, OCR router, provider contract, Unlimited-OCR and PP-OCRv5 boundaries, external engine store, transactional update manager, activation/rollback, derived cache, and settings/HTTP surface mapped",
-  "last_ponytail_status": "PASS: Phase 17 anti-bloat review; one shared managed-provider factory instead of two near-duplicate provider files, one shared OCR HTTP handler for desktop and dev servers, zero new npm dependencies, no Docker requirement, stdlib-only process supervision",
+  "last_graphify_status": "PASS: P17-T002 benchmark delta (graphify 0.9.57, structural AST): 1916 nodes / 5234 raw edges / 4506 post-build edges / 89 communities / 0 import cycles / 0 unverified nodes; 144 nodes originate from server/ocr/benchmark. Semantic LLM extraction skipped (no backend configured) and stated as such",
+  "last_ponytail_status": "PASS: P17-T002 anti-bloat review; zero new npm dependencies, JSON manifests instead of a benchmark database, no image/cropping library added, Arabic mark handling reused from text-representations.mjs, one scoring module, one manifest writer, one run-record module; 8 dead helpers/exports deleted in the same run and two decorative constants promoted into live enforcement",
   "active_blockers": [],
   "known_limitations": [
     "The Graphify package is version 0.9.53 while the installed local skill text reports 0.9.17; the package workflow completed successfully and the mismatch is documented.",
@@ -22,7 +22,12 @@
     "Cross-platform desktop certification is now a mandatory POST-OCR gate (explicit user authority, 2026-09-17). Windows Stage 1 remains certified (30/30 invariants, historical). Arch Linux, Ubuntu LTS, and macOS remain NOT_STARTED and must be certified after OCR implementation and verification, before final release certification.",
     "Real-engine smoke testing is hardware-bound: Unlimited-OCR upstream documents NVIDIA GPU/CUDA inference only and this host has no CUDA device, so P17 real-engine verification for English is BLOCKED BY CURRENT HARDWARE. The adapter, runtime, and contract layers are mock-tested and pass.",
     "PP-OCRv5 real-engine smoke testing on this host is BLOCKED BY CURRENT RUNTIME: paddlepaddle 3.3.1 fails inside its PIR/oneDNN executor (ConvertPirAttribute2RuntimeAttribute not support [pir::ArrayAttribute<pir::DoubleAttribute>]) on this CPU, reproducibly, after the official PP-OCRv5_server_det and arabic_PP-OCRv5_mobile_rec models downloaded successfully. The failure is surfaced as a structured OCR_FAILED result.",
-    "Staged-update integrity verification detects post-staging corruption using hashes recorded at staging time; upstream publishes no independent release checksums for these engines, so this is not a supply-chain attestation."
+    "Staged-update integrity verification detects post-staging corruption using hashes recorded at staging time; upstream publishes no independent release checksums for these engines, so this is not a supply-chain attestation.",
+    "P17-T002 benchmark material (corpus images, real ground truth, run output, fonts) lives only under READ_WATCH_DATA_ROOT/ocr/benchmark/ and is never committed; Git carries schema, algorithms, tests, documentation, and a 14-sample authored synthetic starter corpus in text form.",
+    "The synthetic starter corpus proves plumbing only. It is not representative of real books and is not sufficient for final accuracy acceptance; no engine has been benchmarked yet (P17-T004 outstanding).",
+    "The mandatory Urdu Nastaliq specialist qandeelasim13/urdu-ocr-trocr-si26 is declared and provenance-verified but NOT_INTEGRATED in this build, so Urdu recognition cannot be reported as complete. PP-OCRv5 alone is explicitly not a complete Urdu result.",
+    "The specialist's project repository declares no licence file and its training data includes CC BY-NC-SA 4.0 material; weight and dataset terms must be reviewed before any redistribution or commercial use.",
+    "Producing a benchmark image from a PDF page is not automated: the importer ingests an already-selected page/region/line image. No image or cropping library was added to the repository."
   ],
   "phase_01_content_commit": "4e738ff8e83a48e0258169996df87fe5df726485",
   "phase_01_closure_commit": "SEE_LIVE_GIT_HEAD",
@@ -56,5 +61,5 @@
   "phase_15_closure_commit": "e908ffd",
   "phase_16_content_commit": "f95f69c",
   "phase_16_closure_commit": "c8e8727",
-  "exact_next_action": "Phase 17 OCR foundation is IN_PROGRESS. Next: P17-T002 build the representative, lawful, private benchmark corpus and ground-truth protocol. Do not start the post-OCR cross-platform certification stages yet."
+  "exact_next_action": "Phase 17 OCR foundation is IN_PROGRESS. Next: P17-T004 benchmark primary candidates and accept an architecture only from evidence (it requires real-engine execution, which is blocked on this host for Unlimited-OCR by hardware and for PP-OCRv5 by the Paddle 3.3.1 PIR/oneDNN CPU failure). P17-T002 is complete: benchmark corpus structure, ground-truth protocol, scoring utilities, and the mandatory multi-engine Urdu schema exist. Do not start the post-OCR cross-platform certification stages yet."
 }

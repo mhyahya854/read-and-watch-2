@@ -10,7 +10,12 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { OCR_LANGUAGE_ROUTING, OCR_PROVIDERS, OCR_LANGUAGES } from './ocr-contract.mjs';
+import {
+  OCR_LANGUAGE_ROUTING,
+  OCR_PROVIDERS,
+  OCR_LANGUAGES,
+  requiredProvidersForLanguage,
+} from './ocr-contract.mjs';
 import { createEngineStore } from './engine-store.mjs';
 import { createOcrStore } from './ocr-store.mjs';
 import { createOcrRouter } from './router.mjs';
@@ -71,12 +76,21 @@ export function createOcrService({ dataRoot, driverPath = DEFAULT_OCR_DRIVER_PAT
       const providerId = OCR_LANGUAGE_ROUTING[language];
       const provider = providers[providerId];
       const model = OCR_PROVIDERS[providerId].models?.[language] ?? null;
+      const requiredProviders = requiredProvidersForLanguage(language);
       return {
         language,
         providerId,
         providerDisplayName: provider?.displayName ?? providerId,
         model: model ? { detection: model.detection, recognition: model.recognition } : null,
         available: Boolean(provider?.isAvailable().ok),
+        // Mandatory engines for this language. A language is only fully
+        // recognised when EVERY required engine has produced output; the
+        // integration status states honestly which of them this build can run.
+        requiredProviders: requiredProviders.map((entry) => ({
+          providerId: entry.providerId,
+          displayName: entry.displayName,
+          integrationStatus: entry.integrationStatus,
+        })),
       };
     });
   }

@@ -60,3 +60,77 @@ input validation or data-loss prevention.
 Nothing beyond Phase 17's stated architecture was built. No Phase 18
 verification, no confidence ensembling, no correction memory, no Phase 19
 intelligence features, and no cross-platform certification work was started.
+
+---
+
+# P17-T002 addendum — benchmark foundation review (2026-09-17)
+
+Real review pass over the P17-T002 delta (schema, scoring, run records, private
+corpus store, renderer, importer, tests).
+
+## 1. Ladder decisions (what was NOT built)
+
+| Consideration | Decision |
+| --- | --- |
+| Benchmark database / metadata framework | **Skipped.** Plain JSON manifests plus a filesystem layout. Add a database only if sample volume makes file scans measurably slow. |
+| New npm dependency for image rendering or metrics | **Skipped.** Zero new dependencies. CER/WER are a Levenshtein DP in the repo; rendering uses a locally installed Chromium-family browser that the user already has. |
+| New image/cropping library | **Skipped.** The importer ingests an already-selected page/region/line image; PDF page rendering stays with the application's existing PDF.js path. |
+| HTML/canvas rasteriser built in-repo | **Skipped.** A shaping-capable browser already exists on the host; a hand-rolled Arabic shaper would have been a bug farm. |
+| Duplicating Arabic mark handling in the benchmark | **Skipped.** `text-representations.mjs` (`ARABIC_COMBINING_MARKS`, `stripArabicMarks`, `countArabicMarks`) is reused; the benchmark adds only comparison-specific keys. |
+| Separate scoring module per language | **Skipped.** One `scoring.mjs` with three clearly separated Arabic families and a per-engine Urdu function. |
+| Per-engine result objects with a shared "winner" field | **Skipped — prohibited.** Engine comparison preserves both outputs and never selects one. |
+
+## 2. Dead code found by the review pass and deleted in the same run
+
+| Removed | Where | Reason |
+| --- | --- | --- |
+| `preservationReport()` | `server/ocr/benchmark/unicode.mjs` | Unused helper whose assertions the tests already make directly |
+| `writeManifestFile()` | `server/ocr/benchmark/manifest.mjs` | Duplicate of `corpus-store.writeManifest()`, which is the one actually used |
+| `sampleById()` | `server/ocr/benchmark/manifest.mjs` | Unused lookup helper |
+| `fontDataUriBase64()`, `fontPathFor()` | `server/ocr/benchmark/render.mjs` | Unused wrappers around two standard-library calls |
+| `normalizeLineEndings()` export | `server/ocr/benchmark/unicode.mjs` | Only used internally by `comparisonText()`; no longer part of the public surface |
+| `definitionText()`, `syntheticSourceText()`, `syntheticSampleImageRef()` exports | `server/ocr/benchmark/synthetic-corpus.mjs` | Internal details of the builder, not part of the module contract |
+| `ZERO_WIDTH_TEST` duplicate regex, barrel re-exports of the above | `unicode.mjs`, `benchmark/index.mjs` | Dead after the cleanup |
+
+Two decorative constants were promoted into live enforcement instead of being
+deleted: `expectedScoringModesFor(language)` now drives the `scoringModes` field
+of every scored sample, and `FUTURE_VERIFICATION_STATES` now makes it an error
+for a benchmark run to claim `CONSENSUS_VERIFIED`, `HUMAN_VERIFIED`, or
+`FULLY_PROOFREAD`. `OCR_INTEGRATION_STATUS` became the single source of the
+integration-status strings declared in the provider contract, so the enum and
+the provider records cannot drift apart.
+
+## 3. Deliberate simplifications with a named ceiling
+
+- **Levenshtein alignment is O(n·m) over code points.** Ceiling: very long lines.
+  The comparison is capped at `MAX_COMPARISON_CODE_POINTS = 4000` and throws
+  `COMPARISON_TOO_LARGE` rather than hanging. Upgrade path: banded or Myers diff
+  if real page-level scoring is ever needed.
+- **Disagreement locations are truncated at 200 entries.** Ceiling: forensic
+  detail on very long lines. Upgrade path: persist full diffs beside the record
+  when a review workflow needs them.
+- **Tashkeel metrics compare the ordered mark sequence per cluster, not per
+  letter attachment.** Ceiling: a mark moved to a different letter can score as
+  correct if the sequence still matches. Attachment mismatches are reported
+  separately as evidence. Upgrade path: cluster-keyed alignment in Phase 18.
+- **Split/merged line detection is not inferred.** The report carries explicit
+  `splitLines`/`mergedLines` slots that a real segmenter comparison fills in;
+  guessing them from counts would have produced a confident wrong number.
+- **Synthetic rendering is single-threaded, one browser launch per fixture.**
+  Ceiling: render time for large corpora (~7 s for 14 samples). Upgrade path:
+  reuse one browser session if the corpus grows by orders of magnitude.
+
+## 4. Not simplified (trust boundaries kept intact)
+
+Ground-truth state gating, hash binding of source/rendered/truth, mandatory
+provider enforcement, prohibition of engine substitution, font glyph-coverage
+verification before rasterising, offline rendering flags, and the
+outside-the-repository guard for private data were all kept at full strength.
+Ponytail does not trade away validation or data-safety prevention.
+
+## 5. Scope-creep check
+
+No engine acceptance decision, no real-model benchmark, no confidence model, no
+correction memory, no alignment algorithm, no Phase 18 work, no cross-platform
+certification, and no UI redesign. Phase 17 remains `IN_PROGRESS` with P17-T004
+as the next incomplete task.

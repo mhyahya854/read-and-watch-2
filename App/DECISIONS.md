@@ -487,3 +487,73 @@ Status: Accepted (2026-09-17, explicit user authority)
 9. **Transactional updates with activation pointers, not symlinks:** a candidate revision is staged into its own version directory, integrity-verified, health-checked and smoke-tested in isolation, and only then made live by an atomic JSON activation pointer. A failed update keeps the working revision, records the failure, and permits retry. The previous revision is retained for rollback.
 
 10. **Documented integrity limitation:** hashes are recorded at staging time and re-verified afterwards, which detects post-staging corruption. Upstream publishes no independent release checksums for these engines, so this is not a supply-chain attestation and is not presented as one.
+
+## D-054 - Urdu OCR Is a Mandatory Multi-Engine Pipeline; OCR Benchmark Foundation
+
+Status: Accepted (2026-09-17, explicit user authority)
+
+1. **Urdu OCR is a mandatory two-engine pipeline, not an engine-selection
+   question.** Both engines are required evidence sources and both raw outputs
+   must be preserved independently:
+   - PP-OCRv5 Arabic-script recognition (`paddleocr`), and
+   - the dedicated Urdu Nastaliq specialist
+     `qandeelasim13/urdu-ocr-trocr-si26` (`urdu-nastaliq-trocr`).
+
+   Urdu runtime is therefore explicitly **incomplete** in this build: the
+   specialist is declared, provenance-verified, and required by the benchmark
+   schema, but has no execution path yet (`integrationStatus: NOT_INTEGRATED`).
+
+2. **No fallback chain is authorised anywhere in OCR.** There is no primary,
+   fallback, backup, secondary, or "try the next engine" behaviour, and no
+   majority-vote truth. A mandatory engine that fails or is unavailable produces
+   a structured failure state; available partial output is preserved and the run
+   is labelled `PARTIAL_ENGINE_FAILURE` or `BLOCKED`. This is machine-enforced:
+   `findForbiddenSemantics()` scans produced records, and tests assert that
+   manifests, provider schemas, and run records contain no fallback semantics.
+
+3. **This is a governance correction, not a re-plan.** No phase was renumbered,
+   no task or gate ID was reused or invented, Phase 18 remains `NOT_STARTED` and
+   remains the later alignment / disagreement / uncertainty / human-review phase,
+   and Phase 17 remains `IN_PROGRESS` with P17-T004 as the next incomplete task.
+
+4. **Benchmark foundation (P17-T002) is corpus + ground truth + scoring +
+   protocol.** Delivered as `App/docs/project/OCR_BENCHMARK_PROTOCOL.md` plus
+   `App/app/server/ocr/benchmark/*` (schema, Unicode comparison rules, scoring,
+   run records, manifest I/O, private corpus store, font-coverage + offline
+   renderer, synthetic-corpus builder) and two tooling scripts
+   (`render-benchmark-fixtures.mjs`, `import-benchmark-sample.mjs`).
+
+5. **Private material never enters Git.** Corpus images, real ground truth, run
+   output, fonts, and models live under `READ_WATCH_DATA_ROOT/ocr/benchmark/`.
+   The store refuses to create that layout inside the repository. Git carries the
+   schema, algorithms, tests, documentation, and a 14-sample authored synthetic
+   starter corpus in text form only.
+
+6. **Ground truth is human-authored, stateful, and hash-bound.** States are
+   `DRAFT` → `REVIEWED` → `FINAL`; only `FINAL` truth may be scored formally;
+   `groundTruth.hash` is the sha256 of the exact stored Unicode text, so editing
+   truth without re-hashing is detected. No engine output is ever promoted to
+   ground truth, and engine agreement is never treated as correctness.
+
+7. **Arabic is scored in three separate families** (huroof/base letters,
+   tashkeel/harakat, and fully vocalised combined) rather than one blended
+   number, because a dropped harakah must not be hidden by correct letters.
+
+8. **Urdu is scored per engine** (CER, WER, exact match, Urdu-specific character
+   analysis, diacritic analysis, per-feature breakdown) with a separate
+   comparison record for disagreement evidence. The two outputs are never
+   collapsed into one score and no engine is ever declared the winner.
+
+9. **The Nastaliq specialist is treated as a line-level engine.** Its documented
+   intended input is a clean printed single line; page/region use must be
+   expressed as line-level results with an explicit line association, and a
+   page-level specialist result is rejected by the run-record validator. Its
+   licence situation is recorded honestly: Apache-2.0 model card, no licence file
+   in the project repository, and training data that includes CC BY-NC-SA 4.0
+   (non-commercial/research) material.
+
+10. **Synthetic fixtures are plumbing evidence, not acceptance evidence.** They
+    are authored for this benchmark, rendered with lawfully redistributable
+    OFL-1.1 fonts whose hash and glyph coverage are verified before rasterising,
+    and must not be used to claim engine accuracy. No engine was benchmarked in
+    P17-T002.

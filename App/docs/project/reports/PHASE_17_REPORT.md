@@ -418,9 +418,10 @@ are stricter in the areas that still matter and are documented.
 
 ## 19. Blockers and outstanding evidence
 
-1. **P17-T002 outstanding** — no representative, lawful, private benchmark
-   corpus or ground-truth protocol exists yet. This is now the first incomplete
-   Phase 17 task.
+1. **P17-T002 complete (2026-09-17)** — the benchmark corpus structure,
+   ground-truth protocol, scoring utilities, synthetic starter corpus, private
+   sampling workflow, and the mandatory multi-engine Urdu schema now exist. See
+   section 21. No engine has been measured yet.
 2. **P17-T004 outstanding** — the selected architecture comes from explicit user
    authority, not from a measured benchmark. No benchmark was run.
 3. **P17-T005 partially implemented** — orchestration, regions, boxes, overlay,
@@ -476,3 +477,125 @@ Verified against the live GitHub API after the push:
 - Repository hygiene passed on the pushed content (369 tracked paths) with no
   private markers and no absolute developer-machine paths.
 - The working tree is clean and `master` is in sync with `origin/master`.
+
+---
+
+## 21. P17-T002 — OCR benchmark corpus and ground-truth protocol (2026-09-17)
+
+### 21.1 Governance correction recorded first
+
+By explicit user authority, **Urdu OCR is a mandatory multi-engine pipeline**,
+not an engine-selection question: PP-OCRv5 Arabic-script recognition **and** the
+dedicated Nastaliq specialist `qandeelasim13/urdu-ocr-trocr-si26` are both
+required evidence sources, and both raw outputs must be preserved. There is no
+fallback chain, no backup engine, no automatic substitution, and no
+majority-vote truth. Recorded in `DECISIONS.md` (D-054), `MASTER_PLAN.md`
+(Phase 17 header correction), `PROJECT_STATE.md`, `CHANGELOG.md`, and
+`docs/project/UPSTREAM_AND_LICENSE_LEDGER.md`. No phase was renumbered, no task
+or gate ID was reused, and Phase 18 remains `NOT_STARTED`.
+
+### 21.2 What was built
+
+| Deliverable | Location |
+| --- | --- |
+| Canonical protocol | `docs/project/OCR_BENCHMARK_PROTOCOL.md` |
+| Schema, validation, hashing | `app/server/ocr/benchmark/schema.mjs` |
+| Unicode comparison rules | `app/server/ocr/benchmark/unicode.mjs` |
+| Scoring + disagreement evidence | `app/server/ocr/benchmark/scoring.mjs` |
+| Run/group records, completion states | `app/server/ocr/benchmark/run-record.mjs` |
+| Manifest I/O + truth hashing | `app/server/ocr/benchmark/manifest.mjs` |
+| Private corpus store + sampling | `app/server/ocr/benchmark/corpus-store.mjs` |
+| Font-coverage + offline renderer | `app/server/ocr/benchmark/render.mjs` |
+| Synthetic corpus builder | `app/server/ocr/benchmark/synthetic-corpus.mjs` |
+| Synthetic fixture definitions (14 samples) | `app/tests/fixtures/ocr-benchmark/synthetic-corpus.mjs` |
+| Rendering tool | `app/scripts/render-benchmark-fixtures.mjs` |
+| Private sample importer | `app/scripts/import-benchmark-sample.mjs` |
+| Tests (34) | `app/tests/ocr-benchmark-{corpus,scoring,engines}.test.mjs` |
+
+Private layout (never committed): `READ_WATCH_DATA_ROOT/ocr/benchmark/` with
+`corpus/{english,arabic,urdu,mixed}`, `ground-truth`, `manifests`,
+`runs/{unlimited-ocr,paddleocr,urdu-nastaliq-specialist,combined}`, `reports`,
+`temp`, and `fonts`. The store throws `BENCHMARK_INSIDE_REPOSITORY` if asked to
+create that tree inside Git.
+
+### 21.3 Mandatory-provider policy, machine-enforced
+
+| Language | Mandatory engines |
+| --- | --- |
+| English | `unlimited-ocr` |
+| Arabic | `paddleocr` |
+| Urdu | `paddleocr` **and** `urdu-nastaliq-trocr` |
+
+`requiredProviders` is a requirement set, never an attempt order. Tests assert
+that English, Arabic, and Urdu mandates are enforced; that a formal Urdu sample
+missing either engine is rejected; that single-engine Urdu completion is refused
+(`PARTIAL_ENGINE_FAILURE`, not `COMPLETE`); that a failed engine's sibling output
+is preserved; that an engine outside the mandatory set is refused
+(`PROVIDER_NOT_REQUIRED`); and that no fallback/backup/winner/bestText semantic
+exists in the manifest, provider schema, or run records.
+
+### 21.4 Specialist provenance and honest limits
+
+Verified from the live model card, the live Hugging Face API record, and the
+project repository on 2026-09-17: model revision
+`a9ef072320b50014f6df7ed9db807810157a410e`; Apache-2.0 model card; TrOCR /
+`VisionEncoderDecoderModel` fine-tuned from `microsoft/trocr-base-printed`;
+**single-line printed-image intended input**; the project repository declares
+**no licence file**; training data includes CC BY-NC-SA 4.0 material; the
+project's own evaluation reports CER 0.52 / character accuracy 47.66%. Read &
+Watch marks it `integrationStatus: NOT_INTEGRATED`, gives it
+`supportedUnitTypes: ['LINE']`, requires a line association for page/region use,
+and makes no claim about handwriting, full pages, or accuracy.
+
+### 21.5 Synthetic starter corpus (real render)
+
+14 authored samples (English page + 2 lines; Arabic page, region, line; Urdu
+page, region, 5 lines including an infrastructure-only sample; one mixed
+Urdu/English page). Rendered on this host with lawfully redistributable OFL-1.1
+fonts whose sha256 and `cmap` glyph coverage are verified before rasterising:
+
+| Font | Licence | sha256 (first 12) | Coverage checked |
+| --- | --- | --- | --- |
+| Noto Nastaliq Urdu | OFL-1.1 | `98a4787f34eb` | Urdu-specific letters + marks |
+| Noto Naskh Arabic | OFL-1.1 | `67b5a525a661` | 8 Arabic marks |
+| Noto Sans | OFL-1.1 | `bfb7bb691513` | Latin + digits + punctuation |
+
+Renderer: headless Chromium (`153.0.8010.48`), device scale factor 2, fonts
+embedded as data URIs, DNS refused (`--host-resolver-rules=MAP * ~NOTFOUND`),
+background networking/sync/component-update disabled, throwaway profile cleared
+afterwards, no leaked browser process. 14/14 samples rendered with real
+Nastaliq/Naskh shaping and RTL order; images, ground truth, fonts, and the render
+provenance report all live under the private root.
+
+This corpus proves plumbing only. It is not representative of real books and is
+not acceptance evidence.
+
+### 21.6 Scoring
+
+General CER/WER/exact-match plus line-preservation measures; Arabic split into
+three families (huroof, tashkeel, fully vocalised) so a dropped harakah cannot be
+hidden by correct letters; Urdu scored per engine with Urdu-specific character
+analysis and diacritic analysis, plus a separate comparison record carrying both
+outputs, per-engine scores, and character-level disagreement locations. Ground
+truth is the only correctness authority: engine agreement is recorded as
+evidence and never treated as truth, and no engine is ever declared a winner.
+Only `FINAL` ground truth may be scored formally.
+
+### 21.7 Quality gates
+
+| Gate | Result |
+| --- | --- |
+| `npm test` | 337 passing, 0 failing (303 before this task; +34) |
+| `npx tsc --noEmit` | PASS |
+| `npm run lint` | PASS |
+| `npm run build` | PASS |
+| `python scripts/check_repository_hygiene.py` | PASS |
+| `python scripts/validate_project_state.py` | PASS |
+| Graphify (0.9.57, structural) | 1,916 nodes / 5,234 raw edges / 89 communities / 0 import cycles; 144 benchmark nodes mapped |
+| Ponytail | 8 dead helpers/exports removed, 2 decorative constants promoted to live enforcement, 5 deliberate simplifications recorded with ceilings |
+
+### 21.8 What P17-T002 does not claim
+
+No engine acceptance, no measured accuracy, no speed figure, no CER/WER number,
+no comparison verdict between the two Urdu engines, no reading-order algorithm,
+no Urdu runtime pipeline, and no Phase 18 work.

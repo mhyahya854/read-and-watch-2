@@ -16,7 +16,7 @@ Verified against official upstream repository metadata on 2026-09-08. License co
 | PaddleOCR / PP-OCRv5 | **Adopted** external OCR engine (Arabic + Urdu) | `https://github.com/PaddlePaddle/PaddleOCR` | Apache-2.0 for repository code | No source vendored; external managed runtime | Adopted in Phase 17 for PP-OCRv5 Arabic-script recognition through the Read & Watch provider contract. Fork for continuity only: `https://github.com/mhyahya854/PaddleOCR` (unmodified, tracks upstream `main`). Code licence Apache-2.0 is verified; **model weights are distributed separately under their own model-card terms and are not covered by the repository code licence** |
 | Baidu Unlimited-OCR | **Adopted** external OCR engine (English) | `https://github.com/baidu/Unlimited-OCR` | MIT for repository code | No source vendored; external managed runtime | Adopted in Phase 17 for English OCR through the Read & Watch provider contract. Fork for continuity only: `https://github.com/mhyahya854/Unlimited-OCR` (unmodified, tracks upstream `main`). Model weights are hosted at `https://huggingface.co/baidu/Unlimited-OCR` and carry **their own licence terms, separate from the MIT code licence**; upstream documents Transformers inference on NVIDIA GPU/CUDA only |
 | Tesseract | Deferred OCR validator | `https://github.com/tesseract-ocr/tesseract` | Apache-2.0 | No | Phase 17/18 must verify engine and language-data licensing separately |
-| Urdu/Nastaliq specialist | Deferred benchmark candidate | TBD | UNKNOWN | No | No adoption until official source, license, model provenance, and benchmark evidence exist |
+| Urdu/Nastaliq specialist | **Declared mandatory** second Urdu OCR engine (not yet integrated) | `https://huggingface.co/qandeelasim13/urdu-ocr-trocr-si26` (model) and `https://github.com/qandeelasim13/URDU-OCR-PROJECT-CODE-SAVIOURS-SI-2026-QANDEEL-ASIM` (project) | Model card: Apache-2.0. Project repository: **no licence file declared** (GitHub API returned `license: null`). Training data includes UTRSet-Real (CC BY-NC-SA 4.0) | No source or weights vendored | Declared mandatory for Urdu by explicit user authority (2026-09-17). Benchmark schema requires it alongside PP-OCRv5; `integrationStatus: NOT_INTEGRATED` in this build. Redistribution/commercial use requires a licence and dataset-terms review first. Read & Watch redistributes nothing |
 | Tauri | Desktop candidate (EVALUATED - NOT ADOPTED) | `https://github.com/tauri-apps/tauri` | Apache-2.0 OR MIT per upstream license files | No | Evaluated extensively in Phase 14; rejected in favor of Electron due to Node.js ESM server store dependencies |
 | Electron | Adopted desktop shell | `https://github.com/electron/electron` | MIT | Yes, pinned package `electron@35.7.5` | Adopted in Phase 14 for Windows desktop native shell; sandboxed context bridge, loopback HTTP service, zero child processes |
 | electron-builder | Adopted desktop packaging tool | `https://github.com/electron-userland/electron-builder` | MIT | Yes, pinned package `electron-builder@26.15.3` | Adopted in Phase 14 for NSIS and portable Windows desktop packaging; builds to ignored `dist-electron/` |
@@ -53,6 +53,29 @@ documentation summaries.
 | Arabic/Urdu recognition model | `arabic_PP-OCRv5_mobile_rec` |
 | Arabic/Urdu dictionary | `ppocr/utils/dict/ppocrv5_arabic_dict.txt` |
 | Fork modification policy | None. Forks are unmodified mirrors kept for continuity, inspection, and patch escape hatch only. Upstream updates are resolved from the official upstream, never from the fork. |
+
+### Mandatory Urdu Nastaliq specialist (declared 2026-09-17, verified from live sources)
+
+| Item | Value |
+| --- | --- |
+| Model id | `qandeelasim13/urdu-ocr-trocr-si26` |
+| Model revision observed (Hugging Face API) | `a9ef072320b50014f6df7ed9db807810157a410e` (last modified 2026-08-08) |
+| Model card licence | `apache-2.0` |
+| Architecture | TrOCR / `VisionEncoderDecoderModel` (encoder + decoder fine-tuned end-to-end) |
+| Base model (model card) | `microsoft/trocr-base-printed` |
+| Task | printed Urdu (Nastaliq-style) image-to-text OCR |
+| Documented input granularity | single line ("clean, printed, single-line images"); not handwriting, not multi-line paragraphs, not heavily degraded input |
+| Weights | `model.safetensors`, 333,921,792 F32 parameters; ~1.34 GB repository storage |
+| Public project repository | `qandeelasim13/URDU-OCR-PROJECT-CODE-SAVIOURS-SI-2026-QANDEEL-ASIM` (default branch `main`) |
+| Project repository licence | **none declared** — the GitHub API returned no licence metadata on 2026-09-17 |
+| Project's own evaluation | CER 0.52, character-level accuracy 47.66% on its own leakage-safe held-out split (the project's own claim, not a Read & Watch measurement) |
+| Training-data caveat | includes UTRSet-Real, published under CC BY-NC-SA 4.0 (non-commercial, research use) |
+| Read & Watch status | Declared mandatory second Urdu engine; `integrationStatus: NOT_INTEGRATED` (no execution path in this build). No weights committed, vendored, or redistributed |
+
+Read & Watch makes no claim that this engine supports handwriting, arbitrary full
+pages, or heavily degraded pages, and does not quote its accuracy as a Read &
+Watch result. Its benchmark unit is `LINE`; page/region use must be expressed as
+line-level results with explicit line associations.
 
 ### Model weight licensing note
 

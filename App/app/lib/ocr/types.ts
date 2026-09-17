@@ -81,6 +81,18 @@ export interface OcrLanguageRoute {
   providerDisplayName: string;
   model: { detection: string; recognition: string } | null;
   available: boolean;
+  /**
+   * Every engine that MUST run for this language. Urdu has two: PP-OCRv5 and the
+   * dedicated Nastaliq specialist. `NOT_INTEGRATED` means the engine is declared
+   * and its provenance is verified but this build has no execution path yet.
+   */
+  requiredProviders?: OcrRequiredProvider[];
+}
+
+export interface OcrRequiredProvider {
+  providerId: string;
+  displayName: string;
+  integrationStatus: 'INTEGRATED' | 'NOT_INTEGRATED';
 }
 
 export interface OcrProviderInventory {

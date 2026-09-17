@@ -84,3 +84,57 @@ Import cycles: **none detected**.
 - The Graphify package version is now 0.9.57; `RUN_STATE.json` previously
   recorded 0.9.53 and the installed skill text 0.9.17. The version mismatch is
   recorded rather than smoothed over.
+
+---
+
+# P17-T002 addendum — OCR benchmark corpus delta (2026-09-17)
+
+Real run, `graphify` 0.9.57, incremental structural re-extraction of `App/app`
+after the P17-T002 benchmark work:
+
+```
+graphify update . --no-cluster
+  AST extraction: 219/219 files (100%)
+  Rebuilt: 1916 nodes, 5234 edges
+graphify cluster-only . --no-label --no-viz
+  Done — 89 communities
+graphify diagnose multigraph --json
+```
+
+| Metric | Phase 17 foundation | After P17-T002 |
+| --- | --- | --- |
+| Nodes | 1,730 | 1,916 |
+| Edges (raw extraction) | 3,917 | 5,234 |
+| Edges (post-build, undirected) | — | 4,506 |
+| Communities | 87 | 89 |
+| Import cycles | 0 | **0** |
+| Unverified nodes | — | 0 |
+| Missing-endpoint edges | — | 0 |
+| Dangling-endpoint edges | 435 | 462 |
+| Collapsed same-endpoint groups | 251 | 250 |
+
+New benchmark surface mapped: 144 nodes originate from
+`server/ocr/benchmark/*` — the manifest/corpus schema, the Unicode comparison
+rules, the scoring and disagreement utilities, the run/group records, the
+private corpus store, the font-coverage + offline renderer, and the synthetic
+corpus builder.
+
+Architecture-conformance queries answered from the graph:
+
+- The benchmark modules import the provider contract (`OCR_PROVIDERS`,
+  `OCR_REQUIRED_PROVIDERS`) and the existing Arabic text representations; they do
+  **not** import any engine API, any reader component, or the PDF adapter.
+- No import cycle was introduced by the new modules.
+- `server/ocr/` remains the only production boundary that spawns a process
+  (`child_process` appears only there, including the benchmark renderer).
+
+Honest limitations of this addendum:
+
+- Semantic (LLM) extraction was again **skipped** (no LLM backend is configured
+  in this environment; the CLI reports that it needs an API key for semantic
+  extraction). The delta is structural AST extraction only, and no inferred
+  semantic edges were contributed by this run.
+- The dangling-endpoint and collapsed same-endpoint counts are the same
+  pre-existing extractor artefact class recorded in the Phase 17 foundation
+  audit; they are recorded, not hidden, and are not import cycles.
+- `graphify-out/` stays outside Git; only this sanitized summary is committed.
