@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { PortabilitySettings } from './portability-settings';
+import { OcrSettingsSection } from './ocr-settings';
 import {
   fetchAppSettings,
   updateAppSettings,
@@ -28,6 +29,7 @@ import {
 } from '@/lib/settings/client';
 import {
   type AppSettings,
+  type AppSettingsUpdate,
   type AppTheme,
   type FontScale,
   type ReaderFontFamily,
@@ -107,7 +109,7 @@ export function SettingsManager() {
     };
   }, []);
 
-  async function handlePatch(patch: Partial<AppSettings>) {
+  async function handlePatch(patch: AppSettingsUpdate) {
     try {
       setSaveStatus('Saving changes...');
       const updated = await updateAppSettings(patch);
@@ -722,7 +724,15 @@ export function SettingsManager() {
         </div>
       </section>
 
-      {/* SECTION 7: Reset Preferences (Safe) */}
+      {/* SECTION 7: OCR */}
+      <OcrSettingsSection
+        settings={settings.ocr}
+        onPatch={async (patch) => {
+          await handlePatch(patch);
+        }}
+      />
+
+      {/* SECTION 8: Reset Preferences (Safe) */}
       <section className="space-y-3" aria-labelledby="heading-reset">
         <div className="flex items-center gap-2">
           <RotateCcw className="size-5 text-destructive" aria-hidden="true" />
@@ -752,7 +762,7 @@ export function SettingsManager() {
         </div>
       </section>
 
-      {/* SECTION 8: Desktop & Updates */}
+      {/* SECTION 9: Desktop & Updates */}
       <section className="space-y-3" aria-labelledby="heading-desktop-updates">
         <div className="flex items-center gap-2">
           <Laptop className="size-5 text-primary" aria-hidden="true" />
@@ -784,7 +794,7 @@ export function SettingsManager() {
         </div>
       </section>
 
-      {/* SECTION 9: About & Legal */}
+      {/* SECTION 10: About & Legal */}
       <section className="space-y-3" aria-labelledby="heading-about">
         <div className="flex items-center gap-2">
           <Info className="size-5 text-primary" aria-hidden="true" />

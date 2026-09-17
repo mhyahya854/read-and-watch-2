@@ -20,6 +20,8 @@ const VALID_COLLECTIONS = ['read', 'watch'];
 const VALID_SORT_FIELDS = ['title', 'added', 'rating'];
 const VALID_SORT_DIRECTIONS = ['asc', 'desc'];
 const VALID_MOTION_PREFS = ['system', 'reduce', 'no-preference'];
+const VALID_OCR_LANGUAGES = ['en', 'ar', 'ur'];
+const VALID_OCR_UPDATE_POLICIES = ['manual', 'check-only'];
 
 const MIN_FONT_SIZE = 12;
 const MAX_FONT_SIZE = 36;
@@ -53,6 +55,12 @@ export const DEFAULT_APP_SETTINGS = {
     reduceMotion: 'system',
     largeTextMode: false,
     highContrastFocus: false,
+  },
+  ocr: {
+    enabled: false,
+    defaultLanguage: 'en',
+    updatePolicy: 'manual',
+    preserveTashkeel: true,
   },
 };
 
@@ -171,6 +179,20 @@ export function validateSettings(raw) {
     ? a11yRaw.highContrastFocus
     : DEFAULT_APP_SETTINGS.accessibility.highContrastFocus;
 
+  const ocrRaw = (typeof raw.ocr === 'object' && raw.ocr !== null) ? raw.ocr : {};
+
+  const ocrEnabled = typeof ocrRaw.enabled === 'boolean'
+    ? ocrRaw.enabled
+    : DEFAULT_APP_SETTINGS.ocr.enabled;
+
+  const ocrDefaultLanguage = VALID_OCR_LANGUAGES.includes(ocrRaw.defaultLanguage)
+    ? ocrRaw.defaultLanguage
+    : DEFAULT_APP_SETTINGS.ocr.defaultLanguage;
+
+  const ocrUpdatePolicy = VALID_OCR_UPDATE_POLICIES.includes(ocrRaw.updatePolicy)
+    ? ocrRaw.updatePolicy
+    : DEFAULT_APP_SETTINGS.ocr.updatePolicy;
+
   return {
     format: SETTINGS_FORMAT_IDENTIFIER,
     schemaVersion: SETTINGS_SCHEMA_VERSION,
@@ -198,6 +220,14 @@ export function validateSettings(raw) {
       reduceMotion,
       largeTextMode,
       highContrastFocus,
+    },
+    ocr: {
+      enabled: ocrEnabled,
+      defaultLanguage: ocrDefaultLanguage,
+      updatePolicy: ocrUpdatePolicy,
+      // Arabic tashkeel preservation is an architectural requirement, not a
+      // user toggle. It is always reported as enabled.
+      preserveTashkeel: true,
     },
   };
 }
@@ -233,6 +263,7 @@ export function createSettingsStore({ userDataRoot }) {
       reading: { ...current.reading, ...patch.reading },
       library: { ...current.library, ...patch.library },
       accessibility: { ...current.accessibility, ...patch.accessibility },
+      ocr: { ...current.ocr, ...patch.ocr, preserveTashkeel: true },
       updatedAt: new Date().toISOString(),
     };
 
@@ -262,6 +293,7 @@ export function createSettingsStore({ userDataRoot }) {
         reading: { ...settings.reading },
         library: { ...settings.library },
         accessibility: { ...settings.accessibility },
+        ocr: { ...settings.ocr },
       },
     };
   }

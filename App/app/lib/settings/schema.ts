@@ -13,6 +13,7 @@ import {
   SETTINGS_FORMAT_IDENTIFIER,
   SETTINGS_SCHEMA_VERSION,
 } from './types';
+import type { OcrLanguage, OcrUpdatePolicy } from './types';
 import { APP_VERSION } from '../legal-metadata';
 
 export const VALID_THEMES: ReadonlyArray<AppTheme> = ['light', 'warm', 'dark'];
@@ -24,6 +25,8 @@ export const VALID_COLLECTIONS: ReadonlyArray<LibraryCollection> = ['read', 'wat
 export const VALID_SORT_FIELDS: ReadonlyArray<LibrarySortField> = ['title', 'added', 'rating'];
 export const VALID_SORT_DIRECTIONS: ReadonlyArray<LibrarySortDirection> = ['asc', 'desc'];
 export const VALID_MOTION_PREFS: ReadonlyArray<MotionPreference> = ['system', 'reduce', 'no-preference'];
+export const VALID_OCR_LANGUAGES: ReadonlyArray<OcrLanguage> = ['en', 'ar', 'ur'];
+export const VALID_OCR_UPDATE_POLICIES: ReadonlyArray<OcrUpdatePolicy> = ['manual', 'check-only'];
 
 export const MIN_FONT_SIZE = 12;
 export const MAX_FONT_SIZE = 36;
@@ -57,6 +60,13 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     reduceMotion: 'system',
     largeTextMode: false,
     highContrastFocus: false,
+  },
+  ocr: {
+    // OCR is opt-in: the engines are large external runtimes.
+    enabled: false,
+    defaultLanguage: 'en',
+    updatePolicy: 'manual',
+    preserveTashkeel: true,
   },
 };
 
@@ -174,6 +184,24 @@ export function validateAppSettings(raw: unknown): AppSettings {
     ? a11yRaw.highContrastFocus
     : DEFAULT_APP_SETTINGS.accessibility.highContrastFocus;
 
+  const ocrRaw = (typeof candidate.ocr === 'object' && candidate.ocr !== null
+    ? candidate.ocr
+    : {}) as Record<string, unknown>;
+
+  const ocrEnabled = typeof ocrRaw.enabled === 'boolean'
+    ? ocrRaw.enabled
+    : DEFAULT_APP_SETTINGS.ocr.enabled;
+
+  const ocrDefaultLanguage: OcrLanguage = VALID_OCR_LANGUAGES.includes(ocrRaw.defaultLanguage as OcrLanguage)
+    ? (ocrRaw.defaultLanguage as OcrLanguage)
+    : DEFAULT_APP_SETTINGS.ocr.defaultLanguage;
+
+  const ocrUpdatePolicy: OcrUpdatePolicy = VALID_OCR_UPDATE_POLICIES.includes(
+    ocrRaw.updatePolicy as OcrUpdatePolicy,
+  )
+    ? (ocrRaw.updatePolicy as OcrUpdatePolicy)
+    : DEFAULT_APP_SETTINGS.ocr.updatePolicy;
+
   return {
     format: SETTINGS_FORMAT_IDENTIFIER,
     schemaVersion: SETTINGS_SCHEMA_VERSION,
@@ -202,6 +230,14 @@ export function validateAppSettings(raw: unknown): AppSettings {
       largeTextMode,
       highContrastFocus,
     },
+    ocr: {
+      enabled: ocrEnabled,
+      defaultLanguage: ocrDefaultLanguage,
+      updatePolicy: ocrUpdatePolicy,
+      // Arabic tashkeel preservation is a hard architectural requirement, not a
+      // toggle. It is always reported as true.
+      preserveTashkeel: true,
+    },
   };
 }
 
@@ -218,10 +254,11 @@ export function createSettingsExportPackage(settings: AppSettings): SettingsExpo
     settings: {
       appearance: { ...settings.appearance },
       reading: { ...settings.reading },
-      library: { ...settings.library },
-      accessibility: { ...settings.accessibility },
-    },
-  };
+        library: { ...settings.library },
+        accessibility: { ...settings.accessibility },
+        ocr: { ...settings.ocr },
+      },
+};
 }
 
 /**

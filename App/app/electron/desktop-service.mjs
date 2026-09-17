@@ -38,6 +38,8 @@ import { createKnowledgeStore } from '../server/knowledge-store.mjs';
 import { createSearchStore } from '../server/search-store.mjs';
 import { createPortabilityStore } from '../server/portability-store.mjs';
 import { createSettingsStore } from '../server/settings-store.mjs';
+import { createOcrService } from '../server/ocr/index.mjs';
+import { handleOcrRequest } from '../server/ocr/ocr-http.mjs';
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -162,11 +164,21 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     libraryRoot,
     userDataRoot,
     searchStore,
+    libraryStore,
+    annotationStore,
+    readerStore,
+    userDataStore,
+    canvasStore,
+    knowledgeStore,
   });
 
   const settingsStore = createSettingsStore({
     userDataRoot,
   });
+
+  // Phase 17: OCR engines, models, runtimes, and derived results live under the
+  // external data root. Nothing is copied into the repository.
+  const ocrService = createOcrService({ dataRoot: paths.dataRoot });
 
   const sessionToken = randomBytes(32).toString('hex');
   const clientDistDir = resolve(appRoot, 'dist', 'client');
@@ -567,6 +579,23 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
       return sendJson(res, 404, { error: 'Settings route not found' });
     }
 
+    // -------------------------------------------------------------
+    // OCR APIs: /api/ocr/*  (Phase 17)
+    // -------------------------------------------------------------
+    if (pathname.startsWith('/api/ocr')) {
+      const rest = pathname.replace(/^\/api\/ocr\/?/, '');
+      const body = method === 'POST' ? await readJsonBody(req) : {};
+      const result = await handleOcrRequest({
+        service: ocrService,
+        method,
+        rest,
+        body,
+        query: Object.fromEntries(url.searchParams),
+        signal: req.signal,
+      });
+      return sendJson(res, result.status, result.payload);
+    }
+
     return sendJson(res, 404, { error: 'Unknown API endpoint' });
   }
 
@@ -696,6 +725,7 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
       knowledgeStore,
       searchStore,
       portabilityStore,
+      ocrService,
     },
     start(port = 0, host = '127.0.0.1') {
       return new Promise((resolveStart, rejectStart) => {

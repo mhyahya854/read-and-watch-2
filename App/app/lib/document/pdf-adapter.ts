@@ -40,6 +40,7 @@ import {
   validateDocumentSource,
 } from './source.ts';
 import { validateResourceUri } from './resource-boundary.ts';
+import { mountOcrOverlay, type OcrOverlayModel } from './ocr-overlay.ts';
 
 export const MIN_PDF_ZOOM = 0.25;
 export const MAX_PDF_ZOOM = 5.0;
@@ -67,6 +68,8 @@ export interface PdfPageRenderResult {
   readonly scale: number;
   readonly rotation: number;
   readonly textLayerReady: boolean;
+  /** True when a derived OCR text overlay was mounted for this page. */
+  readonly ocrOverlayReady: boolean;
 }
 
 export interface RenderPageOptions {
@@ -74,6 +77,12 @@ export interface RenderPageOptions {
   readonly rotation?: number;
   readonly highDpi?: boolean;
   readonly signal?: AbortSignal;
+  /**
+   * Phase 17: derived OCR overlay for a page whose native text layer is absent
+   * or unusable. Supplying it is the caller's explicit statement that OCR has
+   * already been run and provenance-bound for this page.
+   */
+  readonly ocrOverlay?: OcrOverlayModel;
 }
 
 interface PdfJsOutlineItem {
@@ -1012,6 +1021,7 @@ export class PdfAdapter implements DocumentAdapter {
     }
 
     let textLayerReady = false;
+    let ocrOverlayReady = false;
 
     // Render synchronized selectable text layer if text is available
     if (this._hasText) {
@@ -1044,6 +1054,17 @@ export class PdfAdapter implements DocumentAdapter {
         }
       } catch {
         textLayerReady = false;
+      }
+    }
+
+    // Phase 17: derived, selectable OCR overlay. Only mounted when the page has
+    // no usable native text layer and the caller has supplied provenance-bound
+    // OCR output. It never replaces the canvas or mutates the source document.
+    if (!textLayerReady && options.ocrOverlay) {
+      try {
+        ocrOverlayReady = mountOcrOverlay(container, options.ocrOverlay) !== null;
+      } catch {
+        ocrOverlayReady = false;
       }
     }
 
@@ -1115,6 +1136,7 @@ export class PdfAdapter implements DocumentAdapter {
       scale: zoom,
       rotation,
       textLayerReady,
+      ocrOverlayReady,
     };
   }
 }

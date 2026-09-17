@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -152,8 +153,17 @@ test('Source Immutability Gate: Real local PDFs remain 100% byte-identical after
   }
 });
 
-test('No-OCR Enforcement: Architecture strictly forbids OCR dependencies and OCR execution', async () => {
-  // 1. Verify package.json contains zero OCR libraries
+/**
+ * Phase 17 re-scope (see DECISIONS.md, 2026-09-17).
+ *
+ * Before Phase 17 this test asserted that OCR did not exist at all. Phase 17
+ * authorises OCR, so the guarantee is restated in the form that still matters:
+ *  - no OCR engine may enter the Electron/Node dependency tree;
+ *  - the PDF adapter must not gain OCR knowledge of any kind;
+ *  - OCR must remain an external, Read & Watch-owned pipeline behind server/ocr.
+ */
+test('No-OCR-In-Node Enforcement: OCR engines stay outside the Node dependency tree', async () => {
+  // 1. package.json must still contain zero OCR libraries.
   const packageJsonPath = resolve(process.cwd(), 'package.json');
   const pkg = JSON.parse(await readFile(packageJsonPath, 'utf-8'));
   const allDeps = {
@@ -180,7 +190,7 @@ test('No-OCR Enforcement: Architecture strictly forbids OCR dependencies and OCR
     );
   }
 
-  // 2. Verify PdfAdapter does not import or invoke OCR
+  // 2. PdfAdapter must not gain OCR knowledge; OCR lives behind server/ocr.
   const adapterSourcePath = resolve(process.cwd(), 'lib/document/pdf-adapter.ts');
   const adapterSource = await readFile(adapterSourcePath, 'utf-8');
 
@@ -198,6 +208,18 @@ test('No-OCR Enforcement: Architecture strictly forbids OCR dependencies and OCR
     adapterSource.includes('ocrMyPdf'),
     false,
     'PdfAdapter must not reference ocrMyPdf'
+  );
+  assert.equal(
+    adapterSource.includes('server/ocr'),
+    false,
+    'PdfAdapter must not reach into the OCR runtime boundary'
+  );
+
+  // 3. The OCR pipeline must exist as an external runtime boundary.
+  const ocrContractPath = resolve(process.cwd(), 'server', 'ocr', 'ocr-contract.mjs');
+  assert.ok(
+    existsSync(ocrContractPath),
+    'the OCR provider contract must exist as the single engine boundary'
   );
 });
 

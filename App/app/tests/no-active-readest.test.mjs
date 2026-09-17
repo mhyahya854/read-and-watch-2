@@ -23,7 +23,18 @@ function scanSourceFiles(dir, fileList = []) {
   return fileList;
 }
 
-test('Production application code contains zero child_process spawn calls', () => {
+/**
+ * Phase 17 re-scope (see DECISIONS.md, 2026-09-17).
+ *
+ * The original assertion was "zero child_process anywhere in production code".
+ * That guarantee existed to prove the retired Readest reader binary was no
+ * longer shelled out to. It is now narrower but still enforced: the ONLY
+ * production module allowed to touch child_process is the supervised OCR
+ * runtime boundary under server/ocr/, which Phase 17 explicitly authorises.
+ * Everything else — UI, document adapters, stores, routes — must stay free of
+ * process spawning.
+ */
+test('Production application code spawns processes only inside the OCR runtime boundary', () => {
   const prodDirs = [
     join(appDir, 'server'),
     join(appDir, 'components'),
@@ -31,18 +42,30 @@ test('Production application code contains zero child_process spawn calls', () =
     join(appDir, 'app'),
   ];
   const prodFiles = prodDirs.flatMap((dir) => scanSourceFiles(dir));
+  const ocrBoundary = join(appDir, 'server', 'ocr');
+  const offenders = [];
 
   for (const file of prodFiles) {
+    if (file.startsWith(ocrBoundary)) continue;
     const content = readFileSync(file, 'utf8');
+    if (content.includes('child_process') || /\bspawn\s*\(/.test(content)) {
+      offenders.push(file);
+    }
+  }
+
+  assert.deepEqual(offenders, [], 'only server/ocr/ may spawn the managed OCR runtime');
+});
+
+test('The OCR runtime boundary never spawns a legacy reader or a shell', () => {
+  const ocrFiles = scanSourceFiles(join(appDir, 'server', 'ocr'));
+  assert.ok(ocrFiles.length > 0, 'the OCR runtime boundary must exist');
+  for (const file of ocrFiles) {
+    const content = readFileSync(file, 'utf8');
+    assert.equal(content.includes('readest'), false, `${file} must not reference the retired Readest reader`);
     assert.equal(
-      content.includes('child_process'),
+      /spawn\s*\([^)]*shell\s*:\s*true/.test(content),
       false,
-      `File ${file} must not import child_process after Readest retirement`
-    );
-    assert.equal(
-      /\bspawn\s*\(/.test(content),
-      false,
-      `File ${file} must not invoke spawn() after Readest retirement`
+      `${file} must never spawn through a shell (no command injection surface)`,
     );
   }
 });

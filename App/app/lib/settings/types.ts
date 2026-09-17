@@ -7,6 +7,7 @@
  * - Reading defaults
  * - Library behavior
  * - Accessibility
+ * - OCR (Phase 17, opt-in)
  * Excludes machine-specific paths, credentials, and session tokens.
  */
 
@@ -22,6 +23,13 @@ export type LibraryCollection = 'read' | 'watch';
 export type LibrarySortField = 'title' | 'added' | 'rating';
 export type LibrarySortDirection = 'asc' | 'desc';
 export type MotionPreference = 'system' | 'reduce' | 'no-preference';
+export type OcrLanguage = 'en' | 'ar' | 'ur';
+/**
+ * OCR engines are never auto-activated. 'manual' waits for an explicit update
+ * click; 'check-only' additionally polls official upstream for a new revision
+ * without installing anything.
+ */
+export type OcrUpdatePolicy = 'manual' | 'check-only';
 
 export interface AppearanceSettings {
   theme: AppTheme;
@@ -51,6 +59,18 @@ export interface AccessibilitySettings {
   highContrastFocus: boolean;
 }
 
+/**
+ * OCR preferences. Deliberately small: the language -> engine mapping is an
+ * authorised architectural decision, not a user preference, so it is not
+ * exposed here. `preserveTashkeel` is fixed true and carried for provenance.
+ */
+export interface OcrSettings {
+  enabled: boolean;
+  defaultLanguage: OcrLanguage;
+  updatePolicy: OcrUpdatePolicy;
+  preserveTashkeel: true;
+}
+
 export interface AppSettings {
   format: typeof SETTINGS_FORMAT_IDENTIFIER;
   schemaVersion: number;
@@ -59,6 +79,7 @@ export interface AppSettings {
   reading: ReadingDefaultsSettings;
   library: LibrarySettings;
   accessibility: AccessibilitySettings;
+  ocr: OcrSettings;
 }
 
 export type AppSettingsUpdate = {
@@ -66,6 +87,7 @@ export type AppSettingsUpdate = {
   reading?: Partial<ReadingDefaultsSettings>;
   library?: Partial<LibrarySettings>;
   accessibility?: Partial<AccessibilitySettings>;
+  ocr?: Partial<OcrSettings>;
 };
 
 export interface SettingsExportPackage {
@@ -78,5 +100,6 @@ export interface SettingsExportPackage {
     reading: ReadingDefaultsSettings;
     library: LibrarySettings;
     accessibility: AccessibilitySettings;
+    ocr: OcrSettings;
   };
 }

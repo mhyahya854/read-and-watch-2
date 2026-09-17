@@ -16,9 +16,9 @@ export * from './test-doubles/fake-reflowable-adapter.ts';
 export * from './test-doubles/conformance.ts';
 export * from './reflowable-adapter.ts';
 export * from './pdf-adapter.ts';
+export * from './ocr-overlay.ts';
 export * from './resource-boundary.ts';
 export * from './history.ts';
 export * from './bookmark.ts';
 export * from './preferences.ts';
-
 
