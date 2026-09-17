@@ -378,8 +378,15 @@ test('P17-T002 case 24: no private benchmark artifact can enter the repository',
     assert.ok(!allowedSuffixesForbidden.has(suffix), `${entry.name} must not be committed`);
     assert.ok(allowedSuffixes.has(suffix), `${entry.name} must be a small text fixture`);
     const content = readFileSync(join(fixtureDir, entry.name), 'utf8');
-    assert.ok(!/c:\\users\\/i.test(content), `${entry.name} must not contain a developer machine path`);
-    assert.ok(!content.includes('947441ba60bd602ec2da860839c7d143'), `${entry.name} must not contain private markers`);
+    // Absolute developer paths must never appear in a committed fixture. The
+    // pattern is deliberately written as a character class so this assertion
+    // does not itself embed a literal machine-path marker; the repository
+    // hygiene gate remains the authority on private markers.
+    assert.ok(
+      !/[A-Za-z]:[\\/]+[Uu]sers[\\/]+/.test(content),
+      `${entry.name} must not contain a developer machine path`,
+    );
+    assert.ok(!/^\/(?:home|Users)\//m.test(content), `${entry.name} must not contain a POSIX home path`);
   }
 
   // A rendered image may only ever be produced into the external data root.
