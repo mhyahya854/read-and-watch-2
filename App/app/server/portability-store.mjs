@@ -26,12 +26,10 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import {
   PORTABLE_FORMATS,
   PORTABILITY_SCHEMA_VERSION,
-} from '../lib/portability/types.ts';
-import {
   assertSafePath,
   sanitizeExportFilename,
   validateBackupPackage,
-} from '../lib/portability/validation.ts';
+} from './portability-schema.mjs';
 
 function nowUtc() {
   return new Date().toISOString();

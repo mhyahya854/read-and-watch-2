@@ -873,6 +873,9 @@ export function createLibraryStore({ databasePath, readOnly = false, searchStore
     listViews,
     loadNote,
     saveNote,
+    getItem(itemId) {
+      return getCatalog().items.find((item) => item.id === itemId) ?? null;
+    },
     close,
   };
 }

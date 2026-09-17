@@ -399,6 +399,7 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
 
   return {
     getAnnotations,
+    listAnnotations: getAnnotations,
     getAnnotation,
     createAnnotation,
     updateAnnotation,

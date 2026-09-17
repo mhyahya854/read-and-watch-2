@@ -366,6 +366,14 @@ export function createReaderStore({
     return updated;
   }
 
+  function saveBookmarks(itemId, bookmarks) {
+    assertItemIdOrSample(itemId);
+    if (!Array.isArray(bookmarks)) fail('Bookmarks must be an array');
+    const target = join(userRoot, 'items', itemId, 'bookmarks.json');
+    writeAtomic(target, JSON.stringify(bookmarks, null, 2));
+    return bookmarks;
+  }
+
   return {
     getStatus,
     open,
@@ -375,6 +383,7 @@ export function createReaderStore({
     saveReadingState,
     getBookmarks,
     addBookmark,
+    saveBookmarks,
     deleteBookmark,
     getSettings,
     saveSettings,
