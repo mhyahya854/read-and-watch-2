@@ -833,3 +833,51 @@ state while keeping the LINE-only contract assertions intact.
 P17-T004 and P17-T007 remain open; no formal benchmark was run; no accuracy,
 speed, CER, WER, or VRAM figure is claimed; Phase 18 remains `NOT_STARTED`; and
 Windows/Arch/Ubuntu/macOS certification stages were not started.
+
+## 29. Commit chain and live GitHub verification (this run)
+
+| Item | Value |
+| --- | --- |
+| Starting HEAD (local = `origin/master`) | `1347f3f9b9e8a6493d39ba5da0748fdab6f66467` |
+| Content commit | `722bf403d759d82cecc0f43ef98c8a679aa1e00f` — "Integrate mandatory Urdu Nastaliq provider, dual-engine orchestration, reading order, and OCR search" |
+| Push | `1347f3f..722bf40 master -> master` (normal push, no force, no history rewrite) |
+| Live GitHub `commits/master` | `722bf403d759d82cecc0f43ef98c8a679aa1e00f` (2026-09-17T16:54:28Z) |
+| Remote tree | complete, not truncated (481 entries); **0** forbidden paths |
+| Largest tracked blobs | pre-existing fixtures only (`sample-alice.pdf` 711,671 · `package-lock.json` 441,586 · `sample-paper.pdf` 90,191) |
+
+Verified against live GitHub raw content and the GitHub API after the push
+(not from the local working copy):
+
+- Every new module exists remotely with a non-trivial size:
+  `provider-urdu-nastaliq.mjs` 1,455 · `urdu-pipeline.mjs` 23,692 ·
+  `reading-order.mjs` 12,678 · `line-segmentation.mjs` 9,601 ·
+  `ocr-search.mjs` 16,246 · `specialist-provisioning.mjs` 10,817 ·
+  `ocr-specialist-smoke.mjs` 7,317; and all seven new test suites (4,991–17,441).
+- `ocr-contract.mjs` on the remote declares `ur: ['paddleocr',
+  'urdu-nastaliq-trocr']`, `integrationStatus: INTEGRATED` for the specialist, and
+  `supportedUnitTypes: ['LINE']`; it contains **no** `fallbackProvider`,
+  `backupProvider`, `tryNextEngine`, or `secondaryOnFailure` identifier.
+- `urdu-pipeline.mjs` on the remote references `PARTIAL_ENGINE_FAILURE`, and the
+  words `bestText`/`winner` appear **only** in prose that prohibits them (a
+  docstring line and the disagreement-policy description); the executable code
+  contains no such field or assignment.
+- `engine_driver.py` on the remote contains `op_recognize_line`, the
+  `--model-dir` argument, and UTF-8 stream pinning.
+- `index.mjs` registers `'urdu-nastaliq-trocr': createUrduNastaliqProvider`, and
+  `components/reader/reader-search.tsx` wires `searchOcrDerivedText` with a
+  "Machine transcription" provenance label.
+- No model weights, virtual environments, site-packages, caches, or OCR
+  engines/models/runtimes/temp paths are tracked anywhere in the remote tree.
+- Remote governance agrees: `RUN_STATE.json` reports `PHASE-17 IN_PROGRESS` with
+  `current_task_id = P17-T004`; `PHASE_INDEX.json` reports `PHASE-17
+  IN_PROGRESS`/first incomplete `P17-T004` and `PHASE-18 NOT_STARTED`/`P18-T001`;
+  `MASTER_PLAN.md` has P17-T002 and P17-T005 checked with P17-T004 and P17-T007
+  unchecked; the cross-platform certification document still reports Arch,
+  Ubuntu, and macOS as `NOT_STARTED`.
+- `python scripts/check_repository_hygiene.py` was re-run **after** staging the
+  new files: PASS (399 tracked paths), and
+  `python scripts/validate_project_state.py`: PASS (21 phases, 231 task/gate
+  IDs).
+
+No action in this run marked P17-T004 or P17-T007 complete, started Phase 18, or
+began a platform certification stage.

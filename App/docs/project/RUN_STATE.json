@@ -8,8 +8,8 @@
   "current_phase_status": "IN_PROGRESS",
   "current_task_id": "P17-T004",
   "last_completed_phase_id": "PHASE-16",
-  "last_verified_local_head": "e603977",
-  "last_verified_remote_head": "e603977",
+  "last_verified_local_head": "722bf40",
+  "last_verified_remote_head": "722bf40",
   "bootstrap_content_commit": "2da6719180af350a5efe311d0728a4c4b85b1db5",
   "bootstrap_closure_commit": "SEE_LIVE_GIT_HEAD",
   "last_graphify_status": "PASS: P17-T005 runtime-completion delta (graphify 0.9.57, structural AST, real incremental run): 2074 nodes / 4926 post-build edges / 92 communities / 0 import cycles / 0 unverified nodes / 0 dangling-endpoint edges / 0 self-loop edges / 0 duplicate edges; 431 OCR-related nodes now mapped (specialist provider, model/runtime boundary, Urdu dual-engine orchestration, line segmentation, reading order, derived OCR search, cancellation, update/rollback). Semantic LLM extraction unavailable (no backend configured) and stated as such",
@@ -64,5 +64,7 @@
   "phase_15_closure_commit": "e908ffd",
   "phase_16_content_commit": "f95f69c",
   "phase_16_closure_commit": "c8e8727",
+  "phase_17_content_commit": "722bf40",
+  "phase_17_closure_commit": "SEE_LIVE_GIT_HEAD",
   "exact_next_action": "Phase 17 is IN_PROGRESS with P17-T005 now complete (orchestration, regions, deterministic reading order, boxes, overlay, caching, cancellation all implemented and tested). Next: P17-T004, which requires representative lawful private real-world samples and measured engine benchmarks on hardware/runtime environments able to run every mandatory provider (Unlimited-OCR needs CUDA; PP-OCRv5 is blocked here by the Paddle 3.3.1 PIR/oneDNN CPU failure; the specialist's app-managed staged runtime is blocked here by the Windows MAX_PATH limit). P17-T007 remains open. Do not start Phase 18 or the post-OCR cross-platform certification stages yet."
 }
