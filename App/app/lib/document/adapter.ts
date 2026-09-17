@@ -44,6 +44,27 @@ export interface SearchResult {
   readonly snippet: string;
   readonly location: DocumentLocation;
   readonly score?: number;
+  /**
+   * Where the matched text came from. `undefined` means the adapter's own
+   * document text layer; `OCR_DERIVED` means local machine transcription and is
+   * never presented as document text.
+   */
+  readonly provenance?: 'NATIVE_TEXT' | 'OCR_DERIVED';
+  /**
+   * Machine-transcription provenance for an OCR-derived hit. Every mandatory
+   * engine that produced text for the hit is listed independently: no engine is
+   * singled out as the winner and the strings are not merged into one.
+   */
+  readonly providers?: ReadonlyArray<{
+    readonly providerId: string;
+    readonly providerVersion: string | null;
+    readonly modelRevision: string | null;
+    readonly text: string;
+  }>;
+  /** Completion state of the mandatory engine set that produced the hit. */
+  readonly completionState?: 'COMPLETE' | 'PARTIAL_ENGINE_FAILURE' | 'REVIEW_REQUIRED' | 'BLOCKED';
+  /** True when a mandatory engine did not complete: shown as partial evidence. */
+  readonly partial?: boolean;
 }
 
 export interface DocumentSelection {

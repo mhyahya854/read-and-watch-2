@@ -89,8 +89,44 @@ export async function handleOcrRequest({ service, method, rest, body = {}, query
     };
   }
 
-  if (segments.length === 1 && segments[0] === 'recognize' && method === 'POST') {
-    const { sourceHash, pageIndex, language, imageBase64, hasTextLayer, nativeText } = body ?? {};
+  if (segments.length === 1 && segments[0] === 'search' && method === 'GET') {
+    const sourceHash = String(query.sourceHash ?? '').trim();
+    if (!/^[0-9a-f]{64}$/.test(sourceHash)) {
+      return {
+        status: 400,
+        payload: { ok: false, code: OCR_STATE.INVALID_INPUT, message: 'A 64-character source hash is required.' },
+      };
+    }
+    try {
+      return {
+        status: 200,
+        payload: service.searchDerivedText({
+          sourceHash,
+          query: query.q ?? '',
+          language: query.language ?? null,
+          limit: Number.isFinite(Number(query.limit)) ? Number(query.limit) : 50,
+        }),
+      };
+    } catch (error) {
+      return {
+        status: error.status ?? 409,
+        payload: {
+          ok: false,
+          code: error.code ?? OCR_STATE.OCR_FAILED,
+          message: error.message,
+          details: error.details ?? {},
+        },
+      };
+    }
+  }
+
+  if (
+    (segments.length === 1 && segments[0] === 'recognize') ||
+    (segments.length === 2 && segments[0] === 'recognize' && segments[1] === 'urdu')
+  ) {
+    if (method !== 'POST') return { status: 405, payload: { error: 'Method not allowed' } };
+    const urduPipeline = segments.length === 2;
+    const { sourceHash, pageIndex, language, imageBase64, hasTextLayer, nativeText, regions } = body ?? {};
     if (typeof imageBase64 !== 'string' || imageBase64.length === 0) {
       return {
         status: 400,
@@ -106,15 +142,26 @@ export async function handleOcrRequest({ service, method, rest, body = {}, query
     const imagePath = join(tempDir, `page-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`);
     writeFileSync(imagePath, Buffer.from(imageBase64, 'base64'));
     try {
-      const result = await service.router.recognizePage({
-        sourceHash,
-        pageIndex,
-        language,
-        hasTextLayer,
-        text: nativeText,
-        imagePath,
-        signal,
-      });
+      const result = urduPipeline
+        ? await service.urduPipeline.recognizePage({
+            sourceHash,
+            pageIndex,
+            language: language ?? 'ur',
+            hasTextLayer,
+            text: nativeText,
+            imagePath,
+            regions: Array.isArray(regions) ? regions : [],
+            signal,
+          })
+        : await service.router.recognizePage({
+            sourceHash,
+            pageIndex,
+            language,
+            hasTextLayer,
+            text: nativeText,
+            imagePath,
+            signal,
+          });
       return { status: result.ok ? 200 : 409, payload: result };
     } catch (error) {
       return {

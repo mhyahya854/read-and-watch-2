@@ -16,6 +16,7 @@ export const OCR_STATE = Object.freeze({
   MODEL_NOT_INSTALLED: 'MODEL_NOT_INSTALLED',
   UNSUPPORTED_HARDWARE: 'UNSUPPORTED_HARDWARE',
   UNSUPPORTED_PLATFORM: 'UNSUPPORTED_PLATFORM',
+  UNSUPPORTED_UNIT: 'UNSUPPORTED_UNIT',
   RUNTIME_UNAVAILABLE: 'RUNTIME_UNAVAILABLE',
   UPDATE_FAILED: 'UPDATE_FAILED',
   OCR_FAILED: 'OCR_FAILED',
@@ -141,19 +142,49 @@ export const OCR_PROVIDERS = Object.freeze({
   'urdu-nastaliq-trocr': Object.freeze({
     id: 'urdu-nastaliq-trocr',
     displayName: 'Urdu Nastaliq OCR (TrOCR fine-tune)',
-    integrationStatus: OCR_INTEGRATION_STATUS.NOT_INTEGRATED,
+    integrationStatus: OCR_INTEGRATION_STATUS.INTEGRATED,
     languages: Object.freeze(['ur']),
     role: 'Mandatory second Urdu recognition engine (independent evidence source)',
+    /**
+     * LINE only. The model card documents clean, printed, SINGLE-LINE images and
+     * explicitly excludes handwriting, multi-line paragraphs, and heavily
+     * degraded input. Advertising PAGE or REGION here would be a false
+     * capability claim, so page/region calls are refused with
+     * `UNSUPPORTED_UNIT` and the Urdu pipeline always supplies line crops.
+     */
+    supportedUnitTypes: Object.freeze(['LINE']),
     officialUpstream: 'qandeelasim13/urdu-ocr-trocr-si26',
     officialUpstreamUrl: 'https://huggingface.co/qandeelasim13/urdu-ocr-trocr-si26',
     modelId: 'qandeelasim13/urdu-ocr-trocr-si26',
     modelSource: 'https://huggingface.co/qandeelasim13/urdu-ocr-trocr-si26',
     modelRevision: 'a9ef072320b50014f6df7ed9db807810157a410e',
     modelRevisionObservedAt: '2026-09-17',
+    modelLastModified: '2026-08-08T18:35:19Z',
     modelLicense: 'apache-2.0 (declared on the model card)',
-    modelFile: 'model.safetensors (333,921,792 F32 parameters, ~1.34 GB repository storage)',
+    modelFile: 'model.safetensors (1,335,747,032 bytes; 333,921,792 F32 parameters)',
+    /**
+     * Exact public files fetched by the managed update path. Hashes are the ones
+     * published by the upstream repository (Hugging Face LFS object ids); they
+     * are verified after download, and Read & Watch also records its own sha256
+     * of every staged file.
+     */
+    modelFiles: Object.freeze([
+      Object.freeze({ path: 'config.json', size: 4836 }),
+      Object.freeze({ path: 'generation_config.json', size: 258 }),
+      Object.freeze({ path: 'merges.txt', size: 456318 }),
+      Object.freeze({
+        path: 'model.safetensors',
+        size: 1335747032,
+        upstreamSha256: '420c828eff17e7e4dbfdc776d51b29aec6bbca5a9fde343573818a9c65099276',
+      }),
+      Object.freeze({ path: 'preprocessor_config.json', size: 364 }),
+      Object.freeze({ path: 'special_tokens_map.json', size: 957 }),
+      Object.freeze({ path: 'tokenizer_config.json', size: 1230 }),
+      Object.freeze({ path: 'vocab.json', size: 999355 }),
+    ]),
     baseModel: 'microsoft/trocr-base-printed',
     architecture: 'TrOCR / VisionEncoderDecoderModel, encoder and decoder fine-tuned end-to-end',
+    processor: 'TrOCRProcessor (preprocessor_config.json + byte-level BPE tokenizer files)',
     task: 'printed Urdu (Nastaliq-style) image-to-text OCR',
     projectRepository:
       'qandeelasim13/URDU-OCR-PROJECT-CODE-SAVIOURS-SI-2026-QANDEEL-ASIM',
@@ -162,35 +193,51 @@ export const OCR_PROVIDERS = Object.freeze({
     projectLicense:
       'NO LICENCE FILE DECLARED: the project repository returned no licence metadata when inspected on 2026-09-17',
     documentedInputGranularity: 'line',
-    supportedUnitTypes: Object.freeze(['LINE']),
+    documentedInference:
+      'model.generate(pixel_values, max_length=319, num_beams=4) plus processor.batch_decode(skip_special_tokens=True), per the model card',
     documentedLimitations: Object.freeze([
       'Model card: intended for clean, printed, SINGLE-LINE Urdu images. Not intended for handwriting, multi-line paragraphs, or heavily degraded/noisy images.',
       'Model card evaluation on its own held-out split: CER 0.52, character-level accuracy 47.66%; the project README states roughly half of characters may be misread. Accuracy is not sufficient for unattended use.',
-      'Training data includes UTRSet-Real, published under CC BY-NC-SA 4.0 (non-commercial, research use). Weight and dataset terms require review before redistribution or commercial use.',
+      'Training data includes UTRSet-Real (ICDAR 2023); that dataset is published under CC BY-NC-SA 4.0 (non-commercial, research use) as recorded in the earlier provenance review. The model card does not restate dataset licence terms, so weight and dataset terms still require review before redistribution or commercial use.',
       'Trained on ~1,348 unique source images before augmentation; the project states dataset size is the primary accuracy bottleneck.',
     ]),
     runtimeRequirements: Object.freeze({
-      python: '>=3.11',
+      python: '>=3.11 (verified on this host with python 3.12)',
       accelerator: 'any',
       acceleratorVendor: 'any',
       cpuSupported: true,
+      // pip-installed into an isolated venv under the external data root.
+      // torch has no CUDA requirement: the model card's own demo runs CPU-only.
+      installPackages: Object.freeze(['torch', 'transformers>=4.57.1', 'safetensors', 'pillow']),
       notes:
-        'Model card documents PyTorch + Hugging Face transformers inference; the deployed demo pins CPU-only torch wheels. Read & Watch has no execution path for this engine yet.',
+        'Model card documents PyTorch + Hugging Face transformers inference (VisionEncoderDecoderModel + TrOCRProcessor) and runs on CPU; no GPU or cloud service is required or used.',
     }),
+    /**
+     * Host/authority for revision resolution and model download. Hugging Face,
+     * not GitHub: this engine's weights are only published there, and no
+     * project-account fork of the weights exists.
+     */
+    revisionAuthority: Object.freeze({
+      kind: 'huggingface-model',
+      modelId: 'qandeelasim13/urdu-ocr-trocr-si26',
+    }),
+    redistributionPolicy:
+      'NOT REDISTRIBUTED: Read & Watch never bundles these weights in an installer or in Git. The user-initiated update path downloads the exact pinned public revision into external storage and verifies it before activation.',
     attribution:
       'Urdu OCR Project - Code Saviours SI-26 (Qandeel Asim); TrOCR base model by Microsoft. Apache-2.0 model card; no repository licence file declared.',
   }),
 });
 
 /**
- * Runtime recognition binding: the executable recogniser this build uses today
- * for a language. Explicit; never inferred.
+ * Runtime recognition binding for single-engine languages, and the geometry
+ * (detection) binding for Urdu. Explicit; never inferred.
  *
  * This table is NOT a fallback chain. There is one binding per language, and if
  * that engine is unavailable the router returns a structured failure state
- * instead of substituting another engine. Urdu's second mandatory engine is
- * declared in `OCR_REQUIRED_PROVIDERS` and is not integrated in this build, so
- * Urdu runtime recognition is explicitly incomplete (see the Phase 17 report).
+ * instead of substituting another engine. Urdu's authoritative requirement set
+ * is `OCR_REQUIRED_PROVIDERS.ur` (two engines, both mandatory); this entry names
+ * the engine that also supplies text-line geometry for the Urdu pipeline, and
+ * the dual-engine orchestration lives in `urdu-pipeline.mjs`.
  */
 export const OCR_LANGUAGE_ROUTING = Object.freeze({
   en: 'unlimited-ocr',
@@ -270,10 +317,26 @@ export function requiredProvidersForLanguage(language) {
       providerId,
       displayName: metadata.displayName,
       integrationStatus: metadata.integrationStatus,
+      supportedUnitTypes: metadata.supportedUnitTypes ? [...metadata.supportedUnitTypes] : [...OCR_UNIT_TYPES],
       modelId: metadata.modelId ?? null,
       officialUpstream: metadata.officialUpstream,
     };
   });
+}
+
+/**
+ * Recognition units a provider actually advertises.
+ *
+ * Absence of an explicit declaration means the provider was not built around a
+ * documented unit restriction. A declared list is enforced: a LINE-only engine
+ * may not be asked for a PAGE, and the caller receives `UNSUPPORTED_UNIT` rather
+ * than a silently fabricated full-page result.
+ */
+export function providerSupportsUnit(providerId, unitType) {
+  const metadata = providerMetadata(providerId);
+  const supported = metadata.supportedUnitTypes;
+  if (!supported) return true;
+  return supported.includes(unitType);
 }
 
 /** Data members a provider object must carry. */

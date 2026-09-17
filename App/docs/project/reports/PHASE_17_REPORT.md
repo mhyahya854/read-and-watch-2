@@ -424,16 +424,18 @@ are stricter in the areas that still matter and are documented.
    section 21. No engine has been measured yet.
 2. **P17-T004 outstanding** — the selected architecture comes from explicit user
    authority, not from a measured benchmark. No benchmark was run.
-3. **P17-T005 partially implemented** — orchestration, regions, boxes, overlay,
-   caching, and cancellation exist and are tested; explicit reading-order
-   reconstruction is not implemented.
+3. **P17-T005 now COMPLETE (2026-09-17, second run)** — orchestration (single
+   engine plus the mandatory dual-engine Urdu pipeline), regions, deterministic
+   reading order, boxes, overlay, caching, and cancellation are all implemented
+   and tested. See sections 22–26.
 4. **P17-T007 outstanding** — English, Urdu, Arabic, and mixed-language
    verification against representative pages has not been performed.
 5. **P17-G002 outstanding** — no accuracy/performance evidence exists, therefore
    no engine has been accepted on benchmark evidence.
-6. **Reader-side OCR search wiring outstanding** — derived OCR text is exposed
-   through the OCR service and `/api/ocr/text` with diacritic-insensitive keys,
-   but book-local search does not yet merge that text into its result set.
+6. **Reader-side OCR search wiring complete (2026-09-17, second run)** — derived
+   OCR text is searchable in the reader through `GET /api/ocr/search`, tagged
+   `OCR_DERIVED`, never duplicated from pages with usable native text, and no
+   longer outstanding. See section 25.
 7. **Real-engine verification is environment-bound** — Unlimited-OCR is blocked
    by the absence of a CUDA device; PP-OCRv5 is blocked by a reproducible
    PaddlePaddle 3.3.1 PIR/oneDNN executor failure on this host's CPU. Neither is
@@ -664,3 +666,170 @@ Re-run after the fix, with every new file tracked:
 
 No history was rewritten, nothing was force-pushed, and no gate was weakened to
 make the build green.
+
+---
+
+## 22. P17-T005 runtime completion — governance wording correction (2026-09-17, second run)
+
+By explicit user authority, and **without reopening or renumbering any task**:
+
+- **P17-T002 stays COMPLETE** and now reads: "Build the OCR benchmark corpus
+  framework, lawful/private corpus workflow, ground-truth protocol, schemas,
+  scoring utilities, and synthetic validation corpus."
+- **P17-T004 stays INCOMPLETE** and now reads: "Populate/use representative
+  lawful private real-world samples and run measured engine benchmarks
+  sufficient for evidence-based acceptance."
+
+The earlier wording implied the completed task already held a fully
+representative private real-world corpus, which contradicted the implementation
+note that the 14-sample synthetic corpus proves plumbing only. The contradiction
+is removed; no task or gate id was reused, invented, or reordered. Recorded in
+`DECISIONS.md` (D-055), `MASTER_PLAN.md`, `PROJECT_STATE.md`,
+`RUN_STATE.json`, and `CHANGELOG.md`.
+
+## 23. Nastaliq specialist — now a real runtime provider
+
+Provider id `urdu-nastaliq-trocr`; upstream `qandeelasim13/urdu-ocr-trocr-si26`;
+pinned revision `a9ef072320b50014f6df7ed9db807810157a410e` (re-verified live on
+2026-09-17: unchanged, last modified 2026-08-08T18:35:19Z; card licence
+`apache-2.0`; project repository still declares **no** licence file).
+
+| Piece | Where |
+| --- | --- |
+| Thin provider adapter | `server/ocr/provider-urdu-nastaliq.mjs` |
+| Hugging Face revision resolution | `server/ocr/upstream-resolver.mjs` (`resolveHuggingFaceModelRevision`) |
+| Transactional staging / hashing / model-dir resolution / staged smoke | `server/ocr/specialist-provisioning.mjs` |
+| LINE recognition (`recognize_line`) | `server/ocr/driver/engine_driver.py` (`_trocr_model`, `_trocr_recognize`) |
+| Capability honesty | `supportedUnitTypes: ['LINE']`; PAGE/REGION refused with `UNSUPPORTED_UNIT` |
+| Storage | `READ_WATCH_DATA_ROOT/ocr/runtimes|models/urdu-nastaliq-trocr/<revision>/` |
+
+No weights are bundled, vendored, committed, or shipped in an installer; a test
+enforces that (including a `git ls-files` scan). Licensing is recorded honestly:
+Apache-2.0 model card, no licence file in the project repository, training data
+including UTRSet-Real (CC BY-NC-SA 4.0). Read & Watch claims no redistribution
+right and redistributes nothing.
+
+## 24. Mandatory dual-engine Urdu runtime, with no fallback semantics
+
+`server/ocr/urdu-pipeline.mjs` orchestrates the two mandatory engines:
+
+```
+Urdu page -> native-text gate (native text still wins)
+  -> PP-OCRv5 page detection + recognition (geometry + text)
+  -> deterministic line segmentation (stable pageId/regionId/lineId)
+  -> per-line Nastaliq specialist recognition on the same line crops
+  -> both outputs preserved independently, per provider
+  -> character-level disagreement evidence (no winner, no merged text)
+  -> execution state: COMPLETE only if every mandatory engine completed
+```
+
+| State | Meaning as implemented |
+| --- | --- |
+| `COMPLETE` | every mandatory engine produced output for the page and no material disagreement was recorded |
+| `PARTIAL_ENGINE_FAILURE` | at least one mandatory engine produced nothing (its structured error is kept) |
+| `REVIEW_REQUIRED` | every mandatory engine completed but material disagreement exists |
+| `BLOCKED` | no mandatory engine produced usable output |
+
+Cancellation stops outstanding work for both engines, disposes both supervised
+workers, never marks the job complete, and preserves already-completed engine
+output. There is no `fallbackProvider`, `backupProvider`, `tryNextEngine`,
+`secondaryOnFailure`, `bestText`, or winner field anywhere in the pipeline, and
+the benchmark module's forbidden-semantics scan is run over the produced record
+in tests.
+
+## 25. Reading order, line segmentation, overlay, caching, and reader search
+
+- `server/ocr/reading-order.mjs`: deterministic geometry-only ordering —
+  column clustering before row ordering, full-width bands read before the
+  columns beneath them, in-band order by script direction, headings before body,
+  captions after their band, footnotes after the main flow, detector emission
+  order preserved as `detectionOrder`, and named warnings
+  (`AMBIGUOUS_COLUMN_STRUCTURE`, `MIXED_DIRECTION_PAGE`,
+  `MIXED_DIRECTION_COLUMN`, `UNUSABLE_GEOMETRY`) instead of invented confidence.
+- `server/ocr/line-segmentation.mjs`: stable `pageId/regionId/lineId`
+  identities, PP-OCRv5 detection boxes reused as line geometry (no second
+  detector), a documented fallback when a region carries no line geometry, and
+  `lineCropPath()` refusing any path that escapes the managed OCR temp root.
+- `server/ocr/ocr-search.mjs` + `GET /api/ocr/search` + reader search
+  integration: `OCR_DERIVED` provenance on every hit, pages with usable native
+  text excluded (no duplication), per-provider Urdu indexing that preserves both
+  provenances, Arabic tashkeel preserved in displayed text while matching folds
+  marks, partial Urdu results visibly partial, and invalidation bound to source
+  hash, engine revision, model revision, settings key, line-segmentation
+  revision, reading-order revision, and Urdu pipeline revision.
+- `POST /api/ocr/recognize/urdu` exposes the dual-engine pipeline; the existing
+  single-engine route is unchanged.
+
+## 26. Real specialist smoke test (SMOKE TEST ONLY) and host findings
+
+| Item | Value |
+| --- | --- |
+| Result | **PASS** — shipped driver loaded the exact pinned revision and ran a synthetic single-line fixture |
+| Model | `qandeelasim13/urdu-ocr-trocr-si26` @ `a9ef072320b50014f6df7ed9db807810157a410e` |
+| Runtime | Python 3.12.10, torch 2.14.0+cpu, transformers 5.17.0, safetensors 0.8.0, pillow 12.3.0, numpy 2.5.3 |
+| Hardware | Windows (win32, AMD64), **no CUDA device** |
+| Weights verification | `model.safetensors` 1,335,747,032 bytes, sha256 `420c828e…9276` — identical to the published upstream LFS object id |
+| Elapsed | 16,739 ms (download already cached from the preceding staged attempt) |
+| Claim made | execution only. No accuracy, CER, WER, speed, or VRAM figure. |
+| Evidence | `READ_WATCH_DATA_ROOT/ocr/evidence/smoke/urdu-nastaliq-trocr-smoke-2026-09-17.json` and the model-file hash inventory beside it |
+
+Two genuine defects were found and fixed rather than worked around:
+
+1. **Windows pipe encoding.** The driver's stdio now pins UTF-8 (and the bridge
+   sets `PYTHONUTF8`/`PYTHONIOENCODING`); without this, Arabic/Urdu text would be
+   re-encoded by the legacy code page on the way to the parent process.
+2. **Tokenizer resolution.** The repository's `tokenizer_config.json` declares
+   `RobertaTokenizer` while shipping `vocab.json` + `merges.txt` and no
+   `tokenizer.json`; newer transformers majors cannot auto-resolve that. The
+   driver now instantiates the documented tokenizer class explicitly (with the
+   byte-level BPE sibling as a bounded fallback) — the intended inference
+   behaviour is unchanged.
+
+One host limitation remains and is reported as such:
+
+- **App-managed staged runtime provisioning is blocked on this host.** With
+  `LongPathsEnabled = 0`, pip cannot materialise torch's deep include tree under
+  the staged runtime path. The failure is surfaced as a structured
+  `UNSUPPORTED_PLATFORM` with remediation ("enable long-path support or move the
+  data root"), the partially staged runtime is removed, and the activation
+  pointer is never touched. The specialist itself was proven to work through the
+  shipped driver using a short-path interpreter, so this is a staging-path
+  limitation, not an adapter or model defect.
+
+Unlimited-OCR remains blocked by the absence of a CUDA device, and PP-OCRv5
+remains blocked by the reproducible Paddle 3.3.1 PIR/oneDNN CPU failure. Neither
+is faked, and neither is claimed as passing.
+
+## 27. Tests and gates for this run
+
+| Suite | Focus |
+| --- | --- |
+| `tests/ocr-reading-order.test.mjs` | LTR/RTL single column, two-column LTR/RTL, mixed direction, heading/caption/footnote ordering, determinism, ambiguity warnings, geometry-less units, empty page |
+| `tests/ocr-line-segmentation.test.mjs` | stable identities, single-line regions, documented fallback, detection blocks outside regions, crop-path containment, invalid input refusal |
+| `tests/ocr-specialist-provider.test.mjs` | provider registration, upstream identity, LINE-only enforcement, external model storage, repository weight scan, staged-then-activate, failed update retention, smoke failure, rollback, Update-All coverage, no network during recognition, structured platform failure |
+| `tests/ocr-urdu-dual-engine.test.mjs` | both engines required, independent preservation, single-engine completion refusal both ways, review evidence without a winner, no fallback invocation, unregistered engine reporting, native-text bypass, cancellation semantics, per-engine persistence, derived cache |
+| `tests/ocr-urdu-cancellation.test.mjs` | real supervised worker termination for PP-OCRv5 and the specialist, no orphan process after a cancelled Urdu job |
+| `tests/ocr-derived-search.test.mjs` | native-text duplication prevention, OCR provenance, Arabic diacritic-insensitive search with tashkeel preserved, Urdu per-provider search, disagreement not merged, partial stays partial, invalidation by source/engine/model/segmentation/reading-order/pipeline revision |
+| `tests/ocr-search-http-and-safety.test.mjs` | `/api/ocr/search` surface, dual-engine provider inventory, Urdu pipeline route, source immutability, no developer paths in OCR responses |
+
+| Gate | Result |
+| --- | --- |
+| `npm test` | **409 passing, 0 failing** (337 before this run) |
+| `npx tsc --noEmit` | PASS |
+| `npm run lint` | PASS |
+| `npm run build` | PASS |
+| `python scripts/check_repository_hygiene.py` | PASS |
+| `python scripts/validate_project_state.py` | PASS |
+| Graphify (0.9.57, real incremental run) | 2,074 nodes / 4,926 edges / 92 communities / 0 import cycles / 0 unverified / 0 dangling; 431 OCR-related nodes |
+| Ponytail | PASS — 6 dead or duplicated items deleted in the same run; no new dependencies; trust boundaries untouched |
+
+One existing assertion was updated rather than weakened: the benchmark engine
+suite previously asserted the specialist is `NOT_INTEGRATED`, which was true
+before this run and is now false. It asserts the new, evidenced `INTEGRATED`
+state while keeping the LINE-only contract assertions intact.
+
+## 28. Scope discipline for this run
+
+P17-T004 and P17-T007 remain open; no formal benchmark was run; no accuracy,
+speed, CER, WER, or VRAM figure is claimed; Phase 18 remains `NOT_STARTED`; and
+Windows/Arch/Ubuntu/macOS certification stages were not started.

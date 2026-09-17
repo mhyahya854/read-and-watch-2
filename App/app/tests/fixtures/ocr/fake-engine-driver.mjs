@@ -67,7 +67,7 @@ async function handle(request) {
     });
     return;
   }
-  if (op === 'recognize_page' || op === 'recognize_region') {
+  if (op === 'recognize_page' || op === 'recognize_region' || op === 'recognize_line') {
     if (mode === 'recognize-fail') {
       emit({ id, ok: false, error: { code: 'OCR_FAILED', message: 'fixture inference failure' } });
       return;

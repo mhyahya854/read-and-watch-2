@@ -41,9 +41,19 @@ import traceback
 
 PROTOCOL_VERSION = 1
 
+# Windows consoles and pipes default to a legacy code page, which would corrupt
+# (or refuse to encode) Arabic and Urdu text. The protocol is UTF-8 on both
+# sides, so pin it here rather than depending on the parent's environment.
+for _stream in (sys.stdin, sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
 ENGINE_NOT_INSTALLED = "ENGINE_NOT_INSTALLED"
 MODEL_NOT_INSTALLED = "MODEL_NOT_INSTALLED"
 UNSUPPORTED_HARDWARE = "UNSUPPORTED_HARDWARE"
+UNSUPPORTED_UNIT = "UNSUPPORTED_UNIT"
 RUNTIME_UNAVAILABLE = "RUNTIME_UNAVAILABLE"
 OCR_FAILED = "OCR_FAILED"
 CANCELLED = "CANCELLED"
@@ -62,7 +72,7 @@ class DriverError(Exception):
 
 def _packages():
     found = {}
-    for name in ("paddleocr", "paddle", "torch", "transformers", "PIL", "numpy"):
+    for name in ("paddleocr", "paddle", "torch", "transformers", "safetensors", "PIL", "numpy"):
         try:
             module = __import__(name)
             found[name] = str(getattr(module, "__version__", "unknown"))
@@ -94,6 +104,7 @@ def _runtime_report(provider):
         "packages": _packages(),
         "accelerator": _accelerator(),
         "tempDirActive": bool(TEMP_DIR),
+        "modelDir": MODEL_DIR or None,
     }
 
 
@@ -132,6 +143,34 @@ def _polygon_to_box(polygon):
     xs = [point[0] for point in points]
     ys = [point[1] for point in points]
     return {"x": min(xs), "y": min(ys), "width": max(xs) - min(xs), "height": max(ys) - min(ys)}
+
+
+def _offset_box(box, region):
+    """Composes a region-relative line box into page coordinates."""
+    if not isinstance(box, dict):
+        return None
+    try:
+        offset_x = float((region or {}).get("x", 0) or 0)
+        offset_y = float((region or {}).get("y", 0) or 0)
+        return {
+            "x": float(box["x"]) + offset_x,
+            "y": float(box["y"]) + offset_y,
+            "width": float(box["width"]),
+            "height": float(box["height"]),
+        }
+    except Exception:
+        return None
+
+
+def _crop(image, box):
+    if not isinstance(box, dict):
+        raise DriverError(INVALID_INPUT, "a bounding box is required to crop a region or line")
+    height, width = image.shape[0], image.shape[1]
+    x = max(0, min(width - 1, int(box.get("x", 0))))
+    y = max(0, min(height - 1, int(box.get("y", 0))))
+    w = max(1, min(width - x, int(box.get("width", width - x))))
+    h = max(1, min(height - y, int(box.get("height", height - y))))
+    return image[y : y + h, x : x + w]
 
 
 # --------------------------------------------------------------------------- #
@@ -307,18 +346,90 @@ def _unlimited_recognize(image):
 
 
 # --------------------------------------------------------------------------- #
+# Urdu Nastaliq specialist: qandeelasim13/urdu-ocr-trocr-si26 (TrOCR)
+# --------------------------------------------------------------------------- #
+
+_TROCR_CACHE = {}
+
+# Documented on the model card for this exact revision. Not tuned by Read & Watch.
+_TROCR_MAX_LENGTH = 319
+_TROCR_NUM_BEAMS = 4
+
+
+def _trocr_model():
+    if "processor" in _TROCR_CACHE:
+        return _TROCR_CACHE["processor"], _TROCR_CACHE["model"]
+    if not MODEL_DIR or not os.path.isdir(MODEL_DIR):
+        raise DriverError(
+            MODEL_NOT_INSTALLED,
+            "The Urdu Nastaliq specialist model is not installed; no staged model directory was supplied.",
+        )
+    try:
+        import torch  # noqa: F401  (imported for the runtime check and inference)
+        from transformers import (  # type: ignore
+            GPT2Tokenizer,
+            RobertaTokenizer,
+            TrOCRProcessor,
+            ViTImageProcessor,
+            VisionEncoderDecoderModel,
+        )
+    except Exception as error:  # pragma: no cover - depends on host runtime
+        raise DriverError(
+            ENGINE_NOT_INSTALLED, "torch/transformers are not importable: %s" % error
+        ) from error
+    try:
+        # The published repository ships vocab.json + merges.txt (a slow byte-level
+        # BPE tokenizer) and no tokenizer.json, while its tokenizer_config.json
+        # declares `RobertaTokenizer`. Newer transformers majors cannot always
+        # auto-resolve that combination, so the documented class is instantiated
+        # explicitly and the byte-level BPE sibling is the bounded fallback. Both
+        # decode identically for this model; no tokenizer behaviour is altered.
+        try:
+            tokenizer = RobertaTokenizer.from_pretrained(MODEL_DIR, local_files_only=True)
+        except Exception:
+            tokenizer = GPT2Tokenizer.from_pretrained(MODEL_DIR, local_files_only=True)
+        image_processor = ViTImageProcessor.from_pretrained(MODEL_DIR, local_files_only=True)
+        processor = TrOCRProcessor(image_processor=image_processor, tokenizer=tokenizer)
+        model = VisionEncoderDecoderModel.from_pretrained(MODEL_DIR, local_files_only=True)
+        model.eval()
+    except Exception as error:  # pragma: no cover - depends on host runtime
+        raise DriverError(MODEL_NOT_INSTALLED, "Could not load specialist weights: %s" % error) from error
+    _TROCR_CACHE["processor"] = processor
+    _TROCR_CACHE["model"] = model
+    return processor, model
+
+
+def _trocr_recognize(image):
+    """Runs one line image through the specialist. CPU only; no network at all."""
+    import torch  # type: ignore
+    from PIL import Image  # type: ignore
+
+    processor, model = _trocr_model()
+    with torch.no_grad():
+        pixel_values = processor(images=Image.fromarray(image), return_tensors="pt").pixel_values
+        generated = model.generate(
+            pixel_values, max_length=_TROCR_MAX_LENGTH, num_beams=_TROCR_NUM_BEAMS
+        )
+        text = processor.batch_decode(generated, skip_special_tokens=True)[0]
+    return str(text)
+
+
+# --------------------------------------------------------------------------- #
 # Operation dispatch
 # --------------------------------------------------------------------------- #
 
 PROVIDER = "paddleocr"
 MODELS_ROOT = ""
+MODEL_DIR = ""
 TEMP_DIR = ""
 PAYLOAD_MODELS = {}
 TOKEN = ""
 
 
 def _default_language():
-    return "ar" if PROVIDER == "paddleocr" else "en"
+    if PROVIDER == "paddleocr":
+        return "ar"
+    return "ur" if PROVIDER == "urdu-nastaliq-trocr" else "en"
 
 
 def op_health(_payload, _request_id):
@@ -334,6 +445,27 @@ def op_smoke(payload, _request_id):
     # A white canvas is enough to prove the pipeline executes end to end; the
     # fixture deliberately asserts nothing about recognition accuracy.
     canvas = np.full((64, 256, 3), 255, dtype=np.uint8)
+    if PROVIDER == "urdu-nastaliq-trocr":
+        # Synthetic single-line fixture. Proves the specialist loads and runs;
+        # it asserts nothing about accuracy and uses no private material.
+        text = _trocr_recognize(canvas)
+        return {
+            "ok": True,
+            "provider": PROVIDER,
+            "fixture": "synthetic-line-white-canvas",
+            "unitType": "LINE",
+            "modelDir": MODEL_DIR or None,
+            "results": [
+                {
+                    "language": languages[0],
+                    "executed": True,
+                    "lineCount": 1,
+                    "characterCount": len(text),
+                }
+            ],
+            "hardware": _accelerator(),
+            "runtime": _runtime_report(PROVIDER),
+        }
     for language in languages:
         if PROVIDER == "paddleocr":
             pipeline = _paddle_pipeline(language)
@@ -364,6 +496,12 @@ def op_recognize_page(payload, request_id):
     if _is_cancelled(request_id):
         raise DriverError(CANCELLED, "Request cancelled before inference")
     language = payload.get("language") or _default_language()
+    if PROVIDER == "urdu-nastaliq-trocr":
+        # Honest capability boundary: this engine is documented for single lines.
+        raise DriverError(
+            UNSUPPORTED_UNIT,
+            "The Urdu Nastaliq specialist is a line-level engine; page recognition is not supported.",
+        )
     if PROVIDER == "paddleocr":
         pipeline = _paddle_pipeline(language)
         raw, blocks, confidence = _normalise_paddle_result(_paddle_predict(pipeline, image))
@@ -385,23 +523,55 @@ def op_recognize_page(payload, request_id):
 def op_recognize_region(payload, request_id):
     region = payload.get("region")
     if region:
-        import numpy as np  # noqa: F401  (ensures numpy availability early)
         from PIL import Image  # type: ignore
 
         image = _decode_image(payload)
-        x = max(0, int(region.get("x", 0)))
-        y = max(0, int(region.get("y", 0)))
-        width = max(1, int(region.get("width", image.shape[1])))
-        height = max(1, int(region.get("height", image.shape[0])))
-        cropped = image[y : y + height, x : x + width]
+        cropped = _crop(image, region)
         buffer = io.BytesIO()
         Image.fromarray(cropped).save(buffer, format="PNG")
         payload = dict(payload)
         payload["imagePath"] = None
         payload["imageBase64"] = base64.b64encode(buffer.getvalue()).decode("ascii")
+    if PROVIDER == "urdu-nastaliq-trocr":
+        raise DriverError(
+            UNSUPPORTED_UNIT,
+            "The Urdu Nastaliq specialist is a line-level engine; region recognition is not supported.",
+        )
     result = op_recognize_page(payload, request_id)
     result["region"] = region or None
     return result
+
+
+def op_recognize_line(payload, request_id):
+    """Line-level recognition. The Nastaliq specialist is the caller that needs it."""
+    if PROVIDER != "urdu-nastaliq-trocr":
+        raise DriverError(
+            UNSUPPORTED_UNIT,
+            "%s does not expose a dedicated line operation." % PROVIDER,
+        )
+    line = payload.get("line") or {}
+    line_box = _offset_box(line.get("box"), payload.get("region"))
+    if line_box is None:
+        raise DriverError(INVALID_INPUT, "recognize_line requires a line bounding box")
+    if _is_cancelled(request_id):
+        raise DriverError(CANCELLED, "Request cancelled before inference")
+    image = _decode_image(payload)
+    crop = _crop(image, line_box)
+    text = _trocr_recognize(crop)
+    if _is_cancelled(request_id):
+        raise DriverError(CANCELLED, "Request cancelled during inference")
+    return {
+        "ok": True,
+        "provider": PROVIDER,
+        "unitType": "LINE",
+        "language": payload.get("language") or _default_language(),
+        "lineId": line.get("lineId"),
+        "regionId": line.get("regionId"),
+        "rawText": text,
+        "blocks": [{"text": text, "confidence": None, "box": line_box}],
+        "confidence": None,
+        "region": payload.get("region") or None,
+    }
 
 
 def op_cancel(payload, _request_id):
@@ -422,6 +592,7 @@ OPERATIONS = {
     "smoke": op_smoke,
     "recognize_page": op_recognize_page,
     "recognize_region": op_recognize_region,
+    "recognize_line": op_recognize_line,
     "cancel": op_cancel,
 }
 
@@ -470,11 +641,14 @@ def _handle(request):
 
 
 def main():
-    global PROVIDER, MODELS_ROOT, TEMP_DIR, TOKEN, PAYLOAD_MODELS
+    global PROVIDER, MODELS_ROOT, MODEL_DIR, TEMP_DIR, TOKEN, PAYLOAD_MODELS
 
     parser = argparse.ArgumentParser(description="Read & Watch OCR engine driver")
-    parser.add_argument("--provider", required=True, choices=["paddleocr", "unlimited-ocr"])
+    parser.add_argument(
+        "--provider", required=True, choices=["paddleocr", "unlimited-ocr", "urdu-nastaliq-trocr"]
+    )
     parser.add_argument("--models-root", default="")
+    parser.add_argument("--model-dir", default="")
     parser.add_argument("--temp-dir", default="")
     parser.add_argument("--token", required=True)
     parser.add_argument("--protocol", type=int, default=PROTOCOL_VERSION)
@@ -490,6 +664,7 @@ def main():
     MODELS_ROOT = os.path.realpath(args.models_root) if args.models_root else ""
     if MODELS_ROOT:
         os.makedirs(MODELS_ROOT, exist_ok=True)
+    MODEL_DIR = os.path.realpath(args.model_dir) if args.model_dir else ""
     if args.temp_dir:
         TEMP_DIR = os.path.realpath(args.temp_dir)
         os.makedirs(TEMP_DIR, exist_ok=True)

@@ -1170,6 +1170,16 @@ the later alignment / disagreement / uncertainty / human-review phase, and the
 durable record lives in `DECISIONS.md` (D-054) and
 `docs/project/OCR_BENCHMARK_PROTOCOL.md`.
 
+The specialist now has a real execution path (`provider-urdu-nastaliq.mjs`,
+LINE-only, `integrationStatus: INTEGRATED`) and the Urdu runtime is the
+dual-engine pipeline in `server/ocr/urdu-pipeline.mjs`: PP-OCRv5 detection +
+recognition plus per-line Nastaliq specialist recognition, both outputs
+preserved, disagreement recorded as review evidence, and completion withheld
+unless both engines complete. `P17-T002` covers the benchmark framework
+(schemas, protocol, scoring, synthetic validation corpus); `P17-T004` covers
+populating representative lawful private real-world samples and running the
+measured benchmark, and therefore remains open.
+
 ### Objective
 
 Add OCR only for PDFs whose native text layer is absent or unusable.
@@ -1189,10 +1199,10 @@ No OCR for usable text, source alteration, unbenchmarked engine adoption, silent
 ### Checklist
 
 - [x] P17-T001 Define and test the usable-native-text decision gate.
-- [x] P17-T002 Build a representative, lawful, private benchmark corpus and ground-truth protocol.
+- [x] P17-T002 Build the OCR benchmark corpus framework, lawful/private corpus workflow, ground-truth protocol, schemas, scoring utilities, and synthetic validation corpus.
 - [x] P17-T003 Verify exact OCR code/model/dataset licenses, provenance, size, runtime, and hardware constraints.
-- [ ] P17-T004 Benchmark primary candidates and accept an architecture only from evidence.
-- [ ] P17-T005 Implement OCR orchestration, regions, reading order, boxes, text overlay, caching, and cancellation.
+- [ ] P17-T004 Populate/use representative lawful private real-world samples and run measured engine benchmarks sufficient for evidence-based acceptance.
+- [x] P17-T005 Implement OCR orchestration, regions, reading order, boxes, text overlay, caching, and cancellation.
 - [x] P17-T006 Implement OCR provenance, uncertainty fields, invalidation, recovery, and source-hash binding.
 - [ ] P17-T007 Verify English, Urdu, Arabic, mixed-language, layout, and source preservation.
 

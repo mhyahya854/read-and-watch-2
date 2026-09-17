@@ -25,7 +25,7 @@ import { createEngineUpdateManager } from './update-manager.mjs';
 import { createUpstreamResolver } from './upstream-resolver.mjs';
 import { sha256OfFile } from './engine-store.mjs';
 
-function runCommand(command, args, { cwd, env, signal, timeoutMs = 30 * 60 * 1000 } = {}) {
+export function runCommand(command, args, { cwd, env, signal, timeoutMs = 30 * 60 * 1000 } = {}) {
   return new Promise((resolve) => {
     let child;
     try {
@@ -219,13 +219,40 @@ export function createManagedOcrProvider({
         revision: revision ?? null,
       });
     }
+    const driverArgs = [driverPath, '--provider', providerId, '--models-root', modelRoot];
+    // Engines whose weights are stored per revision (rather than a shared model
+    // cache) point the driver at the staged revision directory explicitly.
+    if (typeof hooks.resolveModelDir === 'function') {
+      const modelDir = hooks.resolveModelDir({ revision: runtime.revision, dataRoot });
+      if (typeof modelDir === 'string' && modelDir.length > 0) {
+        driverArgs.push('--model-dir', modelDir);
+      }
+    }
     const factory = bridgeFactory ?? ((options) => createRuntimeBridge(options));
     return factory({
       command: runtime.pythonBin,
-      args: [driverPath, '--provider', providerId, '--models-root', modelRoot],
+      args: driverArgs,
       cwd: runtime.base,
-      env: { PYTHONNOUSERSITE: '1' },
+      // PYTHONUTF8 keeps Arabic/Urdu text intact on Windows pipes; the driver
+      // also pins its own streams, so this is redundancy rather than a crutch.
+      env: { PYTHONNOUSERSITE: '1', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
     });
+  }
+
+  /**
+   * A declared unit set is enforced. A LINE-only engine is rejected for PAGE and
+   * REGION with `UNSUPPORTED_UNIT` instead of quietly returning a compound
+   * result it cannot honestly support.
+   */
+  function assertUnitSupported(unitType) {
+    const supported = metadata.supportedUnitTypes;
+    if (supported && !supported.includes(unitType)) {
+      throw new OcrError(
+        OCR_STATE.UNSUPPORTED_UNIT,
+        `${metadata.displayName} does not support ${unitType} recognition; supported units: ${supported.join(', ')}.`,
+        { providerId, unitType, supportedUnitTypes: [...supported] },
+      );
+    }
   }
 
   const provider = {
@@ -233,6 +260,7 @@ export function createManagedOcrProvider({
     displayName: metadata.displayName,
     languages: [...metadata.languages],
     metadata,
+    supportedUnitTypes: metadata.supportedUnitTypes ? [...metadata.supportedUnitTypes] : null,
     get version() {
       return engineStore.readActivation(providerId).activeRevision;
     },
@@ -287,11 +315,23 @@ export function createManagedOcrProvider({
     },
 
     async recognizePage({ imagePath, pageIndex, language, sourceHash, settingsKey, signal, timeoutMs } = {}) {
-      return await recognize({ imagePath, pageIndex, language, sourceHash, settingsKey, signal, timeoutMs });
+      assertUnitSupported('PAGE');
+      return await recognize({
+        unitType: 'PAGE',
+        imagePath,
+        pageIndex,
+        language,
+        sourceHash,
+        settingsKey,
+        signal,
+        timeoutMs,
+      });
     },
 
     async recognizeRegion({ imagePath, region, pageIndex, language, sourceHash, settingsKey, signal } = {}) {
+      assertUnitSupported('REGION');
       return await recognize({
+        unitType: 'REGION',
         imagePath,
         region,
         pageIndex,
@@ -299,6 +339,36 @@ export function createManagedOcrProvider({
         sourceHash,
         settingsKey,
         signal,
+      });
+    },
+
+    /**
+     * Line-level recognition. `region` is the optional parent region box in page
+     * coordinates, `line` the line box (`regionId`, `lineId`, `box`).
+     */
+    async recognizeLine({
+      imagePath,
+      line,
+      region = null,
+      pageIndex = 0,
+      language,
+      sourceHash,
+      settingsKey = 'default',
+      signal,
+      timeoutMs,
+    } = {}) {
+      assertUnitSupported('LINE');
+      return await recognize({
+        unitType: 'LINE',
+        imagePath,
+        line,
+        region,
+        pageIndex,
+        language,
+        sourceHash,
+        settingsKey,
+        signal,
+        timeoutMs,
       });
     },
 
@@ -396,7 +466,7 @@ export function createManagedOcrProvider({
         command: pythonBin,
         args: [driverPath, '--provider', providerId, '--models-root', modelRoot],
         cwd: runtimeForRevision(revision).base,
-        env: { PYTHONNOUSERSITE: '1' },
+        env: { PYTHONNOUSERSITE: '1', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
       });
       try {
         const health = await bridge.request('health', { providerId }, { signal, timeoutMs: 180_000 });
@@ -421,8 +491,10 @@ export function createManagedOcrProvider({
   };
 
   async function recognize({
+    unitType = 'PAGE',
     imagePath,
     region = null,
+    line = null,
     pageIndex = 0,
     language,
     sourceHash,
@@ -447,13 +519,21 @@ export function createManagedOcrProvider({
 
     const bridge = bridgeFor();
     try {
+      const lineOp = unitType === 'LINE' && metadata.documentedInputGranularity === 'line';
+      const op = lineOp
+        ? 'recognize_line'
+        : (unitType === 'LINE' && line?.box) || region
+          ? 'recognize_region'
+          : 'recognize_page';
+      const regionForOp = lineOp ? (region ?? null) : unitType === 'LINE' ? (line?.box ?? region) : region;
       const result = await bridge.request(
-        region ? 'recognize_region' : 'recognize_page',
+        op,
         {
           providerId,
           language,
           imagePath,
-          region,
+          region: regionForOp,
+          line,
           pageIndex,
           models: metadata.models?.[language] ?? null,
         },
@@ -471,11 +551,15 @@ export function createManagedOcrProvider({
 
       return {
         ok: true,
+        unitType,
         provider: providerId,
         providerVersion: state.activeRevision,
         modelRevision: metadata.models?.[language]?.recognition ?? metadata.modelId ?? null,
         language,
         pageIndex,
+        regionId: line?.regionId ?? region?.regionId ?? null,
+        lineId: line?.lineId ?? null,
+        bbox: line?.box ?? region ?? null,
         sourceHash: sourceHash ?? null,
         settingsKey,
         ...representations,
@@ -492,6 +576,7 @@ export function createManagedOcrProvider({
       throw new OcrError(error.code ?? OCR_STATE.OCR_FAILED, `OCR failed: ${error.message}`, {
         providerId,
         pageIndex,
+        unitType,
       });
     } finally {
       await bridge.dispose();
@@ -515,6 +600,17 @@ export function createManagedOcrProvider({
     getUpdateStatus: () => updateManager.getUpdateStatus(),
     getStatus: () => status(),
   };
+
+  // `spread` would freeze these getters into stale nulls at construction time,
+  // which would silently disable revision-based cache invalidation after an
+  // engine update. Re-attach them as live accessors.
+  for (const member of ['version', 'modelRevision']) {
+    Object.defineProperty(composed, member, {
+      enumerable: true,
+      configurable: true,
+      get: () => provider[member],
+    });
+  }
 
   // Composition invariant: the object the rest of the application receives must
   // satisfy the full contract, including the update surface. A staging flow that

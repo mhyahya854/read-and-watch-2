@@ -12,6 +12,7 @@ export type OcrStateCode =
   | 'MODEL_NOT_INSTALLED'
   | 'UNSUPPORTED_HARDWARE'
   | 'UNSUPPORTED_PLATFORM'
+  | 'UNSUPPORTED_UNIT'
   | 'RUNTIME_UNAVAILABLE'
   | 'UPDATE_FAILED'
   | 'OCR_FAILED'
@@ -64,12 +65,20 @@ export interface OcrProviderDescription {
   id: string;
   displayName: string;
   languages: OcrLanguage[];
+  role?: string;
+  /** Declared recognition units. `null` means the engine declares no restriction. */
+  supportedUnitTypes?: string[] | null;
   officialUpstream: string;
   officialUpstreamUrl: string;
-  userFork: string;
-  userForkUrl: string;
+  userFork?: string | null;
+  userForkUrl?: string | null;
   codeLicense: string;
+  modelLicense?: string | null;
   modelSource: string;
+  modelRevision?: string | null;
+  documentedInputGranularity?: string | null;
+  documentedLimitations?: string[];
+  redistributionPolicy?: string | null;
   runtimeRequirements: OcrRuntimeRequirements;
   availability: OcrProviderStatus;
   updateStatus: OcrUpdateStatus;
@@ -81,10 +90,13 @@ export interface OcrLanguageRoute {
   providerDisplayName: string;
   model: { detection: string; recognition: string } | null;
   available: boolean;
+  /** `urdu-dual-engine` for Urdu: both mandatory engines run, neither substitutes. */
+  pipeline?: 'single-engine' | 'urdu-dual-engine';
   /**
    * Every engine that MUST run for this language. Urdu has two: PP-OCRv5 and the
-   * dedicated Nastaliq specialist. `NOT_INTEGRATED` means the engine is declared
-   * and its provenance is verified but this build has no execution path yet.
+   * dedicated Nastaliq specialist. `INTEGRATED` means this build can run it;
+   * `NOT_INTEGRATED` would mean the engine is declared and provenance-verified
+   * but has no execution path, which is never reported as available.
    */
   requiredProviders?: OcrRequiredProvider[];
 }
@@ -93,6 +105,8 @@ export interface OcrRequiredProvider {
   providerId: string;
   displayName: string;
   integrationStatus: 'INTEGRATED' | 'NOT_INTEGRATED';
+  supportedUnitTypes?: string[];
+  available?: boolean;
 }
 
 export interface OcrProviderInventory {
@@ -140,6 +154,65 @@ export interface OcrFailure {
   providerId: string | null;
   language?: OcrLanguage;
   pageIndex?: number;
+}
+
+/** Where a search hit's text came from. Never blended: native text is not OCR. */
+export type OcrSearchProvenance = 'NATIVE_TEXT' | 'OCR_DERIVED';
+
+export type OcrCompletionState =
+  | 'COMPLETE'
+  | 'PARTIAL_ENGINE_FAILURE'
+  | 'REVIEW_REQUIRED'
+  | 'BLOCKED';
+
+export interface OcrDerivedSearchProviderHit {
+  providerId: string;
+  providerVersion: string | null;
+  modelRevision: string | null;
+  confidence: number | null;
+  confidenceSource: 'engine' | 'not-supplied';
+  /** The provider's own text for this line. Two engines are never merged. */
+  text: string;
+  displayText: string;
+  searchText: string;
+  matchText: string;
+  snippet: string;
+}
+
+export interface OcrDerivedSearchResult {
+  id: string;
+  provenance: 'OCR_DERIVED';
+  sourceHash: string;
+  pageIndex: number;
+  regionId: string | null;
+  lineId: string | null;
+  readingOrderIndex: number | null;
+  bbox: { x: number; y: number; width: number; height: number } | null;
+  language: OcrLanguage;
+  snippet: string;
+  matchText: string;
+  providers: OcrDerivedSearchProviderHit[];
+  providerIds: string[];
+  machineTranscription: true;
+  completionState: OcrCompletionState;
+  requiredProviders: string[];
+  completedProviders: string[];
+  /** True when a mandatory engine did not complete: the hit is partial evidence. */
+  partial: boolean;
+  nativeTextPage: false;
+}
+
+export interface OcrDerivedSearchResponse {
+  sourceHash: string;
+  query: string;
+  provenance: 'OCR_DERIVED';
+  invalidationKey: string;
+  lineSegmentationRevision: number;
+  readingOrderRevision: number;
+  urduPipelineRevision: number;
+  results: OcrDerivedSearchResult[];
+  total: number;
+  skipped: { nativeTextPages: number[]; staleRecords: Array<{ providerId: string; pageIndex: number }> };
 }
 
 /** UI status label. Never invents progress; only mirrors a real lifecycle. */

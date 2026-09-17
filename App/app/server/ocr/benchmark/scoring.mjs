@@ -327,6 +327,47 @@ export function scoreSample({ item, provider, prediction, predictedLines }) {
 }
 
 /**
+ * Pairwise character-level disagreement evidence for any set of engine outputs.
+ * Shared by benchmark comparison (which also scores against ground truth) and by
+ * runtime orchestration (which has no truth and must not pretend otherwise).
+ */
+function pairwiseDisagreementEvidence(outputs) {
+  const evidence = [];
+  for (let left = 0; left < outputs.length; left += 1) {
+    for (let right = left + 1; right < outputs.length; right += 1) {
+      const firstText = typeof outputs[left]?.text === 'string' ? outputs[left].text : '';
+      const secondText = typeof outputs[right]?.text === 'string' ? outputs[right].text : '';
+      const { ops, distance, truthLength, predictionLength } = editDistance(firstText, secondText);
+      const counts = opCounts(ops);
+      evidence.push({
+        providers: [outputs[left]?.provider ?? null, outputs[right]?.provider ?? null],
+        identical: firstText === secondText,
+        agreementCount: counts.match,
+        disagreementCount: counts.substitute + counts.insert + counts.delete,
+        substitutionCount: counts.substitute,
+        insertionCount: counts.insert,
+        deletionCount: counts.delete,
+        distance,
+        aLength: truthLength,
+        bLength: predictionLength,
+        locationsTruncated: ops.length > MAX_DISAGREEMENT_LOCATIONS * 2,
+        locations: ops
+          .filter((entry) => entry.op !== 'match')
+          .slice(0, MAX_DISAGREEMENT_LOCATIONS)
+          .map((entry) => ({
+            op: entry.op,
+            aIndex: entry.truthIndex ?? null,
+            bIndex: entry.predictionIndex ?? null,
+            aCodePoint: entry.truth ?? null,
+            bCodePoint: entry.prediction ?? null,
+          })),
+      });
+    }
+  }
+  return evidence;
+}
+
+/**
  * Per-provider Urdu engine comparison evidence.
  *
  * Both raw outputs are preserved. Ground truth remains the benchmark authority:
@@ -349,39 +390,7 @@ export function compareProviders({ item, providerResults }) {
     score: scoreSample({ item, provider: result.provider, prediction: result.text }),
   }));
 
-  const pairwiseDisagreement = [];
-  for (let left = 0; left < providerResults.length; left += 1) {
-    for (let right = left + 1; right < providerResults.length; right += 1) {
-      const first = providerResults[left];
-      const second = providerResults[right];
-      const { ops, distance, truthLength, predictionLength } = editDistance(first.text, second.text);
-      const counts = opCounts(ops);
-      const locations = ops
-        .filter((entry) => entry.op !== 'match')
-        .slice(0, MAX_DISAGREEMENT_LOCATIONS)
-        .map((entry) => ({
-          op: entry.op,
-          aIndex: entry.truthIndex ?? null,
-          bIndex: entry.predictionIndex ?? null,
-          aCodePoint: entry.truth ?? null,
-          bCodePoint: entry.prediction ?? null,
-        }));
-      pairwiseDisagreement.push({
-        providers: [first.provider, second.provider],
-        identical: first.text === second.text,
-        agreementCount: counts.match,
-        disagreementCount: counts.substitute + counts.insert + counts.delete,
-        substitutionCount: counts.substitute,
-        insertionCount: counts.insert,
-        deletionCount: counts.delete,
-        distance,
-        aLength: truthLength,
-        bLength: predictionLength,
-        locationsTruncated: ops.length > MAX_DISAGREEMENT_LOCATIONS * 2,
-        locations,
-      });
-    }
-  }
+  const pairwiseDisagreement = pairwiseDisagreementEvidence(providerResults);
 
   return {
     benchmarkItemId: item.benchmarkItemId,
@@ -446,4 +455,31 @@ export function summarizeByScriptFeature(items, scores) {
     exactMatchRate: entry.samples === 0 ? null : entry.exactMatches / entry.samples,
     meanCer: entry.samples === 0 ? null : entry.cerSum / entry.samples,
   }));
+}
+
+/**
+ * Runtime engine-disagreement evidence, WITHOUT ground truth.
+ *
+ * Benchmark scoring (`compareProviders`) needs human truth because only truth
+ * can say which engine was right. At runtime there is no truth, and this project
+ * refuses to let agreement stand in for correctness. So this function records
+ * exactly what it can defend: where two mandatory engines differ, by how much,
+ * and at which character offsets. It never picks a winner, never averages, and
+ * never writes a `bestText`.
+ */
+export function compareEngineOutputs({ outputs = [] } = {}) {
+  if (!Array.isArray(outputs) || outputs.length < 2) {
+    throw new BenchmarkProtocolError(
+      'COMPARISON_REQUIRES_TWO_PROVIDERS',
+      'engine comparison requires at least two independent provider outputs',
+    );
+  }
+  const pairwise = pairwiseDisagreementEvidence(outputs);
+  return {
+    correctnessAuthority: 'none',
+    note: 'engine agreement is not truth and no winner is selected; ground truth remains the benchmark authority',
+    enginesAgreeWithEachOther: pairwise.every((entry) => entry.identical),
+    materialDisagreement: pairwise.some((entry) => entry.disagreementCount > 0),
+    pairwiseDisagreement: pairwise,
+  };
 }

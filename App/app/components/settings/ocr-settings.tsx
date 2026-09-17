@@ -90,6 +90,19 @@ export function OcrSettingsSection({ settings, onPatch }: OcrSettingsSectionProp
   const providers: OcrProviderDescription[] = inventory?.providers ?? [];
   const modelFor = (providerId: string) =>
     inventory?.routing.find((route) => route.providerId === providerId)?.model?.recognition ?? null;
+  const urduRoute = inventory?.routing.find((route) => route.language === 'ur') ?? null;
+
+  /**
+   * Urdu status is derived from the mandatory engine set, never from "an engine
+   * answered". One installed engine is `Partial`, not `Complete`.
+   */
+  const urduPipelineStatus = (() => {
+    if (!urduRoute?.requiredProviders || urduRoute.requiredProviders.length < 2) return null;
+    const installed = urduRoute.requiredProviders.filter((entry) => entry.available).length;
+    if (installed === 0) return 'Not installed';
+    if (installed < urduRoute.requiredProviders.length) return 'Partial';
+    return 'Complete';
+  })();
 
   return (
     <section className="space-y-4" aria-labelledby="heading-ocr">
@@ -212,6 +225,25 @@ export function OcrSettingsSection({ settings, onPatch }: OcrSettingsSectionProp
                       {provider.runtimeRequirements.notes}
                       {provider.runtimeRequirements.cpuSupported ? '' : ' CPU execution is not claimed.'}
                     </span>
+                    <span>Recognition unit</span>
+                    <span>
+                      {provider.supportedUnitTypes?.length
+                        ? provider.supportedUnitTypes.join(', ')
+                        : 'Not declared'}
+                      {provider.documentedInputGranularity
+                        ? ` (documented input: ${provider.documentedInputGranularity})`
+                        : ''}
+                    </span>
+                    <span>Model licence</span>
+                    <span>
+                      {provider.modelLicense ?? 'Not reported'}
+                      {provider.redistributionPolicy ? ` · ${provider.redistributionPolicy}` : ''}
+                    </span>
+                    <span>Upstream authority</span>
+                    <span className="break-all font-mono">
+                      {provider.officialUpstream}
+                      {provider.userFork ? ` (fork: ${provider.userFork})` : ' (no fork; weights not redistributed)'}
+                    </span>
                     <span>Engine storage</span>
                     <span>
                       Managed runtime under the external data root. Nothing is stored in the project.
@@ -284,6 +316,31 @@ export function OcrSettingsSection({ settings, onPatch }: OcrSettingsSectionProp
             })}
           </dl>
           <div className="border-t border-border px-5 py-4">
+            {urduRoute?.requiredProviders && urduRoute.requiredProviders.length > 1 && (
+              <div className="mb-4 rounded border border-border/70 bg-surface-muted/40 px-4 py-3 text-xs">
+                <p className="font-medium text-foreground">
+                  Urdu OCR · two required engines ·{' '}
+                  <span className="font-mono">{urduPipelineStatus ?? 'Unknown'}</span>
+                </p>
+                <ul className="mt-2 space-y-1 text-muted-foreground">
+                  {urduRoute.requiredProviders.map((entry) => (
+                    <li key={entry.providerId}>
+                      Required engine · {entry.displayName} ·{' '}
+                      {entry.available ? 'installed' : 'not installed'} ·{' '}
+                      <span className="font-mono">{entry.providerId}</span>
+                      {entry.supportedUnitTypes?.length
+                        ? ` (recognition unit: ${entry.supportedUnitTypes.join(', ')})`
+                        : ''}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-muted-foreground">
+                  Both engines run independently and both raw outputs are kept. There is no fallback
+                  engine: if one is unavailable the Urdu result is reported as partial, never as
+                  complete.
+                </p>
+              </div>
+            )}
             <Button
               variant="outline"
               size="sm"

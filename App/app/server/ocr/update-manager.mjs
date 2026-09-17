@@ -125,15 +125,19 @@ export function createEngineUpdateManager({ engineStore, provider }) {
     try {
       manifest = await provider.stageRevision({ revision: target, stagingDir, signal });
     } catch (error) {
+      const code = error.code ?? OCR_STATE.UPDATE_FAILED;
       engineStore.recordFailure(providerId, {
         revision: target,
         phase: 'stage',
         message: error.message,
-        code: error.code ?? OCR_STATE.UPDATE_FAILED,
+        code,
       });
       engineStore.removeVersion(providerId, target);
-      throw new OcrError(OCR_STATE.UPDATE_FAILED, `Staging ${providerId}@${target} failed: ${error.message}`, {
+      // A specific structured state (unsupported platform, missing model, ...)
+      // is preserved rather than flattened into a generic update failure.
+      throw new OcrError(code, `Staging ${providerId}@${target} failed: ${error.message}`, {
         revision: target,
+        cause: code === OCR_STATE.UPDATE_FAILED ? undefined : code,
       });
     }
 

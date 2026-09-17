@@ -557,3 +557,89 @@ Status: Accepted (2026-09-17, explicit user authority)
     OFL-1.1 fonts whose hash and glyph coverage are verified before rasterising,
     and must not be used to claim engine accuracy. No engine was benchmarked in
     P17-T002.
+
+## D-055 - Nastaliq Specialist Runtime, Deterministic Reading Order, and Provenance-Tagged OCR Search
+
+Status: Accepted (2026-09-17, explicit user authority)
+
+1. **P17-T002 wording corrected without reopening or renumbering anything.**
+   P17-T002 means "build the OCR benchmark corpus framework, lawful/private
+   corpus workflow, ground-truth protocol, schemas, scoring utilities, and
+   synthetic validation corpus" and stays COMPLETE. P17-T004 means
+   "populate/use representative lawful private real-world samples and run
+   measured engine benchmarks sufficient for evidence-based acceptance" and
+   stays INCOMPLETE. No task or gate ID was reused, invented, or reordered.
+
+2. **The Nastaliq specialist now has a real execution path.** Provider id
+   `urdu-nastaliq-trocr`, upstream `qandeelasim13/urdu-ocr-trocr-si26`, pinned
+   revision `a9ef072320b50014f6df7ed9db807810157a410e` (unchanged at
+   re-verification; last modified 2026-08-08T18:35:19Z). Upstream identity is
+   preserved and reached through a thin adapter, never a fork or rewrite. It
+   advertises `LINE` only, as the model card documents: page and region calls are
+   refused with `UNSUPPORTED_UNIT` instead of returning a compound result the
+   engine cannot honestly support. `integrationStatus` is now `INTEGRATED`.
+
+3. **Weights are never bundled.** No model file is committed, vendored, or
+   shipped in an installer. The user-initiated update path resolves the
+   authoritative Hugging Face revision, stages the runtime and model into
+   external storage, verifies every file against its published upstream hash and
+   the size recorded in the contract, health-checks and smoke-tests the staged
+   runtime, and only then moves the activation pointer. `model.safetensors` was
+   verified byte-for-byte against the published LFS object id. Licensing remains
+   honestly unresolved for redistribution: Apache-2.0 model card, no licence
+   file in the project repository, training data that includes UTRSet-Real
+   (CC BY-NC-SA 4.0). Read & Watch claims no redistribution right.
+
+4. **Urdu runtime is a mandatory dual-engine pipeline with no fallback.** PP-OCRv5
+   supplies detection geometry and recognition; the specialist recognises the
+   same line crops, keyed to the same `pageId/regionId/lineId` identities. Both
+   raw outputs are persisted independently per provider. There is no fallback,
+   backup, secondary, or "try the next engine" path, no `bestText`, and no
+   majority-vote truth: partially completed runs are `PARTIAL_ENGINE_FAILURE`
+   (or `BLOCKED`), all-mandatory-engines-complete runs with material
+   disagreement are `REVIEW_REQUIRED`, and only all-complete-and-agreeing runs
+   are `COMPLETE`. Engine agreement is recorded, never treated as truth.
+
+5. **Reading order is deterministic geometry, not a model.** `reading-order.mjs`
+   reconstructs order from boxes plus declared language and region type:
+   vertical line bands first, then in-band order by script direction (LTR
+   left-to-right, RTL right-to-left), column grouping before row grouping, a
+   full-width band read before the columns beneath it, headings ahead of body
+   text in the same band, captions after their band's body, footnotes after the
+   main flow. Ambiguity produces named warnings (`AMBIGUOUS_COLUMN_STRUCTURE`,
+   `MIXED_DIRECTION_PAGE`, `MIXED_DIRECTION_COLUMN`, `UNUSABLE_GEOMETRY`) rather
+   than an invented numeric confidence, and the detector's own emission order is
+   preserved separately as `detectionOrder` for provenance.
+
+6. **Derived OCR search is provenance-tagged and never masquerades as document
+   text.** Results carry `OCR_DERIVED`; a page whose native text layer is usable
+   contributes nothing to the OCR search path, so the same words are never
+   indexed twice. Urdu provider outputs are indexed independently: agreement is
+   presented once with both providers recorded, disagreement keeps both strings
+   and selects no winner, and a partially completed page stays visibly partial.
+   Arabic keeps tashkeel in the displayed text — matching folds marks for the
+   query only, and the snippet returned to the reader is mapped back onto the
+   original vocalised characters.
+
+7. **Invalidation is computed from identity, not assumed.** A derived record is
+   searchable only while its source hash, engine revision, model revision,
+   settings key, line-segmentation revision, reading-order revision, and Urdu
+   pipeline revision still match. This exposed and fixed a real defect: the
+   managed-provider composition spread its `version`/`modelRevision` getters into
+   frozen nulls, which silently disabled revision-based cache invalidation after
+   an engine update. They are now live accessors.
+
+8. **Host findings are recorded, not worked around.** Two genuine runtime
+   defects were fixed in the driver rather than papered over: Windows pipes now
+   pin UTF-8 (Arabic/Urdu text would otherwise be re-encoded by the legacy code
+   page), and the specialist tokenizer is instantiated explicitly as the
+   documented class because newer transformers majors cannot auto-resolve this
+   repository's `tokenizer_config.json`. One host limitation remains and is
+   reported as such: staged runtime provisioning under a long Windows data root
+   fails when `LongPathsEnabled = 0`, surfaced as `UNSUPPORTED_PLATFORM` with
+   remediation instead of a raw pip tail. The specialist itself was smoke-tested
+   successfully through the shipped driver with a short-path interpreter.
+
+9. **This run is not benchmark evidence.** No accuracy, CER, WER, speed, or VRAM
+   figure is claimed. P17-T004 and P17-T007 stay open, Phase 18 stays
+   `NOT_STARTED`, and no platform certification was started.

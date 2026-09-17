@@ -134,3 +134,71 @@ No engine acceptance decision, no real-model benchmark, no confidence model, no
 correction memory, no alignment algorithm, no Phase 18 work, no cross-platform
 certification, and no UI redesign. Phase 17 remains `IN_PROGRESS` with P17-T004
 as the next incomplete task.
+
+---
+
+# P17-T005 addendum — runtime-completion review (2026-09-17)
+
+Real review pass over this run's delta: the specialist provider, provisioning
+hooks, Urdu orchestration, reading order, line segmentation, derived search,
+reader wiring, settings additions, and the seven new test suites.
+
+## 1. Ladder decisions (what was NOT built)
+
+| Consideration | Decision |
+| --- | --- |
+| A second OCR framework or a generic "AI orchestration" layer | **Skipped — prohibited by scope.** The specialist is a metadata binding plus provisioning hooks on the existing managed-provider factory. |
+| A separate detector for line segmentation | **Skipped.** PP-OCRv5's own detection boxes supply line geometry; segmentation only assigns identities and order. |
+| A second search index for OCR text | **Skipped.** Derived OCR text is searched from the existing per-provider records with a computed invalidation key; no parallel FTS database was added. |
+| A learned layout/reading-order model | **Skipped.** Deterministic geometry plus declared language/region type, with named warnings for ambiguity. |
+| Duplicated pairwise-diff code for runtime disagreement | **Skipped after the review found it.** `scoring.mjs` now has one `pairwiseDisagreementEvidence()` used by both benchmark comparison and runtime orchestration. |
+| A duplicate artifact-verification hook for the specialist | **Skipped after the review found it.** The specialist hook re-implemented the shared default verification; it was deleted and the hardened default is used instead. |
+| Provider-specific Settings screens | **Skipped.** The existing OCR section renders the specialist from the same inventory it already consumed, plus one Urdu status block. |
+| Extra npm or Python dependencies in the application tree | **Skipped.** Zero npm changes. Python packages are installed only into the external per-revision runtime. |
+
+## 2. Dead code and duplication found by this review pass and deleted in the same run
+
+| Removed | Where | Replacement |
+| --- | --- | --- |
+| `emptyEngineRecord()` | `server/ocr/urdu-pipeline.mjs` | Deleted; never called. |
+| Custom `verifyArtifacts()` hook | `server/ocr/specialist-provisioning.mjs` | The shared managed-provider verification (hash + size, abort-aware) already covers it; the upstream-hash comparison happens at download time. |
+| Unused `language` parameter on `foldWithMap()` | `server/ocr/ocr-search.mjs` | Deleted; the Arabic folding rules are character-level and language-independent. |
+| `modelRevisionPinned` result field | `server/ocr/managed-provider.mjs` | Deleted; `modelRevision` plus the activation provenance already carry it. |
+| `SEARCH_PROVENANCE` re-export on the OCR service object | `server/ocr/index.mjs` | Deleted; callers import the constant from its module, and nothing consumed the re-export. |
+| Duplicated pairwise-disagreement loop | `server/ocr/benchmark/scoring.mjs` | One private `pairwiseDisagreementEvidence()` shared by both comparison functions. |
+
+## 3. Deliberate simplifications with a named ceiling
+
+- **Reading order is rules, not inference.** Heading/caption/footnote handling
+  relies on declared `regionType`; a page whose detector emits no region types
+  still gets correct column and line ordering but no caption/footnote
+  special-casing. Ceiling: semantic layout roles. Upgrade path: region typing in
+  Phase 18 alignment work.
+- **Search matching folds text character-wise.** This is what lets an
+  unvocalised query return the original vocalised snippet. Ceiling: exotic
+  compatibility forms and mixed-script ligatures that a fold cannot align.
+  Upgrade path: reuse the benchmark's comparison keys if a real mismatch is
+  ever measured.
+- **Line crops are produced inside the Python driver per request.** No crop
+  cache is kept on disk. Ceiling: repeated recognition of the same page.
+  Upgrade path: cache line crops under the managed temp root keyed by
+  segmentation revision, only if measured latency demands it.
+- **The Urdu pipeline runs lines sequentially.** Ceiling: long pages on slow
+  hardware. Upgrade path: bounded parallelism per engine, keeping deterministic
+  line identity and cancellation semantics.
+
+## 4. Not simplified (trust boundaries kept intact)
+
+Path-segment and containment validation for line crops, source-hash binding,
+per-engine persistence, session-token enforcement, staged verification before
+activation, the no-fallback rule, partial-vs-complete semantics, cancellation
+and no-orphan teardown, and the refusal to select a winner between mandatory
+engines all remain at full strength. The Ponytail pass removed convenience code,
+not safety code.
+
+## 5. Scope-creep check
+
+No benchmark was run, no accuracy claim was made, no engine was selected, no
+Phase 18 reconciliation was implemented, no cross-platform certification was
+started, and no unrelated module was refactored. P17-T004 and P17-T007 remain
+open and Phase 18 remains `NOT_STARTED`.

@@ -16,7 +16,7 @@ Verified against official upstream repository metadata on 2026-09-08. License co
 | PaddleOCR / PP-OCRv5 | **Adopted** external OCR engine (Arabic + Urdu) | `https://github.com/PaddlePaddle/PaddleOCR` | Apache-2.0 for repository code | No source vendored; external managed runtime | Adopted in Phase 17 for PP-OCRv5 Arabic-script recognition through the Read & Watch provider contract. Fork for continuity only: `https://github.com/mhyahya854/PaddleOCR` (unmodified, tracks upstream `main`). Code licence Apache-2.0 is verified; **model weights are distributed separately under their own model-card terms and are not covered by the repository code licence** |
 | Baidu Unlimited-OCR | **Adopted** external OCR engine (English) | `https://github.com/baidu/Unlimited-OCR` | MIT for repository code | No source vendored; external managed runtime | Adopted in Phase 17 for English OCR through the Read & Watch provider contract. Fork for continuity only: `https://github.com/mhyahya854/Unlimited-OCR` (unmodified, tracks upstream `main`). Model weights are hosted at `https://huggingface.co/baidu/Unlimited-OCR` and carry **their own licence terms, separate from the MIT code licence**; upstream documents Transformers inference on NVIDIA GPU/CUDA only |
 | Tesseract | Deferred OCR validator | `https://github.com/tesseract-ocr/tesseract` | Apache-2.0 | No | Phase 17/18 must verify engine and language-data licensing separately |
-| Urdu/Nastaliq specialist | **Declared mandatory** second Urdu OCR engine (not yet integrated) | `https://huggingface.co/qandeelasim13/urdu-ocr-trocr-si26` (model) and `https://github.com/qandeelasim13/URDU-OCR-PROJECT-CODE-SAVIOURS-SI-2026-QANDEEL-ASIM` (project) | Model card: Apache-2.0. Project repository: **no licence file declared** (GitHub API returned `license: null`). Training data includes UTRSet-Real (CC BY-NC-SA 4.0) | No source or weights vendored | Declared mandatory for Urdu by explicit user authority (2026-09-17). Benchmark schema requires it alongside PP-OCRv5; `integrationStatus: NOT_INTEGRATED` in this build. Redistribution/commercial use requires a licence and dataset-terms review first. Read & Watch redistributes nothing |
+| Urdu/Nastaliq specialist | **Adopted** mandatory second Urdu OCR engine (LINE-only) | `https://huggingface.co/qandeelasim13/urdu-ocr-trocr-si26` (model) and `https://github.com/qandeelasim13/URDU-OCR-PROJECT-CODE-SAVIOURS-SI-2026-QANDEEL-ASIM` (project) | Model card: Apache-2.0. Project repository: **no licence file declared** (GitHub API returned `license: null` on re-verification). Training data includes UTRSet-Real (CC BY-NC-SA 4.0) | No source or weights vendored or committed; external managed runtime and model cache only, downloaded from the public revision | Mandatory for Urdu by explicit user authority (2026-09-17) and now `integrationStatus: INTEGRATED`, provider id `urdu-nastaliq-trocr`, LINE-only. Redistribution/commercial use still requires a licence and dataset-terms review first: Read & Watch redistributes nothing and bundles no weights |
 | Tauri | Desktop candidate (EVALUATED - NOT ADOPTED) | `https://github.com/tauri-apps/tauri` | Apache-2.0 OR MIT per upstream license files | No | Evaluated extensively in Phase 14; rejected in favor of Electron due to Node.js ESM server store dependencies |
 | Electron | Adopted desktop shell | `https://github.com/electron/electron` | MIT | Yes, pinned package `electron@35.7.5` | Adopted in Phase 14 for Windows desktop native shell; sandboxed context bridge, loopback HTTP service, zero child processes |
 | electron-builder | Adopted desktop packaging tool | `https://github.com/electron-userland/electron-builder` | MIT | Yes, pinned package `electron-builder@26.15.3` | Adopted in Phase 14 for NSIS and portable Windows desktop packaging; builds to ignored `dist-electron/` |
@@ -70,7 +70,33 @@ documentation summaries.
 | Project repository licence | **none declared** — the GitHub API returned no licence metadata on 2026-09-17 |
 | Project's own evaluation | CER 0.52, character-level accuracy 47.66% on its own leakage-safe held-out split (the project's own claim, not a Read & Watch measurement) |
 | Training-data caveat | includes UTRSet-Real, published under CC BY-NC-SA 4.0 (non-commercial, research use) |
-| Read & Watch status | Declared mandatory second Urdu engine; `integrationStatus: NOT_INTEGRATED` (no execution path in this build). No weights committed, vendored, or redistributed |
+| Read & Watch status | Mandatory second Urdu engine with a real execution path; `integrationStatus: INTEGRATED`, provider id `urdu-nastaliq-trocr`, LINE-only. No weights committed, vendored, or redistributed |
+
+### Specialist re-verification and runtime facts (2026-09-17, second pass)
+
+Re-checked against the live Hugging Face API, the live model card, and the GitHub
+API. Nothing below is inferred from an earlier summary.
+
+| Item | Value |
+| --- | --- |
+| Model id | `qandeelasim13/urdu-ocr-trocr-si26` |
+| Revision (unchanged since P17-T002) | `a9ef072320b50014f6df7ed9db807810157a410e` |
+| Last modified | `2026-08-08T18:35:19Z` (created `2026-08-08T08:11:34Z`) |
+| Model card licence | `apache-2.0` (from the live card front-matter and card data) |
+| Architecture | `VisionEncoderDecoderModel` (`model_type: vision-encoder-decoder`); TrOCR fine-tuned end-to-end from `microsoft/trocr-base-printed` |
+| Processor | `TrOCRProcessor` (`preprocessor_config.json` + byte-level BPE tokenizer files; `tokenizer_config.json` declares `RobertaTokenizer`) |
+| Documented inference | `model.generate(pixel_values, max_length=319, num_beams=4)` then `processor.batch_decode(skip_special_tokens=True)` |
+| Documented intended input | clean, printed, **single-line** Urdu images; explicitly not handwriting, multi-line paragraphs, or heavily degraded input |
+| Public file inventory | `config.json` (4,836) · `generation_config.json` (258) · `merges.txt` (456,318) · `model.safetensors` (1,335,747,032) · `preprocessor_config.json` (364) · `special_tokens_map.json` (957) · `tokenizer_config.json` (1,230) · `vocab.json` (999,355) · `README.md` · `.gitattributes` |
+| Weight hash | `model.safetensors` sha256 `420c828eff17e7e4dbfdc776d51b29aec6bbca5a9fde343573818a9c65099276` (equals the published upstream LFS object id; verified byte-for-byte after download) |
+| Parameters | 333,921,792 F32; repository storage 1,335,747,032 bytes |
+| Runtime requirements | PyTorch + Hugging Face transformers, CPU-capable; the model card's own demo runs CPU-only. No GPU, no CUDA, no cloud service |
+| Project repository licence | **none declared** — GitHub API returned `license: null` on re-verification |
+| Training data caveat | includes UTRSet-Real (ICDAR 2023), itself published under CC BY-NC-SA 4.0; the model card does not restate dataset terms |
+| Upstream-reported accuracy | CER 0.52, character-level accuracy 47.66% (the project's own claim, not a Read & Watch measurement; quoted only as a limitation) |
+| Redistribution | **not performed and not claimed.** No installer, Git tree, or test contains these weights |
+| Real smoke test (SMOKE TEST ONLY) | PASS on this host with Python 3.12.10, torch 2.14.0+cpu, transformers 5.17.0, no CUDA; synthetic white-canvas line fixture, execution only, 16,739 ms. Evidence: `READ_WATCH_DATA_ROOT/ocr/evidence/smoke/urdu-nastaliq-trocr-smoke-2026-09-17.json` |
+| Staged-runtime provisioning on this host | `UNSUPPORTED_PLATFORM`: the staged runtime path exceeds the Windows MAX_PATH limit while `LongPathsEnabled = 0`. Structured, actionable failure; the activation pointer is never touched. Evidence: `…/evidence/smoke/urdu-nastaliq-trocr-staged-runtime-attempt.json` |
 
 Read & Watch makes no claim that this engine supports handwriting, arbitrary full
 pages, or heavily degraded pages, and does not quote its accuracy as a Read &

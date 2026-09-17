@@ -119,6 +119,72 @@ rules, the scoring and disagreement utilities, the run/group records, the
 private corpus store, the font-coverage + offline renderer, and the synthetic
 corpus builder.
 
+---
+
+# P17-T005 addendum — specialist runtime, dual-engine Urdu, reading order, and OCR search (2026-09-17)
+
+Real run, `graphify` 0.9.57, incremental structural re-extraction of `App/app`
+after the runtime-completion work:
+
+```
+graphify update . --no-cluster
+  AST extraction: 233/233 uncached files (100%) [18 workers]
+  Rebuilt (no clustering): 2074 nodes, 5719 edges
+graphify cluster-only . --no-label --no-viz
+  Done — 92 communities
+graphify diagnose multigraph --json
+```
+
+| Metric | After P17-T002 | After P17-T005 |
+| --- | --- | --- |
+| Nodes | 1,916 | **2,074** |
+| Edges (post-build) | 4,506 | **4,926** |
+| Communities | 89 | **92** |
+| Import cycles | 0 | **0 (none detected)** |
+| Unverified nodes | 0 | **0** |
+| Missing-endpoint edges | 0 | **0** |
+| Dangling-endpoint edges | 462 | **0** |
+| Self-loop edges | — | **0** |
+| Exact duplicate edges | — | **0** |
+| Extraction mix | structural | 96% EXTRACTED · 4% INFERRED (207 edges, avg confidence 0.85) · 0% AMBIGUOUS |
+
+## Required architecture map (present as first-class connected nodes)
+
+A targeted traversal —
+`graphify query "Urdu dual-engine OCR orchestration and the Nastaliq specialist provider boundary"`
+— resolved 488 nodes across the specialist, orchestration, layout, search, and
+worker-supervision surface. The nodes this run was required to map are all in the
+graph:
+
+| Required element | Graph nodes (file-level plus symbols) |
+| --- | --- |
+| Specialist provider | `provider-urdu-nastaliq.mjs` (3 nodes), `urdu-nastaliq-trocr` provider record, `createUrduNastaliqProvider`, `URDU_NASTALIQ_ID` |
+| Model/runtime boundary | `specialist-provisioning.mjs` (13 nodes), `engine_driver.py` community, `createRuntimeBridge`, `_trocr_model`, `_trocr_recognize`, `op_recognize_line` |
+| Urdu dual-engine orchestration | `urdu-pipeline.mjs` (12 nodes, its own community hub), `createUrduPipeline`, `DISAGREEMENT_POLICY`, `URDU_EXECUTION_STATE` |
+| Line segmentation | `line-segmentation.mjs` (14 nodes), `segmentPageLines`, `lineCropPath`, `LINE_SEGMENTATION_REVISION` |
+| Reading order | `reading-order.mjs` (19 nodes, its own community), `orderPageUnits`, `ORDER_SOURCE`, `ORDER_WARNING`, `READING_ORDER_REVISION` |
+| Derived OCR search | `ocr-search.mjs` (15 nodes, grouped with the Urdu pipeline community), `createOcrDerivedSearch`, `foldWithMap`, `SEARCH_PROVENANCE`, `invalidationKey` |
+| Provider-specific indexing/provenance | OCR contract community (`OCR_PROVIDERS`, `OCR_REQUIRED_PROVIDERS`, `providerSupportsUnit`) plus per-provider records persisted through `createOcrStore` |
+| Cancellation | supervisor nodes shared with the runtime bridge; `ocr-urdu-cancellation.test.mjs` community (14 nodes) |
+| Update/rollback | `engine-store.mjs` (`createEngineStore`, `writeActivation`), `update-manager.mjs` (`stageUpdate`, `activateUpdate`, `rollback`), `specialist-provisioning.mjs` staging hooks |
+| Source immutability boundary | `pdf-adapter.ts` / `resource-boundary.ts` communities unchanged by this delta; OCR remains outside them |
+
+OCR-related nodes in the graph now total **431** (`/ocr/` sources), up from 250 at
+the Phase 17 foundation.
+
+## Honest limitations of this audit
+
+- Semantic (LLM) extraction is unavailable in this environment (no Gemini key),
+  so the delta is **structural**; the 4% INFERRED edges come from the
+  extractor's own heuristics, not from an LLM pass, and are labelled as such.
+- `graphify-out/` stays outside Git. `GRAPH_REPORT.md`'s "Built from commit"
+  line still names the previous HEAD (`1347f3f9`) because that metadata is
+  captured at build time and was not regenerated with a label pass; the graph
+  itself demonstrably contains every new file from this run (counts above), which
+  is the fact that matters for coverage.
+- The version mismatch carried from the earlier runs remains: package `0.9.57`
+  versus the installed skill text (`0.9.17`).
+
 Architecture-conformance queries answered from the graph:
 
 - The benchmark modules import the provider contract (`OCR_PROVIDERS`,

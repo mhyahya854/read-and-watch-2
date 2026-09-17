@@ -9,6 +9,7 @@ import type {
   OcrUpdateCheck,
   OcrFailure,
   OcrLanguage,
+  OcrDerivedSearchResponse,
 } from './types';
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -67,5 +68,28 @@ export async function recognizeOcrPage(input: {
     method: 'POST',
     body: JSON.stringify(body),
     signal,
+  });
+}
+
+/**
+ * Book-local search over derived OCR text.
+ *
+ * Runs both mandatory Urdu engines' stored outputs through the same endpoint;
+ * every hit is tagged `OCR_DERIVED` and carries its provider provenance. Pages
+ * with usable native text are reported back in `skipped.nativeTextPages` so the
+ * reader can keep native hits and machine hits from duplicating each other.
+ */
+export async function searchOcrDerivedText(input: {
+  sourceHash: string;
+  query: string;
+  language?: OcrLanguage;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<OcrDerivedSearchResponse> {
+  const params = new URLSearchParams({ sourceHash: input.sourceHash, q: input.query });
+  if (input.language) params.set('language', input.language);
+  if (typeof input.limit === 'number') params.set('limit', String(input.limit));
+  return await requestJson<OcrDerivedSearchResponse>(`/api/ocr/search?${params.toString()}`, {
+    signal: input.signal,
   });
 }

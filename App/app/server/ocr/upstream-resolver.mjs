@@ -11,6 +11,7 @@
  */
 
 const DEFAULT_API_ROOT = 'https://api.github.com';
+const DEFAULT_HF_API_ROOT = 'https://huggingface.co';
 
 export class UpstreamResolutionError extends Error {
   constructor(message, details = {}) {
@@ -21,7 +22,11 @@ export class UpstreamResolutionError extends Error {
   }
 }
 
-export function createUpstreamResolver({ fetchImpl = globalThis.fetch, apiRoot = DEFAULT_API_ROOT } = {}) {
+export function createUpstreamResolver({
+  fetchImpl = globalThis.fetch,
+  apiRoot = DEFAULT_API_ROOT,
+  huggingFaceApiRoot = DEFAULT_HF_API_ROOT,
+} = {}) {
   if (typeof fetchImpl !== 'function') {
     throw new UpstreamResolutionError('No fetch implementation available for upstream resolution');
   }
@@ -74,5 +79,100 @@ export function createUpstreamResolver({ fetchImpl = globalThis.fetch, apiRoot =
     };
   }
 
-  return { resolveUpstreamHead };
+  /**
+   * Resolves the current revision and public file list of a Hugging Face model
+   * repository. Used for the Urdu Nastaliq specialist, whose weights are only
+   * published there. Only public model metadata is fetched: no document, page
+   * image, or recognised text is ever sent.
+   */
+  async function resolveHuggingFaceModelRevision({
+    modelId,
+    signal,
+    userAgent = 'read-and-watch-ocr',
+    expectedRevision = null,
+  }) {
+    if (typeof modelId !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(modelId)) {
+      throw new UpstreamResolutionError(`Invalid Hugging Face model identifier: ${String(modelId)}`);
+    }
+    const headers = { accept: 'application/json', 'user-agent': userAgent };
+    let info;
+    try {
+      const response = await fetchImpl(`${huggingFaceApiRoot}/api/models/${modelId}`, { signal, headers });
+      if (!response.ok) {
+        throw new UpstreamResolutionError(
+          `Hugging Face lookup for ${modelId} returned HTTP ${response.status}`,
+          { modelId, status: response.status },
+        );
+      }
+      info = await response.json();
+    } catch (error) {
+      if (error instanceof UpstreamResolutionError) throw error;
+      throw new UpstreamResolutionError(`Hugging Face lookup failed for ${modelId}: ${error.message}`, {
+        modelId,
+      });
+    }
+    if (typeof info?.sha !== 'string' || info.sha.length === 0) {
+      throw new UpstreamResolutionError(`Hugging Face lookup for ${modelId} returned no revision`, {
+        modelId,
+      });
+    }
+    if (expectedRevision && info.sha !== expectedRevision) {
+      // The pinned revision is the authorised one. A moving upstream head is
+      // reported as an update candidate, never silently adopted.
+      return {
+        revision: info.sha,
+        pinnedRevision: expectedRevision,
+        pinnedRevisionIsCurrent: false,
+        provenance: {
+          authority: 'official-upstream',
+          host: 'huggingface.co',
+          repository: modelId,
+          revision: info.sha,
+          lastModified: info.lastModified ?? null,
+          resolvedAt: new Date().toISOString(),
+          license: info.cardData?.license ?? null,
+        },
+      };
+    }
+
+    let files = [];
+    try {
+      const treeResponse = await fetchImpl(
+        `${huggingFaceApiRoot}/api/models/${modelId}/tree/${encodeURIComponent(info.sha)}?recursive=true&expand=true`,
+        { signal, headers },
+      );
+      if (treeResponse.ok) {
+        const tree = await treeResponse.json();
+        files = (Array.isArray(tree) ? tree : [])
+          .filter((entry) => entry?.type === 'file')
+          .map((entry) => ({
+            path: entry.path,
+            size: entry.size ?? null,
+            upstreamSha256: entry.lfs?.oid ?? entry.lfs?.sha256 ?? null,
+          }));
+      }
+    } catch {
+      // A tree failure is not fatal: the download step verifies each file again.
+      files = [];
+    }
+
+    return {
+      revision: info.sha,
+      pinnedRevision: expectedRevision,
+      pinnedRevisionIsCurrent: expectedRevision ? expectedRevision === info.sha : true,
+      files,
+      provenance: {
+        authority: 'official-upstream',
+        host: 'huggingface.co',
+        repository: modelId,
+        revision: info.sha,
+        lastModified: info.lastModified ?? null,
+        resolvedAt: new Date().toISOString(),
+        license: info.cardData?.license ?? null,
+        fileCount: files.length,
+      },
+    };
+  }
+
+  return { resolveUpstreamHead, resolveHuggingFaceModelRevision };
 }

@@ -398,7 +398,9 @@ test('P17-T002 case 37: Nastaliq specialist results carry line-level sample iden
 
   assert.equal(OCR_PROVIDERS['urdu-nastaliq-trocr'].documentedInputGranularity, 'line');
   assert.deepEqual([...OCR_PROVIDERS['urdu-nastaliq-trocr'].supportedUnitTypes], ['LINE']);
-  assert.equal(OCR_PROVIDERS['urdu-nastaliq-trocr'].integrationStatus, 'NOT_INTEGRATED');
+  // The specialist gained a real execution path in the P17-T005 run, so the
+  // integration status is INTEGRATED. Its LINE-only contract is unchanged.
+  assert.equal(OCR_PROVIDERS['urdu-nastaliq-trocr'].integrationStatus, 'INTEGRATED');
 
   const lineGroup = groupRecord({
     manifest,

@@ -21,6 +21,9 @@ import { createOcrStore } from './ocr-store.mjs';
 import { createOcrRouter } from './router.mjs';
 import { createUnlimitedOcrProvider } from './provider-unlimited-ocr.mjs';
 import { createPaddleOcrProvider } from './provider-paddleocr.mjs';
+import { createUrduNastaliqProvider } from './provider-urdu-nastaliq.mjs';
+import { createUrduPipeline } from './urdu-pipeline.mjs';
+import { createOcrDerivedSearch } from './ocr-search.mjs';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_OCR_DRIVER_PATH = join(moduleDir, 'driver', 'engine_driver.py');
@@ -46,9 +49,15 @@ export function createOcrService({ dataRoot, driverPath = DEFAULT_OCR_DRIVER_PAT
   const providers = {
     'unlimited-ocr': createUnlimitedOcrProvider({ ...shared, ...providerOptions['unlimited-ocr'] }),
     paddleocr: createPaddleOcrProvider({ ...shared, ...providerOptions.paddleocr }),
+    'urdu-nastaliq-trocr': createUrduNastaliqProvider({
+      ...shared,
+      ...providerOptions['urdu-nastaliq-trocr'],
+    }),
   };
 
   const router = createOcrRouter({ providers, store });
+  const urduPipeline = createUrduPipeline({ providers, store });
+  const derivedSearch = createOcrDerivedSearch({ store, providers });
 
   function listProviders() {
     return Object.values(providers).map((provider) => {
@@ -58,12 +67,19 @@ export function createOcrService({ dataRoot, driverPath = DEFAULT_OCR_DRIVER_PAT
         id: provider.id,
         displayName: provider.displayName,
         languages: [...provider.languages],
+        role: metadata.role ?? 'Language engine',
+        supportedUnitTypes: metadata.supportedUnitTypes ? [...metadata.supportedUnitTypes] : null,
         officialUpstream: metadata.officialUpstream,
         officialUpstreamUrl: metadata.officialUpstreamUrl,
         userFork: metadata.userFork,
         userForkUrl: metadata.userForkUrl,
-        codeLicense: metadata.codeLicense,
+        codeLicense: metadata.codeLicense ?? metadata.modelLicense ?? 'Not declared upstream',
+        modelLicense: metadata.modelLicense ?? null,
         modelSource: metadata.modelSource,
+        modelRevision: metadata.modelRevision ?? metadata.models?.[provider.languages[0]]?.recognition ?? null,
+        documentedInputGranularity: metadata.documentedInputGranularity ?? null,
+        documentedLimitations: metadata.documentedLimitations ? [...metadata.documentedLimitations] : [],
+        redistributionPolicy: metadata.redistributionPolicy ?? null,
         runtimeRequirements: metadata.runtimeRequirements,
         availability,
         updateStatus: provider.getUpdateStatus(),
@@ -83,6 +99,7 @@ export function createOcrService({ dataRoot, driverPath = DEFAULT_OCR_DRIVER_PAT
         providerDisplayName: provider?.displayName ?? providerId,
         model: model ? { detection: model.detection, recognition: model.recognition } : null,
         available: Boolean(provider?.isAvailable().ok),
+        pipeline: language === 'ur' ? 'urdu-dual-engine' : 'single-engine',
         // Mandatory engines for this language. A language is only fully
         // recognised when EVERY required engine has produced output; the
         // integration status states honestly which of them this build can run.
@@ -90,6 +107,8 @@ export function createOcrService({ dataRoot, driverPath = DEFAULT_OCR_DRIVER_PAT
           providerId: entry.providerId,
           displayName: entry.displayName,
           integrationStatus: entry.integrationStatus,
+          supportedUnitTypes: entry.supportedUnitTypes,
+          available: Boolean(providers[entry.providerId]?.isAvailable().ok),
         })),
       };
     });
@@ -137,11 +156,18 @@ export function createOcrService({ dataRoot, driverPath = DEFAULT_OCR_DRIVER_PAT
     driverAvailable: existsSync(driverPath),
     providers,
     router,
+    urduPipeline,
+    derivedSearch,
     store,
     engineStore,
     listProviders,
     describeRouting,
     getDerivedText,
+    /**
+     * Book-local OCR search. Results are tagged `OCR_DERIVED`, never presented as
+     * native document text, and pages with usable native text are skipped.
+     */
+    searchDerivedText: (options) => derivedSearch.search(options),
     dispose() {
       // Providers expose no persistent runtime of their own; bridges are created
       // per operation and disposed in a `finally` block, so shutdown is a no-op
