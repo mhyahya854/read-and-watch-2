@@ -629,3 +629,38 @@ Verified against the live GitHub API and raw content after the push:
   `NOT_INTEGRATED`, and contains no fallback provider identifier.
 - Repository hygiene and governance validation pass on the pushed content, and
   the working tree is clean and in sync with `origin/master`.
+
+### 21.10 Corrective commit — hygiene marker in the new test source
+
+The first hygiene run before this task's push reported PASS because the new
+files were still untracked and `check_repository_hygiene.py` inspects tracked
+paths only. After the content commit, the gate correctly failed on one new file:
+`app/tests/ocr-benchmark-corpus.test.mjs` embedded the literal machine-path
+markers it was asserting against, so the file itself carried a private marker
+string.
+
+Fixed without weakening the check: the assertion now uses a character-class
+pattern (`[A-Za-z]:[\\/]+[Uu]sers[\\/]+`) that catches a developer path without
+containing a literal marker, the redundant private-hash assertion was removed
+(the repository hygiene gate is the authority for markers), and the gate was
+re-run with the files tracked.
+
+| Commit | Purpose | Head after |
+| --- | --- | --- |
+| `73bc42772f42df7fdd212bd8592d103110da5f74` | P17-T002 content: benchmark foundation, corpus, protocol, governance correction | verified |
+| `bba9668` | record P17-T002 verification, commit chain, and next task | pushed |
+| `e60397729a6281f24f359bd58a04a791ea0f69de` | keep machine-path markers out of the benchmark test source | verified live |
+
+Re-run after the fix, with every new file tracked:
+
+| Gate | Result |
+| --- | --- |
+| `npm test` | 337 passing, 0 failing |
+| `npx tsc --noEmit` | PASS |
+| `npm run lint` | PASS |
+| `python scripts/check_repository_hygiene.py` | PASS (385 tracked paths) |
+| `python scripts/validate_project_state.py` | PASS (21 phases, 231 task/gate IDs) |
+| Local HEAD / `origin/master` | `e60397729a6281f24f359bd58a04a791ea0f69de` (identical) |
+
+No history was rewritten, nothing was force-pushed, and no gate was weakened to
+make the build green.
