@@ -127,3 +127,90 @@ be able to select an existing library folder and rebuild usable runtime state
 from `Read/` and `Watch/` alone. Rebuilding the runtime database and search index
 from the Markdown records is a later slice; this slice provides only the root
 model, initialization, discovery and Raw enumeration.
+
+## Portable title schema (v1)
+
+Every canonical title Markdown file carries a `schema_version` and a stable
+identity in its YAML frontmatter. The schema is defined and validated by
+`app/server/portable-metadata.mjs`; a single parser serves both collections and
+the Read/Watch differences are thin field profiles, not parallel parsers.
+
+Required identity fields:
+
+```yaml
+---
+schema_version: 1
+id: "read-0123456789abcdef"     # read-<hex> or watch-<hex>
+collection: "Read"               # Read | Watch
+title: "Deep Work"
+---
+```
+
+`category` is not stored: it is the approved physical category folder. `year`
+and `type` may be absent.
+
+Shared optional fields: `title`, `original_title`, `year`, `type`, `status`,
+`favorite`, `personal_rating`, `date_added`, `date_started`, `date_completed`,
+`tags`, `recommendations`, `last_metadata_update`.
+
+Read profile: `authors`, `editors`, `publisher`, `edition`, `isbn`, `languages`,
+`subjects`, `page_count`, `progress_percent`, `current_page`, `current_chapter`,
+`series`, `volume`, `files`, `cover`.
+
+Watch profile: `countries`, `languages`, `runtime`, `age_rating`, `director`,
+`creators`, `writers`, `main_cast`, `rewatch_count`, `progress`, `media`,
+`poster`, `external_ids`.
+
+Asset-role keys recorded by the red-team corrections — `notion_entry_image`,
+`source_asset_full_resolution`, `entry_image`, `recommendation_evidence`,
+`shared_evidence`, `social_clip` — are part of the contract so they are never
+mistaken for unknown keys.
+
+### Preservation rules
+
+Unknown YAML keys and unknown body sections survive a round trip verbatim. A
+malformed optional field is isolated: it produces a field diagnostic while the
+rest of the title still loads. A missing personal value stays missing — it is
+never defaulted to `false` or `0`.
+
+### Stable identity
+
+Identity never depends on the title, the year, the folder name, the absolute
+path or scan order. Where a title has no immutable source identity, a generated
+identifier is derived once, written into the Markdown immediately and preserved
+thereafter. `category` changes and title/folder renames must not change it.
+
+Tools:
+
+```text
+node scripts/assign-portable-identity.mjs --root "<library root>"            # dry run
+node scripts/assign-portable-identity.mjs --root "<library root>" --apply    # write
+```
+
+The tool refuses to write when any title has an error-level diagnostic, verifies
+a per-file rollback bundle before mutating anything, writes each file through a
+temporary file plus atomic rename, re-validates the generated file before
+replacing the original, and is idempotent. Private dry-run/manifest/report output
+lives under `<root>/App/migration/portable-metadata/<timestamp>/` and is never
+committed.
+
+### Field diagnostics
+
+Diagnostics carry a code (`REQUIRED_FIELD_MISSING`, `INVALID_FIELD_TYPE`,
+`INVALID_RATING_RANGE`, `INVALID_DATE`, `INVALID_LIST`, `INVALID_ENUM`,
+`DUPLICATE_YAML_KEY`, `INVALID_YAML`, `NO_FRONTMATTER`,
+`UNSUPPORTED_SCHEMA_VERSION`, `INVALID_STABLE_ID`, `BROKEN_RELATIVE_PATH`,
+`ABSOLUTE_ASSET_PATH`, `PATH_ESCAPE`), the relative file path, the YAML key and
+line where known, the expected shape, the actual value, a severity, a
+recoverability hint and a plain-language message.
+
+Asset references must stay inside the library root. `..` is judged from the
+title's own folder, so shared-evidence references such as
+`../../Source Imports/Shared Recommendation Evidence/<file>` are valid.
+
+### Relationship to runtime SQLite
+
+The title Markdown is the durable portable record. SQLite remains the optimized
+runtime store for queries, search, revisions and conflict detection, and it must
+be rebuildable from the filesystem. Rebuilding the database and search index from
+the Markdown records is a later authorized slice, not part of this one.

@@ -706,3 +706,57 @@ governance state and completes no phase task.
    was opened, and Read/Watch file counts, folder counts, byte totals and a sample
    file hash were identical before and after. The only mutation was creating the
    missing empty `Raw/` folder.
+
+## D-057 - Portable title schema, stable identity and the metadata parser
+
+Status: Accepted
+
+Second checkpoint of the same user-authorized maintenance prerequisite. Phase 17
+stays `IN_PROGRESS`; `P17-T004` stays current; no phase task is completed.
+
+1. **One parser, one schema.** `app/server/portable-metadata.mjs` defines portable
+   title schema v1 and is the only title-Markdown parser. Read and Watch are thin
+   field profiles over a shared implementation; a second parser for either
+   collection is not authorized.
+
+2. **Identity fields are required; almost nothing else is.** `schema_version`,
+   `id`, `collection` and `title` are required. `category` is the approved
+   physical category folder and is therefore not stored in the file. `year` and
+   `type` may be absent.
+
+3. **Missing personal state stays missing.** `favorite` absent is not
+   `favorite: false`; an unset rating is not `0`. The parser never invents a
+   default for personal data.
+
+4. **Unknown data survives.** Unknown YAML keys and unknown Markdown sections are
+   preserved verbatim and re-emitted untouched. A malformed optional field is
+   isolated as a field diagnostic and never invalidates the rest of the title.
+
+5. **Stable identity is generated once and then immutable.** Where no immutable
+   source identity exists, the identifier is generated once, written into the
+   Markdown and preserved. It is never derived from the title, year, folder name,
+   absolute path or scan order, and it survives renames, category changes and
+   database rebuilds. The `read-` / `watch-` prefix convention is retained.
+
+6. **Assignment is fail-closed and reversible.** The identity tool refuses to
+   write when any title has an error-level diagnostic, verifies a per-file
+   rollback bundle before the first mutation, writes through a temporary file plus
+   atomic rename, re-validates every generated file before replacing the
+   original, and is idempotent on a second run. Private manifests, dry-run
+   reports and rollback copies live under
+   `<root>/App/migration/portable-metadata/<timestamp>/` and are never committed.
+
+7. **Asset references are contained, not pattern-matched.** Containment is judged
+   by resolving the reference from the title's own folder, so a legitimate shared
+   evidence path (`../../Source Imports/Shared Recommendation Evidence/...`) is
+   valid while a genuine escape, an absolute path or a symlink escape is rejected.
+   This corrected a real defect: a naive `..` scan initially flagged 12 valid
+   shared-evidence titles as errors.
+
+8. **Real-library application record.** Dry run over the real portable root found
+   219 titles (145 Read / 74 Watch), 219 unique identifiers, 0 parse errors and
+   219 files needing identity. After `--apply`: 219 written, 0 collisions, 0
+   duplicate identifiers, 0 body-loss events, 0 unexpected metadata changes, and a
+   second dry run reported 0 files needing changes. A verified 219-file rollback
+   bundle was created first. No SQLite database exists, was created or was
+   modified, and no source binary was touched.
