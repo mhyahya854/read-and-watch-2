@@ -442,3 +442,37 @@ are stricter in the areas that still matter and are documented.
 
 No fake PASS exists anywhere in this report. Everything above that is not
 evidenced is stated as outstanding.
+
+---
+
+## 20. Final state and GitHub verification
+
+| Item | Value |
+| --- | --- |
+| Starting HEAD | `ada8b20205cfe3e51e461b0bc6e249e9b14d7408` |
+| Commit 1 — preserved pending Stage 1 Windows artifacts | `17e37d6` |
+| Commit 2 — Phase 17 OCR provider foundation, engines, updates | `364f061` |
+| Commit 3 — governance sequencing correction and reports | `82d6224` |
+| Final local HEAD | `82d6224de55a442134a7a991221ae94bb4becd97` |
+| `origin/master` after fetch | `82d6224de55a442134a7a991221ae94bb4becd97` (identical) |
+| Live GitHub `commits/master` | `82d6224de55a442134a7a991221ae94bb4becd97` (2026-09-17T12:23:54Z) |
+
+Verified against the live GitHub API after the push:
+
+- All three commits are present on `master` in the pushed order.
+- Expected files exist remotely with non-trivial sizes: `App/app/server/ocr/ocr-contract.mjs`
+  (7,736 bytes), `App/app/server/ocr/driver/engine_driver.py` (18,564 bytes),
+  `App/app/tests/ocr-routing.test.mjs` (4,280 bytes),
+  `App/docs/project/reports/PHASE_17_REPORT.md` (20,507 bytes at commit time).
+- Fork relationship confirmed: `mhyahya854/Unlimited-OCR` → parent
+  `baidu/Unlimited-OCR`; `mhyahya854/PaddleOCR` → parent `PaddlePaddle/PaddleOCR`,
+  both with default branch `main`.
+- Remote governance is internally consistent: `PHASE-16 COMPLETE`,
+  `PHASE-17 IN_PROGRESS` (first incomplete `P17-T002`), `PHASE-18 NOT_STARTED`,
+  `PHASE-20 NOT_STARTED`; `RUN_STATE.json` agrees.
+- No OCR models, runtimes, caches, engines, databases, virtual machines, ISOs, or
+  package artifacts are tracked. The largest tracked blobs remain the pre-existing
+  test fixtures and `package-lock.json`.
+- Repository hygiene passed on the pushed content (369 tracked paths) with no
+  private markers and no absolute developer-machine paths.
+- The working tree is clean and `master` is in sync with `origin/master`.
