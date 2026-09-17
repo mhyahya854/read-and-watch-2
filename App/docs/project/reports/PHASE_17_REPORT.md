@@ -599,3 +599,33 @@ Only `FINAL` ground truth may be scored formally.
 No engine acceptance, no measured accuracy, no speed figure, no CER/WER number,
 no comparison verdict between the two Urdu engines, no reading-order algorithm,
 no Urdu runtime pipeline, and no Phase 18 work.
+
+### 21.9 Commit chain and live GitHub verification
+
+| Item | Value |
+| --- | --- |
+| Starting HEAD (local and `origin/master`) | `0086ae092290dc498a264e400944b1adc6e63ac3` |
+| P17-T002 content commit | `73bc42772f42df7fdd212bd8592d103110da5f74` |
+| Push | `0086ae0..73bc427 master -> master` (normal push, no force, no history rewrite) |
+| Live GitHub `commits/master` | `73bc42772f42df7fdd212bd8592d103110da5f74` (2026-09-17T15:06:23Z) |
+
+Verified against the live GitHub API and raw content after the push:
+
+- Remote tree is complete (not truncated) and contains **no** benchmark images,
+  fonts, model weights, caches, virtual environments, or private transcriptions.
+  The only binary-ish tracked paths are the two pre-existing PDF test fixtures
+  under `App/app/tests/fixtures/pdf/`.
+- New remote files exist with non-trivial sizes: `OCR_BENCHMARK_PROTOCOL.md`
+  (25,343 bytes), `server/ocr/benchmark/` (9 modules, 2.2 KB–24.5 KB),
+  `synthetic-corpus.mjs` (15,662 bytes), both scripts, all three test suites.
+- Remote governance is consistent: `DECISIONS.md` contains D-054 and the
+  mandatory two-engine Urdu rule; `MASTER_PLAN.md` contains the Phase 17
+  dual-engine correction with `P17-T002` checked and `P17-T004` unchecked;
+  `PHASE_INDEX.json`/`RUN_STATE.json` agree on `PHASE-17 IN_PROGRESS` with
+  `P17-T004` as the first incomplete task and `PHASE-18 NOT_STARTED`
+  (`P18-T001`).
+- `server/ocr/ocr-contract.mjs` on the remote declares
+  `ur: ['paddleocr', 'urdu-nastaliq-trocr']`, marks the specialist
+  `NOT_INTEGRATED`, and contains no fallback provider identifier.
+- Repository hygiene and governance validation pass on the pushed content, and
+  the working tree is clean and in sync with `origin/master`.
