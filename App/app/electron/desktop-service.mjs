@@ -47,6 +47,7 @@ import {
   publicRecoveryState,
   runPortableStartupRecovery,
 } from '../server/portable-recovery.mjs';
+import { inspectLibraryStateIntegrity } from '../server/library-state.mjs';
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -341,6 +342,17 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     }
     if (pathname === '/api/library/recovery/retry' && method === 'POST') {
       return sendJson(res, 200, await retryRecovery());
+    }
+    if (pathname === '/api/library/integrity' && method === 'GET') {
+      const integrity = inspectLibraryStateIntegrity({
+        database: libraryStore?.database ?? null,
+        userDataRoot,
+        itemExists: (itemId) => libraryStore?.itemExists(itemId) ?? false,
+      });
+      return sendJson(res, 200, {
+        ...integrity,
+        recovery: publicRecoveryState(recoveryState),
+      });
     }
 
     // -------------------------------------------------------------

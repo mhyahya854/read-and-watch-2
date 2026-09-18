@@ -201,6 +201,7 @@ export default defineConfig(async () => {
         searchStore,
         portableRoot: dataRoot,
         portableBackupRoot: resolve(dataAppRoot, 'backups'),
+        userDataRoot,
         getRecoveryState,
         retryRecovery,
       }),

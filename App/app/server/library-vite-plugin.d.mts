@@ -5,6 +5,7 @@ export function libraryPlugin(options: {
   searchStore?: unknown;
   portableRoot?: string | null;
   portableBackupRoot?: string | null;
+  userDataRoot?: string | null;
   getRecoveryState?: (() => unknown) | null;
   retryRecovery?: (() => Promise<unknown>) | null;
 }): Plugin;

@@ -465,3 +465,29 @@ views and 0 relationships. The mirror was present, valid and matched 0/0; it was
 not rewritten. Healthy startup returned `HEALTHY` in 9 ms with no portable-root
 scan, SQLite rebuild or FTS rebuild. No canonical Markdown or sampled source
 binary changed. No private saved-view or relationship content is committed.
+
+## Library integrity diagnostic
+
+Added by the final portable-library observability checkpoint. No later slice is
+claimed by this section.
+
+`GET /api/library/integrity` is a read-only local endpoint implemented through
+the same helper in both the Electron desktop service and the Vite development
+middleware. It reports sanitized mirror presence and validity, saved-view and
+relationship counts, semantic file/runtime parity and the existing recovery
+status. It does not expose saved-view names or definitions, relationship records
+or item IDs, absolute paths, hashes, journal contents or stack traces.
+
+The diagnostic never creates a missing mirror, never repairs a malformed mirror,
+never rewrites unchanged state, does not scan `Read/` or `Watch/`, does not hash
+media, does not rebuild SQLite or FTS, and does not mutate the runtime database.
+Settings -> Portability & Backup shows a compact Library Integrity subsection
+with healthy, mismatch, missing-mirror and recovery-required states. Its Retry
+reconciliation action calls the existing `POST /api/library/recovery/retry`
+route. There is no polling, watcher, telemetry, background monitor, diagnostics
+database or second recovery path.
+
+Measured real-library result: mirror present and valid, 0 saved views and 0
+relationships in both the durable file and runtime database, parity matching,
+recovery `HEALTHY`, diagnostic duration in the low-millisecond range, and no
+state mutation.

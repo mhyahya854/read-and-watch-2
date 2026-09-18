@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-09-18 - Library integrity diagnostics
+
+- Added a read-only `GET /api/library/integrity` endpoint, exposed through both the Electron desktop service and the Vite development middleware, using one shared helper in `app/server/library-state.mjs`.
+- The diagnostic reports sanitized mirror presence/validity, saved-view and relationship counts, semantic file/runtime parity and the existing recovery status. It never exposes saved-view names or definitions, relationship records or item IDs, absolute paths, hashes, journal contents or stack traces.
+- Parity is semantic, not count-only: saved-view and relationship classes are compared through the normalized state machinery, so equal counts with different content are reported as `MISMATCH`.
+- Missing mirror reports `MIRROR_MISSING` and does not create the file. Malformed mirror reports `RECOVERY_REQUIRED` without rewriting it. Database unavailability surfaces the existing recovery state instead of duplicating corrupt-runtime logic.
+- Added a compact Library Integrity subsection to Settings -> Portability & Backup with healthy, mismatch, missing-mirror and recovery-required states, a non-blocking loading state, a factual request-failure state and a Retry reconciliation button that calls the existing `POST /api/library/recovery/retry` route. There is no polling, watcher, background monitor, telemetry or new recovery path.
+- Updated the existing restore summaries minimally so backup/restore UI now reports saved views and relationships alongside annotations, bookmarks, notes and canvases.
+- Tests: `npm test` reports 545 total / 544 passing / 0 failing / 1 skipped. The new `library-integrity` suite covers exact-match healthy state, semantic mismatches with equal counts, file/runtime count divergence in both directions, missing mirror, malformed mirror, database unavailability, empty 0/0, complex definitions, external relationship targets, repeated read-only diagnostics, API privacy exclusions, no database or mirror mutation, and retry through the existing recovery route.
+- UI verification used a synthetic temporary root and headless Chrome at desktop width. Healthy, mismatch and recovery-required Settings states rendered correctly in Portability & Backup; the real library was not modified.
+- Real-library validation was read-only: mirror present, valid, 0 saved views and 0 relationships in both file and runtime, parity matching, recovery `HEALTHY`, diagnostic duration in the low-millisecond range, no portable Read/Watch scan, no SQLite rebuild, no FTS rebuild and no state mutation.
+- Gates: TypeScript, lint, production build, repository hygiene, governance validation and a real Graphify incremental update all pass. Graphify structure: 2,373 nodes, 5,758 post-build edges, 96 communities, 0 unverified nodes, 0 missing/dangling endpoints, 0 self-loop edges and 0 duplicate edges. Semantic extraction remains unavailable because no LLM backend is configured. Ponytail review found one read-only helper, one endpoint and one small Settings subsection, with no diagnostics framework, telemetry, polling, watcher, event bus, dependency or second recovery route.
+
 ## 2026-09-18 - File-first saved views and relationships
 
 - Added `App/user-data/library-state.json` as the durable file-first record for library-level saved views and relationships. SQLite `saved_views` and `relationships` are now runtime projections, not independent masters. The file uses schema version 1, deterministic serialization, stable IDs, saved-view definitions/revisions/timestamps and full relationship records including external targets, direction, position and provenance.

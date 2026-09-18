@@ -12,7 +12,7 @@
  *   - Automatic derived search index rebuild after restore
  */
 
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Download,
   Upload,
@@ -36,6 +36,11 @@ import {
   preflightRestore,
   applyRestore,
 } from '@/lib/portability/client';
+import {
+  loadLibraryIntegrity,
+  retryRecovery,
+  type LibraryIntegrityState,
+} from '@/lib/library-data';
 import type {
   RestorePreflightReport,
   RestoreExecutionResult,
@@ -57,6 +62,55 @@ export function PortabilitySettings() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [restoreResult, setRestoreResult] = useState<RestoreExecutionResult | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+
+  const [integrity, setIntegrity] = useState<LibraryIntegrityState | null>(null);
+  const [integrityError, setIntegrityError] = useState<string | null>(null);
+  const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(true);
+
+  async function checkIntegrity(signal?: AbortSignal) {
+    setIsCheckingIntegrity(true);
+    setIntegrityError(null);
+    try {
+      setIntegrity(await loadLibraryIntegrity(signal));
+    } catch (err: unknown) {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        setIntegrityError(
+          err instanceof Error ? err.message : 'Library integrity could not be checked.',
+        );
+      }
+    } finally {
+      setIsCheckingIntegrity(false);
+    }
+  }
+
+  async function handleRetryReconciliation() {
+    setIsCheckingIntegrity(true);
+    setIntegrityError(null);
+    try {
+      await retryRecovery();
+      await checkIntegrity();
+    } catch (err: unknown) {
+      setIntegrityError(
+        err instanceof Error ? err.message : 'Library integrity could not be checked.',
+      );
+      setIsCheckingIntegrity(false);
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadLibraryIntegrity(controller.signal)
+      .then(setIntegrity)
+      .catch((err: unknown) => {
+        if (!(err instanceof DOMException && err.name === 'AbortError')) {
+          setIntegrityError(
+            err instanceof Error ? err.message : 'Library integrity could not be checked.',
+          );
+        }
+      })
+      .finally(() => setIsCheckingIntegrity(false));
+    return () => controller.abort();
+  }, []);
 
   // 1. Create Full Backup
   const handleDownloadBackup = async () => {
@@ -121,7 +175,9 @@ export function PortabilitySettings() {
     try {
       const res = await applyRestore(parsedBackupData, conflictResolution);
       setRestoreResult(res);
-      toast.success(`Successfully restored ${res.restoredCounts.annotations} annotations, ${res.restoredCounts.bookmarks} bookmarks, ${res.restoredCounts.notes} notes, ${res.restoredCounts.canvases} canvases.`);
+      toast.success(
+        `Successfully restored ${res.restoredCounts.annotations} annotations, ${res.restoredCounts.bookmarks} bookmarks, ${res.restoredCounts.notes} notes, ${res.restoredCounts.canvases} canvases, ${res.restoredCounts.savedViews} saved views, ${res.restoredCounts.relationships} relationships.`,
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to apply restore.';
       setRestoreError(msg);
@@ -169,7 +225,7 @@ export function PortabilitySettings() {
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Creates a self-contained, versioned <code className="font-mono text-[11px] bg-surface-muted px-1 py-0.5 rounded">.rwbackup</code> archive
-              containing all annotations, highlights, bookmarks, notes, thoughts, canvases, and library metadata.
+              containing all annotations, highlights, bookmarks, notes, thoughts, canvases, saved views, relationships, and library metadata.
             </p>
             <div className="rounded border border-border/70 bg-surface-muted/40 p-2 text-[11px] text-muted-foreground">
               <strong>Zero Source Bloat:</strong> Original publication files (EPUB/PDF) are never bundled or touched, ensuring your storage remains lean and source books stay pristine.
@@ -210,7 +266,7 @@ export function PortabilitySettings() {
               <h3 className="font-medium text-foreground text-sm">Restore from Backup</h3>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Restores annotations, canvases, and notes into your local library. Includes preflight inspection, conflict review, and automatic search index rebuild.
+              Restores annotations, canvases, notes, saved views, and relationships into your local library. Includes preflight inspection, conflict review, and automatic search index rebuild.
             </p>
             <div className="rounded border border-border/70 bg-surface-muted/40 p-2 text-[11px] text-muted-foreground">
               <strong>Fail-Safe:</strong> Restores validate schema integrity before applying changes. You can choose whether to skip or update conflicting records.
@@ -247,6 +303,103 @@ export function PortabilitySettings() {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Library Integrity */}
+      <div className="rounded-lg border border-border bg-surface p-4 space-y-3 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {integrity?.status === 'HEALTHY' ? (
+              <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <ShieldCheck size={16} className="text-primary" />
+            )}
+            <h3 className="font-medium text-foreground text-sm">Library Integrity</h3>
+          </div>
+          {isCheckingIntegrity && (
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+              <RefreshCw size={12} className="animate-spin" />
+              Checking...
+            </span>
+          )}
+        </div>
+
+        {integrityError ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              <AlertTriangle size={14} className="text-amber-600" />
+              Library integrity could not be checked.
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="text-xs"
+              onClick={() => void checkIntegrity()}
+              disabled={isCheckingIntegrity}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : integrity ? (
+          <>
+            <dl className="grid gap-2 text-xs sm:grid-cols-2">
+              <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-1.5">
+                <dt className="text-muted-foreground">Portable state mirror</dt>
+                <dd className="font-medium text-foreground">
+                  {integrity.mirror.present ? 'Present' : 'Missing'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-1.5">
+                <dt className="text-muted-foreground">Saved views</dt>
+                <dd className="font-medium text-foreground">
+                  {integrity.mirror.savedViewCount} in file / {integrity.runtime.savedViewCount} in runtime
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-1.5">
+                <dt className="text-muted-foreground">Relationships</dt>
+                <dd className="font-medium text-foreground">
+                  {integrity.mirror.relationshipCount} in file / {integrity.runtime.relationshipCount} in runtime
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-1.5">
+                <dt className="text-muted-foreground">Runtime parity</dt>
+                <dd className="font-medium text-foreground">
+                  {integrity.parity.matches ? 'Matching' : 'Needs reconciliation'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3 sm:col-span-2">
+                <dt className="text-muted-foreground">Recovery state</dt>
+                <dd className="font-medium text-foreground">
+                  {integrity.recovery?.status === 'HEALTHY' ? 'Healthy' : 'Recovery needed'}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs">
+              <p className="text-muted-foreground">
+                {integrity.status === 'HEALTHY'
+                  ? 'Library state is synchronized. Saved views and relationships match their durable file-first record.'
+                  : integrity.status === 'MISMATCH'
+                    ? 'Library state needs reconciliation. The durable library state and runtime database do not currently match.'
+                    : 'Library recovery needed. Use the existing recovery path to reconcile the durable state and runtime database.'}
+              </p>
+              {integrity.status !== 'HEALTHY' && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => void handleRetryReconciliation()}
+                  disabled={isCheckingIntegrity}
+                >
+                  <RefreshCw size={13} className="mr-1.5" />
+                  Retry reconciliation
+                </Button>
+              )}
+            </div>
+          </>
+        ) : null}
       </div>
 
       {/* Preflight Modal / Expansion Panel */}
@@ -323,6 +476,10 @@ export function PortabilitySettings() {
               </span>
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            Saved views: <strong className="text-foreground">{preflightReport.counts.incomingSavedViews}</strong>
+            {' '} / Relationships: <strong className="text-foreground">{preflightReport.counts.incomingRelationships}</strong>
+          </p>
 
           {/* Conflicts Summary */}
           {preflightReport.conflicts.length > 0 ? (
@@ -423,6 +580,8 @@ export function PortabilitySettings() {
             <div>Bookmarks Restored: <strong className="text-foreground">{restoreResult.restoredCounts.bookmarks}</strong></div>
             <div>Notes Restored: <strong className="text-foreground">{restoreResult.restoredCounts.notes}</strong></div>
             <div>Canvases Restored: <strong className="text-foreground">{restoreResult.restoredCounts.canvases}</strong></div>
+            <div>Saved Views Restored: <strong className="text-foreground">{restoreResult.restoredCounts.savedViews}</strong></div>
+            <div>Relationships Restored: <strong className="text-foreground">{restoreResult.restoredCounts.relationships}</strong></div>
           </div>
 
           {restoreResult.searchRebuilt && (

@@ -442,6 +442,191 @@ export function libraryStatesEqual(left, right) {
   return canonicalJson(normalizeLibraryState(left)) === canonicalJson(normalizeLibraryState(right));
 }
 
+export function libraryStateClassesEqual(left, right) {
+  const normalizedLeft = normalizeLibraryState(left);
+  const normalizedRight = normalizeLibraryState(right);
+  return {
+    savedViewsMatch:
+      canonicalJson(normalizedLeft.savedViews) === canonicalJson(normalizedRight.savedViews),
+    relationshipsMatch:
+      canonicalJson(normalizedLeft.relationships) ===
+      canonicalJson(normalizedRight.relationships),
+  };
+}
+
+/**
+ * Read-only integrity diagnostic. Never mutates the mirror, the database, the
+ * filesystem, search state or the portable library.
+ */
+export function inspectLibraryStateIntegrity({
+  database,
+  userDataRoot,
+  itemExists = null,
+} = {}) {
+  const startedAt = Date.now();
+  const file = readLibraryState(userDataRoot);
+  const mirrorCounts = {
+    savedViewCount: file.state?.savedViews?.length ?? 0,
+    relationshipCount: file.state?.relationships?.length ?? 0,
+  };
+  const baseMetrics = {
+    durationMs: 0,
+    dbMutated: false,
+    portableRootScanned: false,
+    searchRebuilt: false,
+  };
+  const baseRuntime = {
+    available: Boolean(database),
+    savedViewCount: 0,
+    relationshipCount: 0,
+  };
+  const finish = (value) => {
+    value.metrics = { ...baseMetrics, ...value.metrics, durationMs: Date.now() - startedAt };
+    return value;
+  };
+
+  if (!file.present) {
+    return finish({
+      status: 'MIRROR_MISSING',
+      code: 'MIRROR_MISSING',
+      mirror: {
+        present: false,
+        valid: false,
+        schemaVersion: null,
+        ...mirrorCounts,
+      },
+      runtime: baseRuntime,
+      parity: {
+        matches: false,
+        savedViewsMatch: false,
+        relationshipsMatch: false,
+      },
+      diagnostics: [],
+      metrics: baseMetrics,
+    });
+  }
+
+  if (!file.ok) {
+    return finish({
+      status: 'RECOVERY_REQUIRED',
+      code: LIBRARY_STATE_CODES.MALFORMED,
+      mirror: {
+        present: true,
+        valid: false,
+        schemaVersion: null,
+        ...mirrorCounts,
+      },
+      runtime: baseRuntime,
+      parity: {
+        matches: false,
+        savedViewsMatch: false,
+        relationshipsMatch: false,
+      },
+      diagnostics: file.diagnostics.map((entry) => ({
+        code: entry.code,
+        field: entry.field,
+      })),
+      metrics: baseMetrics,
+    });
+  }
+
+  const validation = validateLibraryState(file.state, { itemExists });
+  if (!validation.ok) {
+    return finish({
+      status: 'RECOVERY_REQUIRED',
+      code: LIBRARY_STATE_CODES.MALFORMED,
+      mirror: {
+        present: true,
+        valid: false,
+        schemaVersion: file.state.schemaVersion,
+        ...mirrorCounts,
+      },
+      runtime: baseRuntime,
+      parity: {
+        matches: false,
+        savedViewsMatch: false,
+        relationshipsMatch: false,
+      },
+      diagnostics: validation.diagnostics.map((entry) => ({
+        code: entry.code,
+        field: entry.field,
+      })),
+      metrics: baseMetrics,
+    });
+  }
+
+  if (!database) {
+    return finish({
+      status: 'RECOVERY_REQUIRED',
+      code: 'RUNTIME_DB_UNUSABLE',
+      mirror: {
+        present: true,
+        valid: true,
+        schemaVersion: file.state.schemaVersion,
+        ...mirrorCounts,
+      },
+      runtime: baseRuntime,
+      parity: {
+        matches: false,
+        savedViewsMatch: false,
+        relationshipsMatch: false,
+      },
+      diagnostics: [{ code: 'RUNTIME_DB_UNUSABLE' }],
+      metrics: baseMetrics,
+    });
+  }
+
+  let runtimeState;
+  try {
+    runtimeState = readLibraryStateFromDatabase(database);
+  } catch (error) {
+    return finish({
+      status: 'RECOVERY_REQUIRED',
+      code: 'RUNTIME_DB_UNUSABLE',
+      mirror: {
+        present: true,
+        valid: true,
+        schemaVersion: file.state.schemaVersion,
+        ...mirrorCounts,
+      },
+      runtime: baseRuntime,
+      parity: {
+        matches: false,
+        savedViewsMatch: false,
+        relationshipsMatch: false,
+      },
+      diagnostics: [{ code: String(error?.code ?? 'RUNTIME_DB_UNUSABLE') }],
+      metrics: baseMetrics,
+    });
+  }
+
+  const equality = libraryStateClassesEqual(file.state, runtimeState);
+  const matches = equality.savedViewsMatch && equality.relationshipsMatch;
+  return finish({
+    status: matches ? 'HEALTHY' : 'MISMATCH',
+    code: matches ? 'HEALTHY' : 'LIBRARY_STATE_MISMATCH',
+    mirror: {
+      present: true,
+      valid: true,
+      schemaVersion: file.state.schemaVersion,
+      savedViewCount: file.state.savedViews.length,
+      relationshipCount: file.state.relationships.length,
+    },
+    runtime: {
+      available: true,
+      savedViewCount: runtimeState.savedViews.length,
+      relationshipCount: runtimeState.relationships.length,
+    },
+    parity: {
+      matches,
+      savedViewsMatch: equality.savedViewsMatch,
+      relationshipsMatch: equality.relationshipsMatch,
+    },
+    diagnostics: [],
+    metrics: baseMetrics,
+  });
+}
+
 export function reconcileLibraryState({ database, userDataRoot, itemExists = null }) {
   const file = readLibraryState(userDataRoot);
   if (file.present && !file.ok) {

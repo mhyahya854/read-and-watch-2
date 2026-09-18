@@ -1,5 +1,6 @@
 import { createLibraryStore } from './library-store.mjs';
 import { rebuildPortableLibrary } from './portable-rebuild.mjs';
+import { inspectLibraryStateIntegrity } from './library-state.mjs';
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -29,6 +30,7 @@ export function libraryPlugin({
   searchStore = null,
   portableRoot = null,
   portableBackupRoot = null,
+  userDataRoot = null,
   getRecoveryState = null,
   retryRecovery = null,
 }) {
@@ -84,6 +86,17 @@ export function libraryPlugin({
               return sendJson(response, 400, { error: 'Recovery retry is unavailable.' });
             }
             return sendJson(response, 200, await retryRecovery());
+          }
+          if (parts.length === 1 && parts[0] === 'integrity' && request.method === 'GET') {
+            const integrity = inspectLibraryStateIntegrity({
+              database: store.database,
+              userDataRoot,
+              itemExists: (itemId) => store.itemExists(itemId),
+            });
+            return sendJson(response, 200, {
+              ...integrity,
+              recovery: getRecoveryState?.() ?? null,
+            });
           }
           if (parts.length === 1 && parts[0] === 'catalog' && request.method === 'GET') {
             return sendJson(response, 200, store.getUiCatalog());

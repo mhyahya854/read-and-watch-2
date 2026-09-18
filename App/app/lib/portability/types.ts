@@ -248,7 +248,16 @@ export type ConflictKind =
   | 'UNSUPPORTED_VERSION';
 
 export interface RestoreConflict {
-  readonly entityType: 'item' | 'annotation' | 'bookmark' | 'note' | 'canvas' | 'knowledge-graph' | 'mermaid-diagram';
+  readonly entityType:
+    | 'item'
+    | 'annotation'
+    | 'bookmark'
+    | 'note'
+    | 'canvas'
+    | 'knowledge-graph'
+    | 'mermaid-diagram'
+    | 'saved-view'
+    | 'relationship';
   readonly entityId: string;
   readonly kind: ConflictKind;
   readonly message: string;
@@ -267,6 +276,8 @@ export interface RestorePreflightReport {
     readonly incomingBookmarks: number;
     readonly incomingNotes: number;
     readonly incomingCanvases: number;
+    readonly incomingSavedViews?: number;
+    readonly incomingRelationships?: number;
   };
   readonly conflicts: ReadonlyArray<RestoreConflict>;
   readonly warnings: ReadonlyArray<string>;
@@ -280,6 +291,8 @@ export interface RestoreExecutionResult {
     readonly bookmarks: number;
     readonly notes: number;
     readonly canvases: number;
+    readonly savedViews?: number;
+    readonly relationships?: number;
   };
   readonly skippedCounts: {
     readonly items: number;
@@ -287,7 +300,10 @@ export interface RestoreExecutionResult {
     readonly bookmarks: number;
     readonly notes: number;
     readonly canvases: number;
+    readonly savedViews?: number;
+    readonly relationships?: number;
   };
+  readonly warnings?: ReadonlyArray<unknown>;
   readonly searchRebuilt: boolean;
   readonly error?: string;
 }

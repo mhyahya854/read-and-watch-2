@@ -20,6 +20,36 @@ export type PortableRecoveryState = {
   metrics: Record<string, unknown>;
 };
 
+export type LibraryIntegrityState = {
+  status: 'HEALTHY' | 'MISMATCH' | 'MIRROR_MISSING' | 'RECOVERY_REQUIRED';
+  code: string;
+  mirror: {
+    present: boolean;
+    valid: boolean;
+    schemaVersion: number | null;
+    savedViewCount: number;
+    relationshipCount: number;
+  };
+  runtime: {
+    available: boolean;
+    savedViewCount: number;
+    relationshipCount: number;
+  };
+  parity: {
+    matches: boolean;
+    savedViewsMatch: boolean;
+    relationshipsMatch: boolean;
+  };
+  recovery: PortableRecoveryState | null;
+  diagnostics: Array<{ code: string; field?: string | null }>;
+  metrics: {
+    durationMs: number;
+    dbMutated: boolean;
+    portableRootScanned: boolean;
+    searchRebuilt: boolean;
+  };
+};
+
 async function jsonResponse<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) throw new Error(payload.error || 'Library request failed');
@@ -77,5 +107,11 @@ export async function loadRecoveryState(signal?: AbortSignal) {
 export async function retryRecovery() {
   return jsonResponse<PortableRecoveryState>(
     await fetch('/api/library/recovery/retry', { method: 'POST' }),
+  );
+}
+
+export async function loadLibraryIntegrity(signal?: AbortSignal) {
+  return jsonResponse<LibraryIntegrityState>(
+    await fetch('/api/library/integrity', { cache: 'no-store', signal }),
   );
 }
