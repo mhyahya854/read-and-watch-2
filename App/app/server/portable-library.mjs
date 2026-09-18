@@ -126,13 +126,6 @@ function hasNonTitleSegment(relativePath) {
  * Returns `null` when the path is contained, otherwise a diagnostic.
  */
 export function assertContained(root, candidate, context = {}) {
-  if (hasNonTitleSegment(relative(root, candidate))) {
-    return toDiagnostic(LIBRARY_ERROR_CODES.PATH_ESCAPE, {
-      ...context,
-      problem: 'computed path leaves the library root',
-      action: 'Re-select the library folder; the library was not modified.',
-    });
-  }
   if (!isInside(root, candidate)) {
     return toDiagnostic(LIBRARY_ERROR_CODES.PATH_ESCAPE, {
       ...context,

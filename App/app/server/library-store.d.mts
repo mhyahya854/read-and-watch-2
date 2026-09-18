@@ -1,6 +1,9 @@
 export function createLibraryStore(options: {
   databasePath: string;
   readOnly?: boolean;
+  searchStore?: unknown;
+  portableRoot?: string | null;
+  portableBackupRoot?: string | null;
 }): {
   getCatalog(): unknown;
   getUiCatalog(): unknown;

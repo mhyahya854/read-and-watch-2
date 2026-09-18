@@ -9,7 +9,7 @@ export type SaveResult =
   | { ok: true; content: string; revision: string | null; exists: boolean }
   | { ok: false; conflict: true; content: string | null; revision: string | null };
 
-const ITEM_ID_RE = /^(read|watch)-[0-9a-f]{32}$/;
+const ITEM_ID_RE = /^(read|watch)-[0-9a-f]{8,64}$/;
 
 function assertItemId(itemId: string) {
   if (!ITEM_ID_RE.test(itemId)) {

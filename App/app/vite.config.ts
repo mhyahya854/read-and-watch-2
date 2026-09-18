@@ -1,4 +1,4 @@
-import { createReadStream, readFileSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -27,6 +27,7 @@ const { d1, r2 } = hostingConfig;
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
 const appRoot = fileURLToPath(new URL('.', import.meta.url));
 const {
+  dataRoot,
   dataAppRoot,
   libraryRoot,
   libraryDatabasePath,
@@ -53,12 +54,18 @@ function safeLibraryFile(requestPath: string) {
   const decoded = decodeURIComponent(requestPath.split('?')[0] ?? '')
     .replace(/^\/+/, '')
     .replace(/^library-assets\//, '');
-  const candidate = resolve(libraryRoot, decoded);
-  const fromRoot = relative(libraryRoot, candidate);
-  if (!fromRoot || fromRoot.startsWith('..') || isAbsolute(fromRoot)) {
-    throw new Error('Unsafe library asset path');
+  let fallback: string | null = null;
+  for (const root of [libraryRoot, dataRoot]) {
+    const candidate = resolve(root, decoded);
+    const fromRoot = relative(root, candidate);
+    if (!fromRoot || fromRoot.startsWith('..') || isAbsolute(fromRoot)) {
+      continue;
+    }
+    fallback ??= candidate;
+    if (statSync(candidate, { throwIfNoEntry: false })?.isFile()) return candidate;
   }
-  return candidate;
+  if (fallback) return fallback;
+  throw new Error('Unsafe library asset path');
 }
 
 function libraryAssets(): Plugin {
@@ -98,10 +105,20 @@ function libraryAssets(): Plugin {
       );
       for (const path of paths) {
         if (!contentTypes[extname(path).toLowerCase()]) continue;
+        const legacy = resolve(libraryRoot, path);
+        const legacyFromRoot = relative(libraryRoot, legacy);
+        if (
+          !legacyFromRoot ||
+          legacyFromRoot.startsWith('..') ||
+          isAbsolute(legacyFromRoot) ||
+          !existsSync(legacy)
+        ) {
+          continue;
+        }
         this.emitFile({
           type: 'asset',
           fileName: `library-assets/${path}`,
-          source: readFileSync(safeLibraryFile(path)),
+          source: readFileSync(legacy),
         });
       }
     },
@@ -162,10 +179,16 @@ export default defineConfig(async () => {
         },
       },
       libraryAssets(),
-      libraryPlugin({ libraryDatabasePath, searchStore }),
+      libraryPlugin({
+        libraryDatabasePath,
+        searchStore,
+        portableRoot: dataRoot,
+        portableBackupRoot: resolve(dataAppRoot, 'backups'),
+      }),
       userDataPlugin({ userDataRoot, libraryDatabasePath, searchStore }),
       readerPlugin({
         libraryRoot,
+        portableRoot: dataRoot,
         libraryDatabasePath,
         userDataRoot,
         searchStore,

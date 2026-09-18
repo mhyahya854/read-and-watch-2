@@ -135,7 +135,6 @@ test('invalid item IDs rejected', (t) => {
     'movie-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     'READ-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     'read-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-    'watch-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     null,
     undefined,
     42,
@@ -145,6 +144,10 @@ test('invalid item IDs rejected', (t) => {
       /Invalid item ID/,
     );
   }
+  assert.throws(
+    () => store.save('thoughts', `watch-${'a'.repeat(31)}`, 'x', null),
+    /Unknown item ID/,
+  );
   assert.throws(
     () => store.save('diary', READ_ID, 'x', null),
     /Invalid user-data type/,

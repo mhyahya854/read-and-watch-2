@@ -45,6 +45,7 @@ async function readJson(request) {
 
 export function readerPlugin({
   libraryRoot,
+  portableRoot = null,
   libraryDatabasePath,
   readerExecutable = null,
   userDataRoot,
@@ -52,6 +53,7 @@ export function readerPlugin({
 } = {}) {
   const store = createReaderStore({
     libraryRoot,
+    portableRoot,
     libraryDatabasePath,
     readerExecutable,
     userDataRoot,
@@ -606,4 +608,3 @@ export function readerPlugin({
     },
   };
 }
-

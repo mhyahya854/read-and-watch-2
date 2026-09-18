@@ -209,3 +209,60 @@ enrichment and database/search rebuild remain future slices.
 machine-specific path appears in source or tests; committed tests are synthetic
 fixtures only; Raw performs zero external requests, which is asserted by a
 committed test that inspects the module for any network access.
+
+## Portable runtime rebuild, write-back and derived search
+
+Added by the portable-library rebuild/write-back slice. No later slice is
+claimed by this section.
+
+**Data ownership.** For the selected portable library, the canonical durable
+record is the title Markdown plus its file-first assets under `Read/` and
+`Watch/`. SQLite (`App/state/read-watch.sqlite3`) is the optimized
+runtime/query/conflict store and is rebuildable from those records. The FTS5
+search tables stay derived and rebuildable. Notes, thoughts, bookmarks,
+annotations, canvases and knowledge objects keep their existing file-first or
+runtime stores and are not bulk-deleted by a title rebuild. The earlier table in
+this document describing SQLite as the canonical library store remains accurate
+for the legacy managed-library `App/library` model; the portable model uses
+Markdown as the durable record.
+
+**Rebuild path.** `app/server/portable-rebuild.mjs` reuses the single portable
+discovery and parser. It validates stable identity, derives the physical
+category/path, derives asset descriptors from Markdown paths (Read) and bounded
+direct children of the title folder plus `Media/` (Watch), and applies all valid
+titles in one transaction. Duplicate stable ids fail closed; a malformed
+required identity is isolated and the run is reported `partial`; items absent
+from the portable set are retained; a second unchanged rebuild changes nothing.
+Migration `002_relax_item_identity.sql` widens the runtime identity check to the
+actual portable `read-`/`watch-` plus 8-64 hex format without rewriting ids. A
+pre-rebuild runtime database copy is created under `App/backups/` before the
+first real rebuild.
+
+**Write-back path.** `app/server/portable-writeback.mjs` validates app-managed
+personal fields, detects external Markdown edits by the stored content hash,
+refuses same-field conflicts with a structured 409, merges non-conflicting
+external edits, stages a temporary file, creates bounded per-title recovery
+evidence, opens the SQLite transaction, atomically replaces Markdown, and then
+commits. A failed replace rolls the database back and never reports success; a
+failed commit restores the previous Markdown or retains an explicit divergence
+journal under `App/state/`. Unknown YAML keys, unknown body sections, Unicode,
+Arabic, Urdu, apostrophes and ampersands survive; absent personal values stay
+absent.
+
+**Search.** After a successful rebuild the existing FTS5 store is rebuilt from
+the runtime library projection. Search stays derived and never becomes a second
+canonical store. OCR-derived page text remains separate and provenance-tagged;
+this slice does not change OCR search semantics.
+
+**Measured real-library result.** 145 Read + 74 Watch = 219 titles, 219 unique
+stable ids, 0 duplicate ids, 0 duplicate canonical paths, 0 rebuild errors,
+282 derived assets (152 readable), search index reporting 219 library items.
+The second rebuild changed 0 items. Read/Watch file counts, byte totals and
+Markdown hashes were identical before and after, and 13 sampled source binaries
+were byte-identical by SHA-256. No real Markdown was rewritten. A pre-rebuild
+database backup was verified by SHA-256 before the mutation.
+
+**Limitations.** Watch media indexing is bounded to direct children of the title
+folder and `Media/`; deep trees are not traversed. No external metadata refresh,
+artwork download, Raw organization, OCR benchmark, Phase 18 work or platform
+certification is claimed by this section.

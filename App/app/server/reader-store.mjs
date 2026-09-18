@@ -19,7 +19,7 @@ import {
 } from 'node:path';
 import { createLibraryStore } from './library-store.mjs';
 
-const ITEM_ID_PATTERN = /^(read|watch)-[0-9a-f]{32}$/;
+const ITEM_ID_PATTERN = /^(read|watch)-[0-9a-f]{8,64}$/;
 const SUPPORTED_SUFFIXES = new Map([
   ['.epub', 'EPUB'],
   ['.pdf', 'PDF'],
@@ -123,6 +123,7 @@ function fileReady(path) {
 
 export function createReaderStore({
   libraryRoot,
+  portableRoot = null,
   libraryDatabasePath,
   readerExecutable: _readerExecutable,
   userDataRoot,
@@ -132,38 +133,44 @@ export function createReaderStore({
   const userRoot = userDataRoot
     ? resolve(userDataRoot)
     : resolve(libraryRoot, '../user-data');
-  let catalog = { items: [] };
-  try {
-    const libraryStore = createLibraryStore({
-      databasePath: libraryDatabasePath,
-      readOnly: true,
-    });
-    catalog = libraryStore.getCatalog();
-    libraryStore.close();
-  } catch {
-    // Database uninitialized or empty in test/clean environment
+
+  function loadItems() {
+    try {
+      const libraryStore = createLibraryStore({
+        databasePath: libraryDatabasePath,
+        readOnly: true,
+      });
+      const catalog = libraryStore.getUiCatalog();
+      libraryStore.close();
+      return new Map(catalog.items.map((item) => [item.id, item]));
+    } catch {
+      // Database uninitialized or empty in test/clean environment.
+      return new Map();
+    }
   }
-  const itemsById = new Map(catalog.items.map((item) => [item.id, item]));
-  const canonicalLibraryRoot = existsSync(libraryRoot) ? realpathSync(libraryRoot) : libraryRoot;
 
   function resolveItem(itemId) {
     assertItemId(itemId);
-    const item = itemsById.get(itemId);
+    const item = loadItems().get(itemId);
     if (!item) fail('Unknown item ID', 404);
     if (item.collection !== 'read' || !itemId.startsWith('read-')) {
       fail('Read items only', 403);
     }
     assertSafeRelativePath(item.itemPath, 'item');
-    const itemDirectory = resolve(libraryRoot, dirname(item.itemPath));
-    if (!isInside(libraryRoot, itemDirectory)) fail('Unsafe catalog item path');
+    const sourceRoot = item.portable && portableRoot ? portableRoot : libraryRoot;
+    const itemDirectory = resolve(sourceRoot, dirname(item.itemPath));
+    if (!isInside(sourceRoot, itemDirectory)) fail('Unsafe catalog item path');
+    const canonicalSourceRoot = existsSync(sourceRoot)
+      ? realpathSync(sourceRoot)
+      : sourceRoot;
 
     const candidates = [];
     const missing = [];
     const unsupported = [];
     for (const media of item.media ?? []) {
       assertSafeRelativePath(media.path, 'media');
-      const source = resolve(libraryRoot, media.path);
-      if (!isInside(libraryRoot, source) || !isInside(itemDirectory, source)) {
+      const source = resolve(sourceRoot, media.path);
+      if (!isInside(sourceRoot, source) || !isInside(itemDirectory, source)) {
         fail('Unsafe catalog media path');
       }
       const { format, supported } = detectFormat(media.path);
@@ -174,7 +181,7 @@ export function createReaderStore({
       }
       const canonicalSource = realpathSync(source);
       if (
-        !isInside(canonicalLibraryRoot, canonicalSource) ||
+        !isInside(canonicalSourceRoot, canonicalSource) ||
         !isInside(realpathSync(itemDirectory), canonicalSource)
       ) {
         fail('Unsafe catalog media path');
@@ -389,5 +396,3 @@ export function createReaderStore({
     saveSettings,
   };
 }
-
-

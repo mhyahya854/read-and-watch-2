@@ -124,9 +124,64 @@ classification and no network access of any kind.
 
 Because the filesystem is the portable source of truth, a fresh installation must
 be able to select an existing library folder and rebuild usable runtime state
-from `Read/` and `Watch/` alone. Rebuilding the runtime database and search index
-from the Markdown records is a later slice; this slice provides only the root
-model, initialization, discovery and Raw enumeration.
+from `Read/` and `Watch/` alone. The rebuild path is implemented by
+`app/server/portable-rebuild.mjs` and the maintenance command:
+
+```text
+node scripts/rebuild-portable-library.mjs --root "<library root>"            # dry run
+node scripts/rebuild-portable-library.mjs --root "<library root>" --apply --rebuild-search
+```
+
+The rebuild reuses the existing discovery and parser, validates stable identity,
+derives the physical category and path, and applies all valid titles in one
+SQLite transaction. A duplicate stable id fails closed. A single malformed
+required identity is isolated as a diagnostic and the run is reported `partial`.
+Items that are not present in the portable set are never bulk-deleted, and
+notes/annotations/canvases/knowledge objects keep their existing stores.
+Idempotence is enforced by a per-title content hash, so an unchanged second
+rebuild changes nothing.
+
+The runtime schema is migration v2. Migration `002_relax_item_identity.sql`
+keeps the portable `read-`/`watch-` identity but accepts 8-64 lowercase hex
+characters, because existing portable ids are generated as 16 hex characters and
+identity must not be rewritten to satisfy a database length check.
+
+Search remains derived. `search_index_records` and FTS5 are rebuilt through the
+existing search store after a successful library rebuild; deleting them loses no
+canonical title data.
+
+### Field ownership and app write-back
+
+The durable portable Markdown owns the title record and the user/app personal
+state. SQLite owns optimized runtime/query/conflict state and is rebuildable.
+Search is derived. Notes, thoughts, bookmarks, annotations, canvases and
+knowledge objects keep their existing canonical stores.
+
+App-managed personal fields are written back through
+`app/server/portable-writeback.mjs`:
+
+```text
+status, favorite, personal_rating, rewatch_count,
+date_added, date_started, date_completed, tags,
+progress_percent, current_page, current_chapter, progress
+```
+
+Title, type, authors/creators, series/volume and the Overview/My Description
+prose section are also written back for portable titles. A missing value stays
+missing; it never becomes `false`, `0` or a fabricated date. Unknown YAML keys
+and unknown body sections survive.
+
+Write-back is filesystem-first and compensating:
+
+1. validate and detect an external Markdown edit by the stored SHA-256
+2. refuse a same-field external conflict with a structured 409
+3. merge non-conflicting external edits into the new Markdown
+4. stage a temporary file and create bounded recovery evidence
+5. open the SQLite transaction, atomically replace Markdown, then commit
+6. roll back on replace failure; restore Markdown on commit failure, or retain a
+   divergence journal under `App/state/` if compensation also fails
+
+A failed filesystem write never reports success.
 
 ## Portable title schema (v1)
 

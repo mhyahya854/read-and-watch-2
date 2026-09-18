@@ -1,4 +1,5 @@
 import { createLibraryStore } from './library-store.mjs';
+import { rebuildPortableLibrary } from './portable-rebuild.mjs';
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -23,8 +24,32 @@ async function readJson(request) {
   return body ? JSON.parse(body) : {};
 }
 
-export function libraryPlugin({ libraryDatabasePath, searchStore = null }) {
-  const store = createLibraryStore({ databasePath: libraryDatabasePath, searchStore });
+export function libraryPlugin({
+  libraryDatabasePath,
+  searchStore = null,
+  portableRoot = null,
+  portableBackupRoot = null,
+}) {
+  const store = createLibraryStore({
+    databasePath: libraryDatabasePath,
+    searchStore,
+    portableRoot,
+    portableBackupRoot,
+  });
+
+  function sanitizedRebuild(result) {
+    return {
+      ok: Boolean(result.ok),
+      status: result.status,
+      counts: result.counts,
+      changed: result.changed ?? 0,
+      skippedCount: result.skipped?.length ?? 0,
+      diagnostics: (result.diagnostics ?? []).map(({ code, severity }) => ({
+        code,
+        severity,
+      })),
+    };
+  }
 
   return {
     name: 'local-library-data',
@@ -61,6 +86,28 @@ export function libraryPlugin({ libraryDatabasePath, searchStore = null }) {
             );
             return sendJson(response, 200, { ok: true, item });
           }
+          if (
+            parts.length === 1 &&
+            parts[0] === 'rebuild' &&
+            request.method === 'POST'
+          ) {
+            if (!portableRoot) {
+              return sendJson(response, 400, {
+                error: 'No portable library root is configured.',
+              });
+            }
+            const result = await rebuildPortableLibrary({
+              root: portableRoot,
+              database: store.database,
+              searchStore,
+              apply: true,
+            });
+            return sendJson(
+              response,
+              result.ok ? 200 : 409,
+              sanitizedRebuild(result),
+            );
+          }
           return sendJson(response, 404, { error: 'Library route not found' });
         } catch (error) {
           if (error instanceof SyntaxError) {
@@ -68,6 +115,7 @@ export function libraryPlugin({ libraryDatabasePath, searchStore = null }) {
           }
           return sendJson(response, error?.status ?? 500, {
             error: error?.message ?? 'Library error',
+            ...(error?.conflict ? { conflict: error.conflict } : {}),
           });
         }
       });

@@ -16,7 +16,8 @@
     "lint": "oxlint app components lib server vite.config.ts && oxlint electron",
     "format": "oxfmt",
     "hygiene": "python ../scripts/check_repository_hygiene.py",
-    "test": "node --test \"tests/*.test.mjs\""
+    "test": "node --test \"tests/*.test.mjs\"",
+    "rebuild:portable": "node scripts/rebuild-portable-library.mjs"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",

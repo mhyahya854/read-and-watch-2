@@ -12,7 +12,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { createLibraryStore } from './library-store.mjs';
 
 const TYPES = new Set(['thoughts', 'notes']);
-const ITEM_ID_RE = /^(read|watch)-[0-9a-f]{32}$/;
+const ITEM_ID_RE = /^(read|watch)-[0-9a-f]{8,64}$/;
 const DEFAULT_HISTORY_LIMIT = 5;
 
 function readJsonOrNull(file) {

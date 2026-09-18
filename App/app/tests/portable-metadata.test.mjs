@@ -87,6 +87,44 @@ test('a valid Watch title parses against the Watch status vocabulary', () => {
   assert.ok(READ_STATUSES.includes('reference'));
 });
 
+test('legacy portable statuses remain valid', () => {
+  for (const status of ['unread', 'study']) {
+    const result = parseTitleMarkdown(
+      `---\ntitle: "A"\nstatus: "${status}"\n---\n\nb\n`,
+      { relativePath: 'Read/Books/A/A.md', collection: 'Read' },
+    );
+    assert.equal(result.diagnostics.some((item) => item.code === FIELD_ERROR_CODES.INVALID_ENUM), false);
+  }
+  const watch = parseTitleMarkdown(
+    '---\ntitle: "A"\nstatus: "to_watch"\n---\n\nb\n',
+    { relativePath: 'Watch/Movies/A/A.md', collection: 'Watch' },
+  );
+  assert.equal(watch.diagnostics.some((item) => item.code === FIELD_ERROR_CODES.INVALID_ENUM), false);
+});
+
+test('file metadata siblings are not mistaken for asset paths', () => {
+  const result = parseTitleMarkdown(
+    `---
+title: "A"
+files:
+  - name: "book.pdf"
+    path: "Files/book.pdf"
+    format: "PDF"
+    size: 128
+    sha256: "${'0'.repeat(64)}"
+---
+
+b
+`,
+    {
+      relativePath: 'Read/Books/A/A.md',
+      collection: 'Read',
+      loadAsset: (reference) => reference === 'Files/book.pdf',
+    },
+  );
+  assert.equal(result.diagnostics.some((item) => item.code === FIELD_ERROR_CODES.BROKEN_RELATIVE_PATH), false);
+});
+
 test('missing optional fields are allowed', () => {
   const result = parseTitleMarkdown('---\ntitle: "Only A Title"\n---\n\nbody\n', {
     relativePath: 'Read/Books/Only/Only.md',

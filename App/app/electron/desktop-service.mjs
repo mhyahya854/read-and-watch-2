@@ -40,6 +40,7 @@ import { createPortabilityStore } from '../server/portability-store.mjs';
 import { createSettingsStore } from '../server/settings-store.mjs';
 import { createOcrService } from '../server/ocr/index.mjs';
 import { handleOcrRequest } from '../server/ocr/ocr-http.mjs';
+import { rebuildPortableLibrary } from '../server/portable-rebuild.mjs';
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -104,7 +105,13 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
   }
 
   const paths = resolveDataPaths({ appRoot, environment: env });
-  const { libraryDatabasePath, libraryRoot, userDataRoot } = paths;
+  const {
+    dataRoot,
+    backupRoot,
+    libraryDatabasePath,
+    libraryRoot,
+    userDataRoot,
+  } = paths;
 
   if (libraryDatabasePath && libraryDatabasePath !== ':memory:') {
     try {
@@ -126,6 +133,8 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
   const libraryStore = createLibraryStore({
     databasePath: libraryDatabasePath,
     searchStore,
+    portableRoot: dataRoot,
+    portableBackupRoot: backupRoot,
   });
 
   const userDataStore = createUserDataStore({
@@ -136,6 +145,7 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
 
   const readerStore = createReaderStore({
     libraryRoot,
+    portableRoot: dataRoot,
     libraryDatabasePath,
     userDataRoot,
     searchStore,
@@ -211,21 +221,26 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/.test(bareName)) {
       throw new Error('Windows reserved device name forbidden');
     }
-    const candidate = resolve(libraryRoot, decoded);
-    const fromRoot = relative(libraryRoot, candidate);
-    if (!fromRoot || fromRoot.startsWith('..') || isAbsolute(fromRoot)) {
-      throw new Error('Unsafe library asset path');
-    }
-    if (existsSync(candidate)) {
-      const canonicalLibRoot = existsSync(libraryRoot) ? realpathSync(libraryRoot) : libraryRoot;
+    const roots = [libraryRoot, dataRoot].filter(Boolean);
+    let fallback = null;
+    for (const root of roots) {
+      const candidate = resolve(root, decoded);
+      const fromRoot = relative(root, candidate);
+      if (!fromRoot || fromRoot.startsWith('..') || isAbsolute(fromRoot)) {
+        continue;
+      }
+      if (!fallback) fallback = candidate;
+      if (!existsSync(candidate)) continue;
+      const canonicalRoot = existsSync(root) ? realpathSync(root) : root;
       const real = realpathSync(candidate);
-      const realFromRoot = relative(canonicalLibRoot, real);
+      const realFromRoot = relative(canonicalRoot, real);
       if (!realFromRoot || realFromRoot.startsWith('..') || isAbsolute(realFromRoot)) {
         throw new Error('Unsafe library asset reparse point');
       }
       return real;
     }
-    return candidate;
+    if (fallback) return fallback;
+    throw new Error('Unsafe library asset path');
   }
 
   function handleLibraryAssets(req, res, pathname) {
@@ -335,6 +350,21 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         const body = await readJsonBody(req);
         const item = libraryStore.updateItem(decodeURIComponent(parts[1]), body.patch, body.expectedRevision);
         return sendJson(res, 200, { ok: true, item });
+      }
+      if (parts.length === 1 && parts[0] === 'rebuild' && method === 'POST') {
+        const result = await rebuildPortableLibrary({
+          root: dataRoot,
+          database: libraryStore.database,
+          searchStore,
+          apply: true,
+        });
+        return sendJson(res, result.ok ? 200 : 409, {
+          ok: Boolean(result.ok),
+          status: result.status,
+          counts: result.counts,
+          changed: result.changed ?? 0,
+          skippedCount: result.skipped?.length ?? 0,
+        });
       }
       return sendJson(res, 404, { error: 'Library route not found' });
     }
@@ -707,7 +737,10 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     } catch (err) {
       console.error('[desktop-service] Unhandled error:', err);
       if (!res.headersSent) {
-        sendJson(res, 500, { error: 'Internal Server Error' });
+        sendJson(res, err?.status ?? 500, {
+          error: err?.message ?? 'Internal Server Error',
+          ...(err?.conflict ? { conflict: err.conflict } : {}),
+        });
       }
     }
   });

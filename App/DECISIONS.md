@@ -760,3 +760,93 @@ stays `IN_PROGRESS`; `P17-T004` stays current; no phase task is completed.
    second dry run reported 0 files needing changes. A verified 219-file rollback
    bundle was created first. No SQLite database exists, was created or was
    modified, and no source binary was touched.
+
+## D-058 - Portable runtime rebuild and safe Markdown write-back
+
+Status: Accepted
+
+Third checkpoint of the same user-authorized portable-library maintenance
+prerequisite. Phase 17 remains `IN_PROGRESS`, `P17-T004` remains the current
+incomplete task, `P17-T007` remains open, Phase 18 remains `NOT_STARTED`, and no
+platform certification was started. This decision completes no phase task and is
+not OCR benchmark evidence.
+
+1. **One discovery path and one parser.** Rebuild consumes
+   `portable-library.mjs` discovery and `portable-metadata.mjs` parsing. It adds
+   no second title scanner, no Read/Watch parser fork, and no parallel metadata
+   model.
+
+2. **Portable identity is never rewritten for SQLite.** The checkpoint-2
+   generator emits `read-`/`watch-` plus 16 lowercase hex characters, while the
+   Phase 02 schema required exactly 32. Migration `002_relax_item_identity.sql`
+   widens the accepted range to 8-64 hex characters and preserves every existing
+   row and child relation. The packaged runtime carries a byte-identical embedded
+   snapshot of migrations 001 and 002; `runtime-schema.test.mjs` fails if the
+   snapshot and the canonical migration files diverge.
+
+3. **Rebuild is transactional, additive and idempotent.** Given a selected root,
+   the rebuild discovers canonical titles, parses Markdown, validates stable
+   identity, derives the physical category/path, derives asset rows, and applies
+   all valid titles in one `BEGIN IMMEDIATE` transaction. A duplicate stable id
+   fails the whole rebuild closed. A malformed required identity is isolated as a
+   diagnostic and leaves the rest of the library usable; the run is reported
+   `partial`, never silently current. Items absent from the portable set are
+   retained. A content hash makes a second unchanged rebuild a no-op.
+
+4. **Ownership stays unambiguous.**
+   - Portable Markdown/filesystem: durable reconstructable title record.
+   - SQLite: optimized runtime/query/conflict state, rebuildable from Markdown.
+   - Search: derived and rebuildable through the existing FTS5 store.
+   - Notes, thoughts, bookmarks, annotations, canvases and knowledge objects keep
+     their existing canonical stores; a rebuild never bulk-deletes them. An asset
+     still referenced by user annotations is retained rather than cascaded.
+
+5. **Category is physical, assets are portable-relative.** Category comes from
+   the approved category folder and is stored in the runtime `portable`
+   namespace, not duplicated into Markdown. Read assets come from Markdown
+   `files` path entries. Watch assets additionally use a bounded direct-child
+   enumeration of the title folder and its `Media/` folder; this is not a second
+   library scanner and it performs no content hashing.
+
+6. **App write-back is filesystem-first and compensates on failure.** The app
+   validates personal fields, detects an external Markdown edit by the stored
+   content hash, refuses same-field conflicts with a structured 409, and merges
+   non-conflicting external edits. It stages a temporary Markdown file, creates a
+   bounded per-title backup, starts the SQLite transaction, atomically replaces
+   the Markdown, then commits. A failed replace rolls the database back and never
+   reports success. A failed commit restores the previous Markdown, or leaves an
+   explicit divergence journal under `App/state/` if compensation also fails.
+   Unknown YAML keys, unknown body sections and absent personal values survive.
+
+7. **Structured state has one authoritative representation.** Personal values
+   live in frontmatter (`status`, `favorite`, `personal_rating`, dates, tags,
+   progress) and the UI renders them from there. The body keeps prose; the
+   Read `## Overview` and Watch `## My Description` sections are the app-managed
+   prose targets. Unknown/custom sections are never normalized away.
+
+8. **Real-library record.**
+   - Rebuild: 145 Read + 74 Watch = 219 items; 219 unique ids; 0 duplicate ids;
+     0 duplicate paths; 0 parse errors; 282 derived assets (152 readable);
+     0 notes/annotations deleted because none existed and none are bulk-deleted.
+   - Search: `search_index_records` reports 219 library items and status `ready`.
+   - Idempotence: the second real rebuild reported 0 changed items.
+   - Canonical preservation: Read file count/byte total and Markdown hash and
+     Watch file count/byte total and Markdown hash were identical before and
+     after. Thirteen sampled Read PDF/Watch media binaries were byte-identical by
+     SHA-256.
+   - Recovery: the pre-rebuild runtime database was copied to
+     `App/backups/read-watch.sqlite3.<timestamp>.pre-portable-rebuild.bak` and
+     verified by SHA-256 before the rebuild. No real Markdown was rewritten; the
+     real write-back path was exercised with an unchanged patch and correctly
+     reported `unchanged` without touching the file.
+   - Parser audit defect fixed: `files`/`media` sibling metadata (`format`,
+     `size`, `sha256`) was previously mistaken for asset paths, and shared
+     `Source Imports` evidence paths were incorrectly rejected by containment
+     checks. Both defects were corrected and tested.
+
+9. **Limitations.** Watch media indexing is bounded to direct children of the
+   title folder and `Media/`; deep media trees are not traversed. No external
+   metadata refresh, artwork download, Raw organization, OCR benchmark, Phase 18
+   work or platform certification was started. The real app write-back was
+   validated synthetically and with a real unchanged no-op; no real personal
+   field was changed.

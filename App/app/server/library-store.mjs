@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
+import { getPortableMarker, isPortableItem } from './portable-rebuild.mjs';
+import { updatePortableItem } from './portable-writeback.mjs';
+
 const COLLECTIONS = new Set(['read', 'watch']);
 
 function parse(value) {
@@ -15,7 +18,13 @@ function fail(message, status = 400) {
   throw Object.assign(new Error(message), { status });
 }
 
-export function createLibraryStore({ databasePath, readOnly = false, searchStore = null }) {
+export function createLibraryStore({
+  databasePath,
+  readOnly = false,
+  searchStore = null,
+  portableRoot = null,
+  portableBackupRoot = null,
+}) {
   const database = new DatabaseSync(databasePath, {
     readOnly,
     allowExtension: false,
@@ -263,7 +272,7 @@ export function createLibraryStore({ databasePath, readOnly = false, searchStore
           internal[p.property_key] = parse(p.value_json);
         } else if (p.namespace === 'notion') {
           notionProperties[p.property_key] = parse(p.value_json);
-        } else {
+        } else if (p.namespace !== 'portable') {
           customProperties[p.property_key] = parse(p.value_json);
         }
       }
@@ -298,6 +307,9 @@ export function createLibraryStore({ databasePath, readOnly = false, searchStore
           .map(({ display_name }) => display_name),
         series: series ? { name: series.name, position: series.position } : null,
         customProperties,
+        portable: isPortableItem(database, row.id)
+          ? getPortableMarker(database, row.id)
+          : null,
       };
     });
 
@@ -316,6 +328,28 @@ export function createLibraryStore({ databasePath, readOnly = false, searchStore
     }
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
       fail('Invalid metadata changes');
+    }
+    if (!readOnly && portableRoot && isPortableItem(database, itemId)) {
+      updatePortableItem({
+        database,
+        root: portableRoot,
+        backupRoot: portableBackupRoot,
+        itemId,
+        patch,
+        expectedRevision,
+      });
+      const updatedPortable = getUiCatalog().items.find(
+        ({ id: candidateId }) => candidateId === itemId,
+      );
+      if (searchStore && updatedPortable) {
+        try {
+          searchStore.indexItem(updatedPortable);
+        } catch {
+          // The Markdown and database are already committed. Search remains
+          // derived and can be rebuilt without falsifying the save.
+        }
+      }
+      return updatedPortable;
     }
     const allowed = new Set([
       'title',

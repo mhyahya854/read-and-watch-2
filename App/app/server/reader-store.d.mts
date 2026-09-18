@@ -33,9 +33,10 @@ export type ReaderStore = {
 
 export declare function createReaderStore(options: {
   libraryRoot: string;
+  portableRoot?: string | null;
   libraryDatabasePath: string;
   readerExecutable?: string | null;
   userDataRoot?: string;
   launchReader?: (executable: string, source: string) => void | Promise<void>;
+  searchStore?: unknown;
 }): ReaderStore;
-
