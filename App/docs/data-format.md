@@ -183,6 +183,45 @@ Write-back is filesystem-first and compensating:
 
 A failed filesystem write never reports success.
 
+### Startup recovery
+
+`app/server/portable-recovery.mjs` runs before the desktop service starts
+listening and before the Vite development stores are created. Normal healthy
+startup inspects only the runtime database schema and portable item count, then
+returns `HEALTHY` without scanning the portable root, rebuilding SQLite, or
+rebuilding FTS.
+
+Automatic reconstruction runs only when the runtime database file is missing,
+the runtime library schema is missing, the portable projection is empty while
+the selected root has usable titles, or a supported older runtime schema needs
+the forward migration. It reuses `planPortableRebuild` and
+`rebuildPortableLibrary`, and applies only when the plan is unambiguous: no
+duplicate stable ids, no malformed required identities, and no discovery
+conflicts. Search is rebuilt through the existing FTS store.
+
+The write-back journal is reconciled by comparing the current Markdown SHA-256,
+the journal `previousSha256`/`stagedSha256`, and the runtime portable
+`markdown_sha256`. Stale journals are archived under
+`App/backups/recovery-journals/`. Deterministic filesystem-plus-database
+disagreements rebuild runtime state from the current durable Markdown, verify
+the result, and only then archive and clear the active journal. An unexpected
+Markdown hash, an ambiguous divergence, malformed JSON, an unknown journal code,
+a path escape, an invalid stable id, or an unsupported runtime schema enters
+`RECOVERY_REQUIRED` and preserves the journal.
+
+While recovery is unresolved, a bounded
+`App/state/portable-recovery-required.json` marker or an active journal blocks
+portable title metadata write-back with `PORTABLE_RECOVERY_REQUIRED` (HTTP 503).
+Reading and browsing remain available when the runtime database itself can be
+opened. The marker is cleared only after a verified `HEALTHY` or `RECOVERED`
+inspection.
+
+`GET /api/library/recovery` returns the sanitized recovery state and
+`POST /api/library/recovery/retry` reruns the same inspection. The library page
+shows a calm recovery notice only when human recovery is required. Missing
+recommendation-evidence references remain warning-level diagnostics and do not
+turn into recovery failures.
+
 ## Portable title schema (v1)
 
 Every canonical title Markdown file carries a `schema_version` and a stable

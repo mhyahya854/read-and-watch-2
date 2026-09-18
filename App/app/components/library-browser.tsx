@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import { ItemDetail } from '@/components/item-detail';
+import { PortableRecoveryNotice } from '@/components/portable-recovery-notice';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -687,6 +688,9 @@ export function LibraryBrowser({
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto px-4 py-4 md:px-6">
+              <PortableRecoveryNotice
+                onRecovered={() => void refreshLibrary()}
+              />
               {loadError ? (
                 <div
                   role="alert"

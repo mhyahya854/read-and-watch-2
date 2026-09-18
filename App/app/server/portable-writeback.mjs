@@ -34,6 +34,7 @@ import {
   isPortableItem,
   projectPortableTitle,
 } from './portable-rebuild.mjs';
+import { assertPortableMutationsAllowed } from './portable-recovery.mjs';
 
 const HISTORY_LIMIT = 10;
 
@@ -247,6 +248,7 @@ export function updatePortableItem({
   if (item.revision !== expectedRevision) {
     throw portableError('PORTABLE_REVISION_CONFLICT', 'Metadata conflict', { status: 409 });
   }
+  assertPortableMutationsAllowed(root);
   const marker = getPortableMarker(database, itemId);
   if (!marker.markdownRelativePath || !marker.folderRelativePath) {
     throw portableError('PORTABLE_MARKER_MISSING', 'The portable Markdown location is missing from runtime state.', { status: 500 });

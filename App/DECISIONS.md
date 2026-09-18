@@ -850,3 +850,102 @@ not OCR benchmark evidence.
    work or platform certification was started. The real app write-back was
    validated synthetically and with a real unchanged no-op; no real personal
    field was changed.
+
+## D-059 - Portable startup recovery and journal reconciliation
+
+Status: Accepted
+
+Fourth checkpoint of the same user-authorized portable-library maintenance
+prerequisite. Phase 17 remains `IN_PROGRESS`, `P17-T004` remains the current
+incomplete task, `P17-T007` remains open, Phase 18 and Phase 19 remain
+`NOT_STARTED`, and no platform certification was started. This decision
+completes no phase task and is not OCR benchmark evidence.
+
+1. **One small recovery coordinator.** `app/server/portable-recovery.mjs` is a
+   policy layer over the existing scanner, parser, rebuild and write-back
+   contracts. It adds no second scanner, parser, SQLite model, search index,
+   watcher, sync framework or journal format.
+
+2. **Recovery runs before ordinary service requests.** In production desktop,
+   `createDesktopService(...).start(...)` awaits startup recovery before
+   `server.listen(...)` accepts requests. In Vite development, recovery runs
+   during async config initialization before the library stores and middleware
+   are created. `main.mjs` still uses the same `service.start(...)` call and did
+   not gain a second boot system.
+
+3. **Healthy startup is a cheap fast path.** If the runtime database opens,
+   contains at least one portable title, uses a supported schema version and no
+   recovery journal exists, inspection returns `HEALTHY` after two database
+   queries. It performs no portable-root scan, no title hashing, no Markdown
+   rewrite, no rebuild and no FTS rebuild. Measured on the real library:
+   `HEALTHY`, `portableRootScanned: false`, `rebuildApplied: false`,
+   `searchRebuilt: false`, 5 ms.
+
+4. **Automatic recovery conditions.** Runtime state is reconstructed from the
+   durable portable filesystem when the runtime database file is missing, the
+   runtime library schema is missing, the portable projection is empty while the
+   selected root contains usable titles, or a supported older schema version
+   needs the forward migration. Recovery first runs the existing
+   `planPortableRebuild`; it applies only when the selected root is valid, there
+   are no duplicate stable IDs and no malformed/skipped identities. It then
+   applies the existing transactional rebuild and rebuilds the existing derived
+   FTS index.
+
+5. **Journal reconciliation is explicit and hash-driven.** A
+   `PORTABLE_WRITEBACK_PREPARED` journal is validated defensively. Journal paths
+   must stay inside the selected root, the referenced Markdown must exist and
+   keep the same stable identity, hashes must be syntactically valid, and archive
+   paths must stay under `App/backups/markdown-history`. Deterministic outcomes:
+   - Markdown previous and DB previous: stale journal is archived and cleared.
+   - Markdown staged and DB staged: stale journal is archived and cleared without
+     incrementing revision.
+   - Markdown staged and DB previous or missing: runtime is rebuilt from the
+     current durable Markdown, verified, then the journal is archived and cleared.
+   - Markdown previous and DB staged: runtime is rebuilt from the current durable
+     Markdown, verified, then the journal is archived and cleared.
+   - Markdown has a third unexpected hash: `RECOVERY_REQUIRED`; Markdown and the
+     journal are preserved unchanged.
+
+6. **Divergence is conservative.** `PORTABLE_DIVERGENCE` never restores the
+   archive over current Markdown. If the current Markdown is valid, its identity
+   matches and the existing rebuild plan is unambiguous, runtime is rebuilt from
+   the current filesystem state and the journal is archived. Otherwise startup
+   enters `RECOVERY_REQUIRED`.
+
+7. **Malformed or hostile journals fail closed.** Malformed JSON, unknown codes,
+   invalid stable IDs, unexpected collection/path references, missing Markdown,
+   path traversal, symlink escape, invalid hashes and archive paths outside the
+   allowed recovery storage produce `MALFORMED_RECOVERY_JOURNAL` or
+   `DIVERGENCE_REQUIRES_REVIEW`. The journal is never deleted or executed.
+
+8. **Mutation blocking while recovery is unresolved.** An active write-back
+   journal or the bounded `App/state/portable-recovery-required.json` marker
+   blocks portable title metadata write-back with HTTP 503 and
+   `PORTABLE_RECOVERY_REQUIRED`. Reading and browsing remain available when the
+   runtime database itself can be opened. The marker is removed only after a
+   verified `HEALTHY` or `RECOVERED` inspection.
+
+9. **Recovery status is exposed through the existing local API and design
+   language.** `GET /api/library/recovery` returns a sanitized state and
+   `POST /api/library/recovery/retry` reruns the same inspector. The library
+   page shows a calm recovery notice only when human recovery is required. It
+   does not expose stack traces, machine paths or journal contents.
+
+10. **Warning-level portable-library diagnostics are not corruption.** Missing
+    recommendation-evidence references remain warning-level
+    `BROKEN_RELATIVE_PATH` diagnostics and do not make startup recovery fail.
+
+11. **Real-library record.** The real selected root remained 145 Read, 74 Watch,
+    219 total, 219 unique stable IDs, search index 219 items, no journal, no
+    recovery marker, and `HEALTHY` with no rebuild or search rebuild. The
+    runtime database hash, Read/Watch Markdown hashes and thirteen sampled source
+    binaries were unchanged. The same three missing recommendation-evidence
+    references remained warning-level diagnostics.
+
+12. **Limitations.** No automatic recovery is attempted for an unreadable or
+    corrupt runtime database beyond surfacing `RUNTIME_DB_UNUSABLE`; automatic
+    reconstruction does not run while any title has a malformed required
+    identity, because that requires human review. Recovery evidence archives are
+    bounded to the newest 20 journal records. No Raw organization, external
+    metadata refresh, OCR benchmark, Phase 18 work or platform certification was
+    started.

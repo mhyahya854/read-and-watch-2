@@ -266,3 +266,79 @@ database backup was verified by SHA-256 before the mutation.
 folder and `Media/`; deep trees are not traversed. No external metadata refresh,
 artwork download, Raw organization, OCR benchmark, Phase 18 work or platform
 certification is claimed by this section.
+
+## Portable startup recovery and journal reconciliation
+
+Added by the portable startup recovery checkpoint. No later slice is claimed by
+this section.
+
+**When it runs.** `app/server/portable-recovery.mjs` is invoked by the Electron
+desktop service before its loopback HTTP server begins listening, and by the Vite
+development configuration before the library/search stores and middleware are
+created. The durable portable filesystem remains the reconstructable authority;
+SQLite and FTS remain rebuildable runtime/derived state. User-data stores,
+annotations, canvases and knowledge objects keep their existing authority and are
+not bulk-deleted by recovery.
+
+**Healthy fast path.** A healthy startup opens the runtime database, checks that
+the portable item projection is non-empty and the schema version is supported,
+and checks that no recovery journal exists. It then returns `HEALTHY` with
+`portableRootScanned: false`, `rebuildApplied: false` and `searchRebuilt: false`.
+It does not hash titles, rewrite Markdown, rebuild SQLite or rebuild FTS. The
+real-library healthy path measured 5 ms with zero portable-root scan.
+
+**Automatic recovery.** Runtime state is reconstructed from `Read/` and `Watch/`
+only when the database file is missing, the runtime schema is missing, the
+portable projection is empty while usable titles exist, or a supported older
+schema needs the forward migration. The existing `planPortableRebuild` and
+`rebuildPortableLibrary` are reused; duplicate stable ids, malformed required
+identities or discovery conflicts stop the automatic path. Successful recovery
+rebuilds the existing derived FTS index through the existing search store.
+
+**Journal reconciliation.** `PORTABLE_WRITEBACK_PREPARED` is validated and
+compared by hash:
+
+- Markdown previous and database previous: stale journal archived and cleared.
+- Markdown staged and database staged: stale journal archived and cleared with no
+  revision inflation.
+- Markdown staged and database previous or missing: runtime rebuilt from current
+  Markdown, verified, then journal archived and cleared.
+- Markdown previous and database staged: runtime rebuilt from the current
+  filesystem state, verified, then journal archived and cleared.
+- Any third Markdown hash: `RECOVERY_REQUIRED`, Markdown and journal preserved.
+
+`PORTABLE_DIVERGENCE` is more conservative. The current Markdown is never
+overwritten by the archive. If current Markdown is valid, its stable identity
+matches and an unambiguous rebuild plan exists, runtime is rebuilt from the
+current filesystem state and the journal is archived. Otherwise recovery
+remains required.
+
+Malformed JSON, unknown journal codes, invalid stable ids, path traversal,
+symlink escape, missing Markdown, invalid hashes and archive paths outside the
+allowed recovery storage all preserve the active journal and enter
+`RECOVERY_REQUIRED`. Archived journals live under
+`App/backups/recovery-journals/` with a bounded retention of 20.
+
+**Mutation safety.** An active journal or a bounded
+`App/state/portable-recovery-required.json` marker blocks portable title
+metadata write-back with HTTP 503 and `PORTABLE_RECOVERY_REQUIRED`. Reading and
+browsing remain available when the runtime database can be opened. The marker is
+removed only after a verified `HEALTHY` or `RECOVERED` inspection.
+
+**Local API surface.** `GET /api/library/recovery` returns the sanitized state
+and `POST /api/library/recovery/retry` reruns the same inspection. The library
+page shows a calm recovery notice only when human recovery is required. It does
+not expose stack traces, machine paths or journal contents.
+
+**Measured real-library result.** The selected root remained 145 Read, 74 Watch,
+219 total, 219 unique stable ids, 219 searchable library records, no active
+journal and no recovery marker. Startup returned `HEALTHY` without rebuilding.
+Runtime database hash, Read/Watch Markdown hashes and thirteen sampled source
+binaries were unchanged. The same three missing recommendation-evidence
+references remained warning-level diagnostics and did not trigger recovery.
+
+**Limitations.** An unreadable or corrupt runtime database surfaces
+`RUNTIME_DB_UNUSABLE` rather than attempting an automatic destructive repair.
+Automatic reconstruction does not run while any title has a malformed required
+identity. No Raw organization, external metadata refresh, OCR benchmark, Phase
+18 work or platform certification is claimed by this section.

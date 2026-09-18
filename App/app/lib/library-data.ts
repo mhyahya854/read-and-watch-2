@@ -7,6 +7,17 @@ export type LibraryView = {
   definition: Record<string, unknown>;
 };
 
+export type PortableRecoveryState = {
+  status: 'HEALTHY' | 'RECOVERED' | 'RECOVERY_REQUIRED';
+  code: string;
+  reasons: string[];
+  message: string;
+  actions: string[];
+  counts: { read: number; watch: number; total: number } | null;
+  mutationBlocked: boolean;
+  metrics: Record<string, unknown>;
+};
+
 async function jsonResponse<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) throw new Error(payload.error || 'Library request failed');
@@ -52,5 +63,17 @@ export async function saveLibraryView(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, definition }),
     }),
+  );
+}
+
+export async function loadRecoveryState(signal?: AbortSignal) {
+  return jsonResponse<PortableRecoveryState>(
+    await fetch('/api/library/recovery', { cache: 'no-store', signal }),
+  );
+}
+
+export async function retryRecovery() {
+  return jsonResponse<PortableRecoveryState>(
+    await fetch('/api/library/recovery/retry', { method: 'POST' }),
   );
 }

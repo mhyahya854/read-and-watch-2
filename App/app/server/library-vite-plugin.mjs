@@ -29,6 +29,8 @@ export function libraryPlugin({
   searchStore = null,
   portableRoot = null,
   portableBackupRoot = null,
+  getRecoveryState = null,
+  retryRecovery = null,
 }) {
   const store = createLibraryStore({
     databasePath: libraryDatabasePath,
@@ -60,6 +62,29 @@ export function libraryPlugin({
           let parts = url.pathname.split('/').filter(Boolean);
           if (parts[0] === 'api' && parts[1] === 'library') parts = parts.slice(2);
 
+          if (parts.length === 1 && parts[0] === 'recovery' && request.method === 'GET') {
+            return sendJson(response, 200, getRecoveryState?.() ?? {
+              status: 'HEALTHY',
+              code: 'HEALTHY',
+              reasons: [],
+              message: 'Startup recovery completed.',
+              actions: [],
+              counts: null,
+              mutationBlocked: false,
+              metrics: {},
+            });
+          }
+          if (
+            parts.length === 2 &&
+            parts[0] === 'recovery' &&
+            parts[1] === 'retry' &&
+            request.method === 'POST'
+          ) {
+            if (!retryRecovery) {
+              return sendJson(response, 400, { error: 'Recovery retry is unavailable.' });
+            }
+            return sendJson(response, 200, await retryRecovery());
+          }
           if (parts.length === 1 && parts[0] === 'catalog' && request.method === 'GET') {
             return sendJson(response, 200, store.getUiCatalog());
           }

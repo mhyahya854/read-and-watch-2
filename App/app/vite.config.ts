@@ -15,6 +15,10 @@ import { readerPlugin } from './server/reader-vite-plugin.mjs';
 import { userDataPlugin } from './server/user-data-vite-plugin.mjs';
 import { searchPlugin } from './server/search-vite-plugin.mjs';
 import { createSearchStore } from './server/search-store.mjs';
+import {
+  publicRecoveryState,
+  runPortableStartupRecovery,
+} from './server/portable-recovery.mjs';
 import { portabilityPlugin } from './server/portability-vite-plugin.mjs';
 import { knowledgePlugin } from './server/knowledge-vite-plugin.mjs';
 import { settingsPlugin } from './server/settings-vite-plugin.mjs';
@@ -33,11 +37,6 @@ const {
   libraryDatabasePath,
   userDataRoot,
 } = resolveDataPaths({ appRoot });
-
-const searchStore = createSearchStore({
-  databasePath: libraryDatabasePath,
-  userDataRoot,
-});
 
 const contentTypes: Record<string, string> = {
   '.avif': 'image/avif',
@@ -153,6 +152,24 @@ export default defineConfig(async () => {
   process.env.MINIFLARE_REGISTRY_PATH ??= '.wrangler/registry';
 
   const { cloudflare } = await import('@cloudflare/vite-plugin');
+  let recoveryState = await runPortableStartupRecovery({
+    root: dataRoot,
+    databasePath: libraryDatabasePath,
+    userDataRoot,
+  });
+  const searchStore = createSearchStore({
+    databasePath: libraryDatabasePath,
+    userDataRoot,
+  });
+  const getRecoveryState = () => publicRecoveryState(recoveryState);
+  const retryRecovery = async () => {
+    recoveryState = await runPortableStartupRecovery({
+      root: dataRoot,
+      databasePath: libraryDatabasePath,
+      userDataRoot,
+    });
+    return publicRecoveryState(recoveryState);
+  };
 
   return {
     css: { postcss: { plugins: [tailwindcss()] } },
@@ -184,6 +201,8 @@ export default defineConfig(async () => {
         searchStore,
         portableRoot: dataRoot,
         portableBackupRoot: resolve(dataAppRoot, 'backups'),
+        getRecoveryState,
+        retryRecovery,
       }),
       userDataPlugin({ userDataRoot, libraryDatabasePath, searchStore }),
       readerPlugin({

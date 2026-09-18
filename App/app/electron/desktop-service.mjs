@@ -41,6 +41,12 @@ import { createSettingsStore } from '../server/settings-store.mjs';
 import { createOcrService } from '../server/ocr/index.mjs';
 import { handleOcrRequest } from '../server/ocr/ocr-http.mjs';
 import { rebuildPortableLibrary } from '../server/portable-rebuild.mjs';
+import {
+  PORTABLE_RECOVERY_CODES,
+  makeRecoveryRequiredState,
+  publicRecoveryState,
+  runPortableStartupRecovery,
+} from '../server/portable-recovery.mjs';
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -113,86 +119,141 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     userDataRoot,
   } = paths;
 
-  if (libraryDatabasePath && libraryDatabasePath !== ':memory:') {
-    try {
-      mkdirSync(dirname(libraryDatabasePath), { recursive: true });
-    } catch {}
-  }
-  if (userDataRoot) {
-    try {
-      mkdirSync(userDataRoot, { recursive: true });
-    } catch {}
-  }
-
-  // Initialize canonical stores
-  const searchStore = createSearchStore({
-    databasePath: libraryDatabasePath,
-    userDataRoot,
-  });
-
-  const libraryStore = createLibraryStore({
-    databasePath: libraryDatabasePath,
-    searchStore,
-    portableRoot: dataRoot,
-    portableBackupRoot: backupRoot,
-  });
-
-  const userDataStore = createUserDataStore({
-    userDataRoot,
-    libraryDatabasePath,
-    searchStore,
-  });
-
-  const readerStore = createReaderStore({
-    libraryRoot,
-    portableRoot: dataRoot,
-    libraryDatabasePath,
-    userDataRoot,
-    searchStore,
-  });
-
-  const annotationStore = createAnnotationStore({
-    databasePath: libraryDatabasePath,
-    userDataRoot,
-    searchStore,
-  });
-
-  const canvasStore = createCanvasStore({
-    databasePath: libraryDatabasePath,
-    userDataRoot,
-    searchStore,
-  });
-
-  const knowledgeStore = createKnowledgeStore({
-    databasePath: libraryDatabasePath,
-    userDataRoot,
-    searchStore,
-  });
-
-  const portabilityStore = createPortabilityStore({
-    databasePath: libraryDatabasePath,
-    libraryRoot,
-    userDataRoot,
-    searchStore,
-    libraryStore,
-    annotationStore,
-    readerStore,
-    userDataStore,
-    canvasStore,
-    knowledgeStore,
-  });
-
-  const settingsStore = createSettingsStore({
-    userDataRoot,
-  });
-
-  // Phase 17: OCR engines, models, runtimes, and derived results live under the
-  // external data root. Nothing is copied into the repository.
-  const ocrService = createOcrService({ dataRoot: paths.dataRoot });
-
   const sessionToken = randomBytes(32).toString('hex');
   const clientDistDir = resolve(appRoot, 'dist', 'client');
   const serverDistIndex = resolve(appRoot, 'dist', 'server', 'index.js');
+
+  const stores = {
+    libraryStore: null,
+    userDataStore: null,
+    readerStore: null,
+    annotationStore: null,
+    canvasStore: null,
+    knowledgeStore: null,
+    searchStore: null,
+    portabilityStore: null,
+    settingsStore: null,
+    ocrService: null,
+  };
+  let searchStore = null;
+  let libraryStore = null;
+  let userDataStore = null;
+  let readerStore = null;
+  let annotationStore = null;
+  let canvasStore = null;
+  let knowledgeStore = null;
+  let portabilityStore = null;
+  let settingsStore = null;
+  let ocrService = null;
+  let storesReady = false;
+  let recoveryState = null;
+
+  function ensureDirectories() {
+    if (libraryDatabasePath && libraryDatabasePath !== ':memory:') {
+      try {
+        mkdirSync(dirname(libraryDatabasePath), { recursive: true });
+      } catch {}
+    }
+    if (userDataRoot) {
+      try {
+        mkdirSync(userDataRoot, { recursive: true });
+      } catch {}
+    }
+  }
+
+  async function initializeStores() {
+    stores.settingsStore ??= createSettingsStore({ userDataRoot });
+    stores.ocrService ??= createOcrService({ dataRoot: paths.dataRoot });
+    settingsStore = stores.settingsStore;
+    ocrService = stores.ocrService;
+    if (storesReady) return;
+    ensureDirectories();
+
+    searchStore = createSearchStore({
+      databasePath: libraryDatabasePath,
+      userDataRoot,
+    });
+    libraryStore = createLibraryStore({
+      databasePath: libraryDatabasePath,
+      searchStore,
+      portableRoot: dataRoot,
+      portableBackupRoot: backupRoot,
+    });
+    userDataStore = createUserDataStore({
+      userDataRoot,
+      libraryDatabasePath,
+      searchStore,
+    });
+    readerStore = createReaderStore({
+      libraryRoot,
+      portableRoot: dataRoot,
+      libraryDatabasePath,
+      userDataRoot,
+      searchStore,
+    });
+    annotationStore = createAnnotationStore({
+      databasePath: libraryDatabasePath,
+      userDataRoot,
+      searchStore,
+    });
+    canvasStore = createCanvasStore({
+      databasePath: libraryDatabasePath,
+      userDataRoot,
+      searchStore,
+    });
+    knowledgeStore = createKnowledgeStore({
+      databasePath: libraryDatabasePath,
+      userDataRoot,
+      searchStore,
+    });
+    portabilityStore = createPortabilityStore({
+      databasePath: libraryDatabasePath,
+      libraryRoot,
+      userDataRoot,
+      searchStore,
+      libraryStore,
+      annotationStore,
+      readerStore,
+      userDataStore,
+      canvasStore,
+      knowledgeStore,
+    });
+
+    stores.searchStore = searchStore;
+    stores.libraryStore = libraryStore;
+    stores.userDataStore = userDataStore;
+    stores.readerStore = readerStore;
+    stores.annotationStore = annotationStore;
+    stores.canvasStore = canvasStore;
+    stores.knowledgeStore = knowledgeStore;
+    stores.portabilityStore = portabilityStore;
+    storesReady = true;
+  }
+
+  async function runStartupRecovery() {
+    recoveryState = await runPortableStartupRecovery({
+      root: dataRoot,
+      databasePath: libraryDatabasePath,
+      userDataRoot,
+    });
+    try {
+      await initializeStores();
+    } catch (error) {
+      recoveryState = makeRecoveryRequiredState(
+        PORTABLE_RECOVERY_CODES.RUNTIME_DB_UNUSABLE,
+        {
+          details: { message: String(error?.message ?? error) },
+          metrics: recoveryState?.metrics ?? {},
+        },
+      );
+    }
+    return recoveryState;
+  }
+
+  async function retryRecovery() {
+    recoveryState = await runStartupRecovery();
+    return publicRecoveryState(recoveryState);
+  }
 
   // Lazy-load SSR/RSC handler if dist exists
   let ssrHandler = null;
@@ -265,6 +326,13 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     const pathname = url.pathname;
     const method = req.method;
 
+    if (pathname === '/api/library/recovery' && method === 'GET') {
+      return sendJson(res, 200, publicRecoveryState(recoveryState));
+    }
+    if (pathname === '/api/library/recovery/retry' && method === 'POST') {
+      return sendJson(res, 200, await retryRecovery());
+    }
+
     // -------------------------------------------------------------
     // Desktop Native APIs: /api/desktop/*
     // -------------------------------------------------------------
@@ -273,6 +341,14 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         isDesktop: true,
         sessionToken,
         paths,
+        recovery: publicRecoveryState(recoveryState),
+      });
+    }
+
+    if (!storesReady) {
+      return sendJson(res, 503, {
+        error: recoveryState?.message ?? 'Library recovery is required.',
+        recovery: publicRecoveryState(recoveryState),
       });
     }
 
@@ -735,7 +811,9 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
       // Fallback: If no SSR handler (e.g. dev mode without build), return 404
       sendText(res, 404, 'Not Found');
     } catch (err) {
-      console.error('[desktop-service] Unhandled error:', err);
+      if ((err?.status ?? 500) >= 500 && !err?.recovery) {
+        console.error('[desktop-service] Unhandled error:', err);
+      }
       if (!res.headersSent) {
         sendJson(res, err?.status ?? 500, {
           error: err?.message ?? 'Internal Server Error',
@@ -749,18 +827,9 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     server,
     paths,
     sessionToken,
-    stores: {
-      libraryStore,
-      userDataStore,
-      readerStore,
-      annotationStore,
-      canvasStore,
-      knowledgeStore,
-      searchStore,
-      portabilityStore,
-      ocrService,
-    },
-    start(port = 0, host = '127.0.0.1') {
+    stores,
+    async start(port = 0, host = '127.0.0.1') {
+      await runStartupRecovery();
       return new Promise((resolveStart, rejectStart) => {
         server.listen(port, host, () => {
           const addr = server.address();
@@ -776,6 +845,12 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         });
         server.on('error', rejectStart);
       });
+    },
+    recovery: {
+      get state() {
+        return publicRecoveryState(recoveryState);
+      },
+      retry: retryRecovery,
     },
   };
 }
