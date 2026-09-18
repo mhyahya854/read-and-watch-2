@@ -16,6 +16,7 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { assertProviderContract, OcrError, OCR_LIFECYCLE, OCR_STATE } from './ocr-contract.mjs';
@@ -153,9 +154,37 @@ export function createManagedOcrProvider({
   const modelRoot = join(dataRoot, 'ocr', 'models', providerId);
   const upstreamResolver = createUpstreamResolver({ fetchImpl: hooks.fetchImpl });
 
+  // Windows without LongPathsEnabled cannot materialise a deep Python package
+  // tree under a long data root. Keep the engine-store/activation layout where
+  // it is, but place the throwaway Python venv under a short external runtime
+  // root. An already-materialised data-root runtime is always respected so
+  // existing installations are unchanged; tests can redirect the short root
+  // with READ_WATCH_OCR_RUNTIME_ROOT.
+  function shortRuntimeRoot() {
+    if (process.env.READ_WATCH_OCR_RUNTIME_ROOT) {
+      return join(process.env.READ_WATCH_OCR_RUNTIME_ROOT, providerId);
+    }
+    const base =
+      process.env.LOCALAPPDATA ||
+      process.env.XDG_CACHE_HOME ||
+      join(homedir(), '.cache');
+    return join(base, 'RW', 'ocr', 'runtimes', providerId);
+  }
+
   function runtimeForRevision(revision) {
-    const base = join(runtimeRoot, revision);
-    const pythonBin = process.platform === 'win32' ? join(base, 'Scripts', 'python.exe') : join(base, 'bin', 'python');
+    const normalBase = join(runtimeRoot, revision);
+    const normalPython =
+      process.platform === 'win32'
+        ? join(normalBase, 'Scripts', 'python.exe')
+        : join(normalBase, 'bin', 'python');
+    if (existsSync(normalPython)) {
+      return { base: normalBase, pythonBin: normalPython };
+    }
+    const base = join(shortRuntimeRoot(), revision);
+    const pythonBin =
+      process.platform === 'win32'
+        ? join(base, 'Scripts', 'python.exe')
+        : join(base, 'bin', 'python');
     return { base, pythonBin };
   }
 
@@ -235,7 +264,16 @@ export function createManagedOcrProvider({
       cwd: runtime.base,
       // PYTHONUTF8 keeps Arabic/Urdu text intact on Windows pipes; the driver
       // also pins its own streams, so this is redundancy rather than a crutch.
-      env: { PYTHONNOUSERSITE: '1', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+      // PADDLE_PDX_CACHE_HOME keeps public PaddleX model files inside the
+      // external data root, and DISABLE_MODEL_SOURCE_CHECK avoids a network
+      // hoster probe when models are already staged locally.
+      env: {
+        PYTHONNOUSERSITE: '1',
+        PYTHONUTF8: '1',
+        PYTHONIOENCODING: 'utf-8',
+        PADDLE_PDX_CACHE_HOME: join(modelRoot, 'paddlex-cache'),
+        DISABLE_MODEL_SOURCE_CHECK: 'True',
+      },
     });
   }
 
@@ -466,7 +504,13 @@ export function createManagedOcrProvider({
         command: pythonBin,
         args: [driverPath, '--provider', providerId, '--models-root', modelRoot],
         cwd: runtimeForRevision(revision).base,
-        env: { PYTHONNOUSERSITE: '1', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+        env: {
+          PYTHONNOUSERSITE: '1',
+          PYTHONUTF8: '1',
+          PYTHONIOENCODING: 'utf-8',
+          PADDLE_PDX_CACHE_HOME: join(modelRoot, 'paddlex-cache'),
+          DISABLE_MODEL_SOURCE_CHECK: 'True',
+        },
       });
       try {
         const health = await bridge.request('health', { providerId }, { signal, timeoutMs: 180_000 });

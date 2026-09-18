@@ -264,6 +264,16 @@ test('P17-T028: provider metadata records the verified upstream and model identi
   assert.equal(paddle.models.ar.detection, 'PP-OCRv5_server_det');
   assert.equal(paddle.models.ar.dictionary, 'ppocr/utils/dict/ppocrv5_arabic_dict.txt');
   assert.deepEqual([...paddle.languages], ['ar', 'ur']);
+  assert.deepEqual([...paddle.runtimeRequirements.installPackages], [
+    'paddlepaddle==3.0.0',
+    'paddleocr==3.3.1',
+    'paddlex==3.3.13',
+    'numpy==1.26.4',
+    'scipy==1.13.1',
+    'scikit-learn==1.5.2',
+    'langchain<0.3',
+    'setuptools',
+  ]);
 });
 
 test('P17-T015: engine storage is external and never inside the repository', () => {

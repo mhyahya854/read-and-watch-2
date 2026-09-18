@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test, { after } from 'node:test';
@@ -22,10 +22,13 @@ const scratchDirs = [];
 function scratchRoot() {
   const dir = mkdtempSync(join(tmpdir(), 'rw-ocr-specialist-'));
   scratchDirs.push(dir);
+  // Keep the short runtime-root fallback inside the scratch tree during tests.
+  process.env.READ_WATCH_OCR_RUNTIME_ROOT = join(dir, 'runtimes');
   return dir;
 }
 
 after(() => {
+  delete process.env.READ_WATCH_OCR_RUNTIME_ROOT;
   for (const dir of scratchDirs) {
     try {
       rmSync(dir, { recursive: true, force: true });
@@ -222,6 +225,32 @@ test('P17-T013: a specialist update stages and verifies before it can activate',
   const activation = provider.activateUpdate({ revision: staged.revision });
   assert.equal(activation.activeRevision, 'rev-A');
   assert.equal(provider.version, 'rev-A');
+});
+
+test('P17-T029: a long data root provisions the specialist runtime in the short fallback root', async () => {
+  const dataRoot = scratchRoot();
+  const longDataRoot = join(dataRoot, 'x'.repeat(90));
+  mkdirSync(longDataRoot, { recursive: true });
+  const { provider } = makeSpecialist(longDataRoot, { revisions: { latest: 'rev-long' } });
+
+  const staged = await provider.stageUpdate();
+  assert.equal(staged.status, 'staged');
+  const shortBase = join(
+    process.env.READ_WATCH_OCR_RUNTIME_ROOT,
+    URDU_NASTALIQ_ID,
+    'rev-long',
+  );
+  assert.ok(
+    existsSync(join(shortBase, 'Scripts', 'python.exe')),
+    'the staged specialist runtime must live under the short external runtime root',
+  );
+  assert.equal(
+    existsSync(join(longDataRoot, 'ocr', 'runtimes', URDU_NASTALIQ_ID, 'rev-long', 'Scripts', 'python.exe')),
+    false,
+  );
+  const activation = provider.activateUpdate({ revision: 'rev-long' });
+  assert.equal(activation.activeRevision, 'rev-long');
+  assert.equal(provider.version, 'rev-long');
 });
 
 test('P17-T014: a failed specialist update leaves the previous specialist revision active', async () => {

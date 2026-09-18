@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-18 - Phase 17 OCR readiness: PP-OCRv5 CPU unblock and specialist short runtime root
+
+- Found and verified a working PP-OCRv5 CPU runtime on this Windows host: `paddlepaddle==3.0.0`, `paddleocr==3.3.1`, `paddlex==3.3.13`, `numpy==1.26.4`, `scipy==1.13.1`, `scikit-learn==1.5.2`, `langchain<0.3` and `setuptools`. PaddlePaddle 3.3.1 remains deliberately unused because of its PIR/oneDNN CPU failure.
+- Pinned that proven combination in the PaddleOCR provider contract. A single pip resolution with these pins installs a working environment instead of an empty runtime or an incompatible latest PaddleX.
+- The shipped Read & Watch `engine_driver.py` loaded the official `PP-OCRv5_server_det` and `arabic_PP-OCRv5_mobile_rec` models and returned real page-recognition output (`HELLO 123 OCR TEST`, confidence `0.9969695210456848`). This is runtime/provider evidence only, not representative benchmark acceptance evidence.
+- Managed Paddle runs now set `PADDLE_PDX_CACHE_HOME` under the external data-root model area and set `DISABLE_MODEL_SOURCE_CHECK=True`, so public model files remain outside Git and staged recognition does not trigger an unnecessary network hoster probe.
+- Fixed the specialist staged-runtime path blocker by using a short external Python runtime root (`%LOCALAPPDATA%/RW/ocr/runtimes` on Windows, overridable with `READ_WATCH_OCR_RUNTIME_ROOT`) while activation/evidence stay under the selected data root. Existing data-root runtimes remain respected. The fallback is unit-proven with a long synthetic data root; the full 1.3 GB specialist provisioning was not executed in this run.
+- Unlimited-OCR remains `BLOCKED BY CURRENT HARDWARE`: this host has Intel Arc graphics and no CUDA-capable NVIDIA device. No CPU fallback, cloud OCR or substitute engine was introduced.
+- Representative private real-world corpus with human-validated ground truth remains unavailable, so no P17-T004 acceptance benchmark or P17-G002 gate was executed. The 14-sample synthetic corpus remains plumbing evidence only.
+- Tests: `npm test` reports 546 total / 545 passing / 0 failing / 1 skipped. TypeScript, lint, build, repository hygiene and governance validation pass. Real Graphify incremental run: 2,374 nodes / 5,760 post-build edges / 101 communities / 0 unverified, 0 missing/dangling, 0 self-loop and 0 duplicate edges. Semantic extraction remains unavailable because no LLM backend is configured.
+- Governance: Phase 17 remains `IN_PROGRESS`, `P17-T004` remains the current incomplete task, `P17-T007` and `P17-G002` remain open, and Phase 18 remains `NOT_STARTED`.
+
 ## 2026-09-18 - Library integrity diagnostics
 
 - Added a read-only `GET /api/library/integrity` endpoint, exposed through both the Electron desktop service and the Vite development middleware, using one shared helper in `app/server/library-state.mjs`.

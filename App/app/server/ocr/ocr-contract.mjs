@@ -123,8 +123,26 @@ export const OCR_PROVIDERS = Object.freeze({
       accelerator: 'any',
       acceleratorVendor: 'any',
       cpuSupported: true,
+      /**
+       * Proven on this Windows CPU host on 2026-09-18 with the shipped driver:
+       * PP-OCRv5_server_det + arabic_PP-OCRv5_mobile_rec loaded and returned
+       * exact synthetic text with 0.9969 confidence. PaddlePaddle 3.3.1 is
+       * deliberately NOT used because its PIR/oneDNN executor fails on this
+       * CPU; PaddleX is pinned so PaddleOCR does not resolve an incompatible
+       * newer PaddleX.
+       */
+      installPackages: Object.freeze([
+        'paddlepaddle==3.0.0',
+        'paddleocr==3.3.1',
+        'paddlex==3.3.13',
+        'numpy==1.26.4',
+        'scipy==1.13.1',
+        'scikit-learn==1.5.2',
+        'langchain<0.3',
+        'setuptools',
+      ]),
       notes:
-        'PP-OCRv5 mobile recognition models run on CPU or GPU; no CUDA requirement is claimed.',
+        'PP-OCRv5 mobile recognition models run on CPU or GPU; no CUDA requirement is claimed. The pinned CPU combination was verified with a real PP-OCRv5 Arabic inference through the shipped driver.',
     }),
     attribution:
       'PaddleOCR / PP-OCRv5 (PaddlePaddle), Apache-2.0 licensed code; model weights distributed separately by PaddlePaddle.',

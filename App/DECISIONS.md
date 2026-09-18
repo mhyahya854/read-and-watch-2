@@ -1143,3 +1143,61 @@ completes no phase task and is not OCR benchmark evidence.
    non-empty legacy `App/library/catalog.json` still blocks the JS automatic
    disaster-recovery path. No Raw organization, external metadata refresh, OCR
    benchmark, Phase 18 or 19 work, or platform certification was started.
+
+## D-062 - Proven PP-OCRv5 CPU runtime pin and short specialist runtime root
+
+Status: Accepted
+
+Maintenance/readiness checkpoint on the authoritative Phase 17 path. Phase 17
+remains `IN_PROGRESS`, `P17-T004` remains the current incomplete task,
+`P17-T007` remains open, `P17-G002` remains open, Phase 18 remains
+`NOT_STARTED`, and no benchmark acceptance claim is made by this decision.
+
+1. **PP-OCRv5 CPU runtime is no longer blocked by PaddlePaddle 3.3.1.** A real
+   isolated Windows CPU test found a working supported combination:
+   - Python 3.12.10
+   - `paddlepaddle==3.0.0`
+   - `paddleocr==3.3.1`
+   - `paddlex==3.3.13`
+   - `numpy==1.26.4`
+   - `scipy==1.13.1`
+   - `scikit-learn==1.5.2`
+   - `langchain<0.3`
+   - `setuptools`
+   PaddlePaddle 3.3.1 is deliberately not pinned; its PIR/oneDNN executor
+   failure was the previous blocker. PaddleX is pinned so PaddleOCR cannot
+   resolve a newer incompatible PaddleX.
+
+2. **The shipped Read & Watch driver now has a real PP-OCRv5 inference record
+   on this host.** The exact `PP-OCRv5_server_det` and
+   `arabic_PP-OCRv5_mobile_rec` models loaded, the shipped
+   `engine_driver.py` reported health, and a page recognition call returned
+   `HELLO 123 OCR TEST` with confidence `0.9969695210456848`. This is
+   runtime/provider evidence, not representative benchmark acceptance evidence.
+
+3. **Model files stay in the external data root.** Managed Paddle runs set
+   `PADDLE_PDX_CACHE_HOME` under
+   `<dataRoot>/ocr/models/<provider>/paddlex-cache`, so public model files do
+   not drift into a user profile cache or Git. `DISABLE_MODEL_SOURCE_CHECK` is
+   set for recognition so staged models do not trigger an unnecessary network
+   hoster probe.
+
+4. **The specialist long-path blocker now has a real software fix.** Python
+   virtual environments are staged under a short external runtime root
+   (`%LOCALAPPDATA%/RW/ocr/runtimes` on Windows, configurable with
+   `READ_WATCH_OCR_RUNTIME_ROOT`) while the engine-store/activation/evidence
+   layout remains under the selected data root. An already-materialised
+   data-root runtime is respected for backward compatibility. This is
+   unit-proven with a long synthetic data root; the full 1.3 GB specialist
+   provisioning was not executed in this run.
+
+5. **No fallback or substitute engine was introduced.** Unlimited-OCR remains
+   `BLOCKED BY CURRENT HARDWARE` because this host has Intel Arc graphics and no
+   CUDA-capable NVIDIA device. No CPU fallback, cloud OCR, or alternate engine
+   was substituted.
+
+6. **P17-T004 remains incomplete.** The 14-sample synthetic corpus is plumbing
+   evidence only. No representative lawful private real-world corpus with
+   human-validated ground truth was available or generated in this run, so no
+   provider acceptance benchmark or P17-G002 gate was executed. Unlimited-OCR
+   cannot run on this host, so English benchmark handoff remains required.
