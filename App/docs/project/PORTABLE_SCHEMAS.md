@@ -83,4 +83,9 @@ Full application state snapshot (excluding original book binaries):
   *"This backup contains Read & Watch data. Original books are not included."*
 - **Manifest**: Contains backup ID, creation timestamp, member counts, and section SHA-256 checksums (`librarySha256`, `annotationsSha256`, `notesSha256`, `canvasesSha256`).
 - **Data Sections**: Complete `library`, `annotations`, `notes`, and `canvases` records.
+- **Optional v1 `libraryState` extension**: Complete `savedViews` and
+  `relationships` arrays, with manifest `savedViews`/`relationships` member
+  counts and a `libraryStateSha256` checksum. Older valid v1 backups without this
+  section remain accepted; unknown additive v1 fields are safely ignored or
+  preserved.
 - **Exclusions**: FTS5 search tables, runtime caches, logs, temp files.

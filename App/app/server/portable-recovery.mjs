@@ -31,6 +31,10 @@ import {
   CORRUPT_RUNTIME_CODES,
   recoverCorruptRuntime,
 } from './corrupt-runtime-recovery.mjs';
+import {
+  LIBRARY_STATE_CODES,
+  reconcileLibraryState,
+} from './library-state.mjs';
 
 export const PORTABLE_RECOVERY_STATUS = Object.freeze({
   HEALTHY: 'HEALTHY',
@@ -63,6 +67,9 @@ export const PORTABLE_RECOVERY_CODES = Object.freeze({
   CORRUPT_RUNTIME_ACTIVATION_FAILED: CORRUPT_RUNTIME_CODES.ACTIVATION_FAILED,
   LEGACY_MANAGED_LIBRARY_PRESENT: CORRUPT_RUNTIME_CODES.LEGACY_LIBRARY_PRESENT,
   RECOVERED_CORRUPT_RUNTIME: CORRUPT_RUNTIME_CODES.RECOVERED,
+  MALFORMED_LIBRARY_STATE: LIBRARY_STATE_CODES.MALFORMED,
+  RECOVERED_LIBRARY_STATE_MIGRATED: LIBRARY_STATE_CODES.MIGRATED,
+  RECOVERED_LIBRARY_STATE_RECONCILED: LIBRARY_STATE_CODES.RECONCILED,
 });
 
 const JOURNAL_FILE = 'portable-writeback-journal.json';
@@ -157,6 +164,12 @@ function messageFor(code) {
       return 'A legacy managed library is present and needs review before automatic runtime reconstruction. Your library files have not been changed.';
     case PORTABLE_RECOVERY_CODES.RECOVERED_CORRUPT_RUNTIME:
       return 'The runtime database was reconstructed from your portable library and file-first recovery data. The damaged runtime database was preserved safely.';
+    case PORTABLE_RECOVERY_CODES.MALFORMED_LIBRARY_STATE:
+      return 'Saved views and relationships could not be validated. Your library files have not been changed.';
+    case PORTABLE_RECOVERY_CODES.RECOVERED_LIBRARY_STATE_MIGRATED:
+      return 'Saved views and relationships were migrated to durable file-first storage.';
+    case PORTABLE_RECOVERY_CODES.RECOVERED_LIBRARY_STATE_RECONCILED:
+      return 'Saved views and relationships were reconciled from durable file-first storage.';
     default:
       return 'Startup recovery completed.';
   }
@@ -557,6 +570,15 @@ export function assertPortableMutationsAllowed(root) {
   }
 }
 
+function reconcileLibraryStateForDatabase(database, userDataRoot) {
+  return reconcileLibraryState({
+    database,
+    userDataRoot,
+    itemExists: (itemId) =>
+      Boolean(database.prepare('SELECT 1 FROM items WHERE id=?').get(itemId)),
+  });
+}
+
 async function rebuildRuntimeFromPortable(root, {
   databasePath,
   userDataRoot,
@@ -614,6 +636,16 @@ async function rebuildRuntimeFromPortable(root, {
     const search = searchStore.rebuildIndex();
     metrics.searchRebuilt = true;
     metrics.rebuildApplied = true;
+    const libraryState = reconcileLibraryStateForDatabase(database, userDataRoot);
+    if (libraryState.status === 'RECOVERY_REQUIRED') {
+      return {
+        state: requiredState(PORTABLE_RECOVERY_CODES.MALFORMED_LIBRARY_STATE, metrics, {
+          reasons: [PORTABLE_RECOVERY_CODES.MALFORMED_LIBRARY_STATE],
+          details: { diagnostics: libraryState.diagnostics },
+        }),
+        result,
+      };
+    }
     return {
       state: recoveredState(PORTABLE_RECOVERY_CODES.RECOVERED_RUNTIME_REBUILT, metrics, {
         reasons: reasonCodes,
@@ -880,15 +912,35 @@ export async function runPortableStartupRecovery({
 
   if (runtime.exists && runtime.schema && runtime.userVersion < RUNTIME_SCHEMA_VERSION) {
     const database = new DatabaseSync(databasePath);
+    let libraryState;
     try {
       applyRuntimeSchema(database);
+      libraryState = reconcileLibraryStateForDatabase(
+        database,
+        userDataRoot ?? join(absoluteRoot, 'App', 'user-data'),
+      );
     } finally {
       database.close();
+    }
+    if (libraryState.status === 'RECOVERY_REQUIRED') {
+      const result = requiredState(PORTABLE_RECOVERY_CODES.MALFORMED_LIBRARY_STATE, metrics, {
+        reasons: [PORTABLE_RECOVERY_CODES.MALFORMED_LIBRARY_STATE],
+        details: { diagnostics: libraryState.diagnostics },
+      });
+      writeRecoveryMarker(absoluteRoot, {
+        code: result.code,
+        reasons: result.reasons,
+        details: result.details,
+        detectedAtUtc: now,
+      });
+      metrics.durationMs = Date.now() - startedAt;
+      result.metrics = metrics;
+      return result;
     }
     const result = recoveredState(
       PORTABLE_RECOVERY_CODES.RECOVERED_RUNTIME_SCHEMA_MIGRATED,
       metrics,
-      { actions: ['schema_migration'] },
+      { actions: ['schema_migration', 'library_state_reconcile'] },
     );
     clearRecoveryMarker(absoluteRoot);
     metrics.durationMs = Date.now() - startedAt;
@@ -925,7 +977,37 @@ export async function runPortableStartupRecovery({
     return rebuilt.state;
   }
 
-  const result = healthyState(metrics);
+  const database = new DatabaseSync(databasePath);
+  let libraryState;
+  try {
+    libraryState = reconcileLibraryStateForDatabase(
+      database,
+      userDataRoot ?? join(absoluteRoot, 'App', 'user-data'),
+    );
+  } finally {
+    database.close();
+  }
+  if (libraryState.status === 'RECOVERY_REQUIRED') {
+    const result = requiredState(PORTABLE_RECOVERY_CODES.MALFORMED_LIBRARY_STATE, metrics, {
+      reasons: [PORTABLE_RECOVERY_CODES.MALFORMED_LIBRARY_STATE],
+      details: { diagnostics: libraryState.diagnostics },
+    });
+    writeRecoveryMarker(absoluteRoot, {
+      code: result.code,
+      reasons: result.reasons,
+      details: result.details,
+      detectedAtUtc: now,
+    });
+    metrics.durationMs = Date.now() - startedAt;
+    result.metrics = metrics;
+    return result;
+  }
+  const result = libraryState.status === 'RECOVERED'
+    ? recoveredState(libraryState.code, metrics, {
+        reasons: [libraryState.code],
+        actions: ['library_state_reconcile'],
+      })
+    : healthyState(metrics);
   clearRecoveryMarker(absoluteRoot);
   metrics.durationMs = Date.now() - startedAt;
   result.metrics = metrics;

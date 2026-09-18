@@ -14,6 +14,9 @@
 - **Bookmarks:** All named location bookmarks with progression, page, and CFI references.
 - **Notes & Thoughts:** All Markdown notes and thoughts files associated with library items.
 - **Canvases & Assets:** All Excalidraw diagrams, embedded image assets (base64 encoded), and bidirectional deep links.
+- **Saved Views & Relationships:** Optional v1 `libraryState` section with
+  stable saved-view definitions/revisions/timestamps and full relationship
+  records, including external targets, direction, position and provenance.
 
 ### Explicitly Excluded:
 - **Original Publication Binaries:** Original EPUB and PDF book files are NOT included in the user-data backup. The backup manifest explicitly records:  
@@ -33,7 +36,7 @@
    - `readerStore` (bookmarks)
    - `userDataStore` (notes & thoughts)
    - `canvasStore` (canvases, links, embedded assets)
-3. Computes individual SHA-256 digests for each data section (`librarySha256`, `annotationsSha256`, `notesSha256`, `canvasesSha256`).
+3. Computes individual SHA-256 digests for each data section (`librarySha256`, `libraryStateSha256`, `annotationsSha256`, `notesSha256`, `canvasesSha256`).
 4. Generates a unique `backupId` and UTC ISO-8601 timestamp.
 5. Writes the bundle atomically via temporary file (`.rwbackup.tmp-...`) to ensure atomicity.
 6. Returns or downloads the `.rwbackup` JSON package.
@@ -52,11 +55,16 @@
   - `SOURCE_MISMATCH`: Restoring an annotation for a book whose local file hash differs.
   - `SOURCE_MISSING`: Restoring data for a book not yet in the local library.
 - Returns a preflight report to the UI showing total counts, conflicts, and warnings.
+- Saved views and relationships are preflighted by stable ID and case-insensitive
+  saved-view name.
 
 ### Step 2: Atomic Application
 - Wraps database operations in SQL transactions (`BEGIN IMMEDIATE ... COMMIT`).
 - Staged file writes for notes and canvas documents/assets.
 - Restores annotations, bookmarks, notes, canvases, and metadata.
+- Restores saved views and relationships from the optional `libraryState`
+  section using stable IDs; repeated restore is idempotent and relationships
+  with missing referenced items produce warnings instead of fabricated targets.
 
 ### Step 3: Search Index Rebuild
 - Clears the derived FTS5 tables (`search_index_fts`, `search_index_records`, `search_index_meta`).

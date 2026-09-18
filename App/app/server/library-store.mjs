@@ -1,8 +1,23 @@
 import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { getPortableMarker, isPortableItem } from './portable-rebuild.mjs';
 import { updatePortableItem } from './portable-writeback.mjs';
+import {
+  applyLibraryStateRows,
+  LIBRARY_STATE_CODES,
+  libraryStatePath,
+  libraryStatesEqual,
+  mergeLibraryState,
+  readLibraryState,
+  readLibraryStateFromDatabase,
+  validateLibraryState,
+  writeLibraryStateAtomic,
+  writeLibraryStateMarkerForDivergence,
+} from './library-state.mjs';
+import { toLongPath } from './portable-library.mjs';
 
 const COLLECTIONS = new Set(['read', 'watch']);
 
@@ -29,7 +44,85 @@ export function createLibraryStore({
     readOnly,
     allowExtension: false,
   });
+  const databaseDirectory = dirname(databasePath);
+  const isRuntimeLayout =
+    basename(databaseDirectory) === 'state' &&
+    basename(dirname(databaseDirectory)) === 'App';
+  const userDataRoot = isRuntimeLayout
+    ? resolve(databaseDirectory, '..', 'user-data')
+    : join(databaseDirectory, 'user-data');
   database.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000');
+
+  function currentLibraryState() {
+    const file = readLibraryState(userDataRoot);
+    if (file.present && !file.ok) {
+      throw Object.assign(new Error(file.diagnostics[0]?.message ?? 'Invalid library-state.json.'), {
+        code: LIBRARY_STATE_CODES.MALFORMED,
+        status: 500,
+        diagnostics: file.diagnostics,
+      });
+    }
+    if (file.present) return file.state;
+    const dbState = readLibraryStateFromDatabase(database);
+    const validation = validateLibraryState(dbState, { itemExists });
+    if (!validation.ok) {
+      throw Object.assign(new Error(validation.diagnostics[0]?.message ?? 'Invalid runtime library state.'), {
+        code: LIBRARY_STATE_CODES.MALFORMED,
+        status: 500,
+        diagnostics: validation.diagnostics,
+      });
+    }
+    writeLibraryStateAtomic(userDataRoot, dbState);
+    return dbState;
+  }
+
+  function commitLibraryStateMutation(nextState, applyDb) {
+    const validation = validateLibraryState(nextState, { itemExists });
+    if (!validation.ok) {
+      throw Object.assign(new Error(validation.diagnostics[0]?.message ?? 'Invalid library state.'), {
+        status: 400,
+        code: LIBRARY_STATE_CODES.MALFORMED,
+        diagnostics: validation.diagnostics,
+      });
+    }
+    const path = libraryStatePath(userDataRoot);
+    const previous = existsSync(toLongPath(path))
+      ? readFileSync(toLongPath(path))
+      : null;
+    writeLibraryStateAtomic(userDataRoot, nextState);
+    let inTransaction = false;
+    try {
+      database.exec('BEGIN IMMEDIATE');
+      inTransaction = true;
+      applyDb();
+      const projected = readLibraryStateFromDatabase(database);
+      if (!libraryStatesEqual(projected, nextState)) {
+        throw Object.assign(new Error('Runtime library state did not match the durable file.'), {
+          code: LIBRARY_STATE_CODES.DIVERGENCE,
+        });
+      }
+      database.exec('COMMIT');
+    } catch (error) {
+      if (inTransaction) {
+        try {
+          database.exec('ROLLBACK');
+        } catch {}
+      }
+      try {
+        if (previous === null) {
+          rmSync(toLongPath(path), { force: true });
+        } else {
+          writeFileSync(toLongPath(path), previous);
+        }
+      } catch (restoreError) {
+        writeLibraryStateMarkerForDivergence(userDataRoot, {
+          message: String(error?.message ?? error),
+          restoreError: String(restoreError?.message ?? restoreError),
+        });
+      }
+      throw error;
+    }
+  }
 
   function itemExists(itemId) {
     return Boolean(
@@ -773,55 +866,114 @@ export function createLibraryStore({
     relationshipType,
     expectedRevision,
   ) {
-    database.exec('BEGIN IMMEDIATE');
-    try {
-      const current = database
-        .prepare('SELECT revision FROM items WHERE id=?')
-        .get(sourceItemId);
-      if (!current || !itemExists(targetItemId)) fail('Unknown item ID', 404);
-      if (current.revision !== expectedRevision) fail('Metadata conflict', 409);
-      const relationshipId = id(
-        'relation',
-        `${sourceItemId}\0${targetItemId}\0${relationshipType}`,
-      );
+    if (readOnly) fail('Library is read-only', 405);
+    const current = database
+      .prepare('SELECT revision FROM items WHERE id=?')
+      .get(sourceItemId);
+    if (!current || !itemExists(targetItemId)) fail('Unknown item ID', 404);
+    if (current.revision !== expectedRevision) fail('Metadata conflict', 409);
+    const relationshipId = id(
+      'relation',
+      `${sourceItemId}\0${targetItemId}\0${relationshipType}`,
+    );
+    const now = new Date().toISOString();
+    const position = database
+      .prepare(
+        'SELECT COALESCE(MAX(position)+1, 0) AS position FROM relationships WHERE source_item_id=?',
+      )
+      .get(sourceItemId).position;
+    const state = currentLibraryState();
+    const nextState = {
+      ...state,
+      relationships: [
+        ...state.relationships.filter((relationship) => relationship.id !== relationshipId),
+        {
+          id: relationshipId,
+          sourceItemId,
+          targetItemId,
+          targetExternal: null,
+          relationshipType,
+          direction: 'directed',
+          position,
+          provenance: {},
+          createdAtUtc: now,
+        },
+      ],
+    };
+    commitLibraryStateMutation(nextState, () => {
       database
         .prepare(
-          `INSERT INTO relationships(id,source_item_id,target_item_id,relationship_type,direction,position,provenance_json,created_at_utc)
-         VALUES(?,?,?,?, 'directed',COALESCE((SELECT max(position)+1 FROM relationships WHERE source_item_id=?),0),'{}',?)`,
+          `INSERT INTO relationships
+             (id,source_item_id,target_item_id,relationship_type,direction,position,provenance_json,created_at_utc)
+           VALUES(?,?,?,?, 'directed',?,'{}',?)`,
         )
         .run(
           relationshipId,
           sourceItemId,
           targetItemId,
           relationshipType,
-          sourceItemId,
-          new Date().toISOString(),
+          position,
+          now,
         );
       database
         .prepare(
           'UPDATE items SET revision=revision+1,updated_at_utc=? WHERE id=?',
         )
-        .run(new Date().toISOString(), sourceItemId);
-      database.exec('COMMIT');
-      return { id: relationshipId, revision: current.revision + 1 };
-    } catch (error) {
-      database.exec('ROLLBACK');
-      throw error;
-    }
+        .run(now, sourceItemId);
+    });
+    return { id: relationshipId, revision: current.revision + 1 };
   }
 
   function saveView(name, definition) {
+    if (readOnly) fail('Library is read-only', 405);
+    if (typeof name !== 'string' || !name.trim()) fail('A view name is required');
+    if (definition === undefined || definition === null) fail('A view definition is required');
+    const state = currentLibraryState();
+    const normalizedName = name.trim();
+    const existing = state.savedViews.find(
+      (view) => view.name.toLocaleLowerCase() === normalizedName.toLocaleLowerCase(),
+    );
+    const viewId = existing?.id ?? id('view', normalizedName.toLocaleLowerCase());
     const now = new Date().toISOString();
-    const viewId = id('view', name.toLocaleLowerCase());
-    database
-      .prepare(
-        `INSERT INTO saved_views VALUES(?,?,?,1,?,?)
-       ON CONFLICT(name) DO UPDATE SET definition_json=excluded.definition_json,revision=saved_views.revision+1,updated_at_utc=excluded.updated_at_utc`,
-      )
-      .run(viewId, name, JSON.stringify(definition), now, now);
+    const nextState = {
+      ...state,
+      savedViews: [
+        ...state.savedViews.filter(
+          (view) => view.id !== viewId &&
+            view.name.toLocaleLowerCase() !== normalizedName.toLocaleLowerCase(),
+        ),
+        {
+          id: viewId,
+          name: normalizedName,
+          definition,
+          revision: existing ? existing.revision + 1 : 1,
+          createdAtUtc: existing?.createdAtUtc ?? now,
+          updatedAtUtc: now,
+        },
+      ],
+    };
+    commitLibraryStateMutation(nextState, () => {
+      database
+        .prepare(
+          `INSERT INTO saved_views (id,name,definition_json,revision,created_at_utc,updated_at_utc)
+           VALUES (?,?,?,?,?,?)
+           ON CONFLICT(name) DO UPDATE SET
+             definition_json=excluded.definition_json,
+             revision=excluded.revision,
+             updated_at_utc=excluded.updated_at_utc`,
+        )
+        .run(
+          viewId,
+          normalizedName,
+          JSON.stringify(definition),
+          existing ? existing.revision + 1 : 1,
+          existing?.createdAtUtc ?? now,
+          now,
+        );
+    });
     return database
       .prepare('SELECT * FROM saved_views WHERE name=? COLLATE NOCASE')
-      .get(name);
+      .get(normalizedName);
   }
 
   function listViews() {
@@ -829,6 +981,49 @@ export function createLibraryStore({
       .prepare('SELECT * FROM saved_views ORDER BY name COLLATE NOCASE')
       .all()
       .map((row) => ({ ...row, definition: parse(row.definition_json) }));
+  }
+
+  function listRelationships() {
+    return database
+      .prepare('SELECT * FROM relationships ORDER BY source_item_id, position, id')
+      .all()
+      .map((row) => ({
+        id: row.id,
+        sourceItemId: row.source_item_id,
+        targetItemId: row.target_item_id,
+        targetExternal: row.target_external_json
+          ? parse(row.target_external_json)
+          : null,
+        relationshipType: row.relationship_type,
+        direction: row.direction,
+        position: row.position,
+        provenance: parse(row.provenance_json),
+        createdAtUtc: row.created_at_utc,
+      }));
+  }
+
+  function restoreLibraryState(incomingState, { conflictResolution = 'skip' } = {}) {
+    if (readOnly) fail('Library is read-only', 405);
+    const current = currentLibraryState();
+    const merged = mergeLibraryState(current, incomingState, {
+      conflictResolution,
+      itemExists,
+    });
+    if (!merged.ok) {
+      throw Object.assign(new Error(merged.diagnostics[0]?.message ?? 'Invalid library state.'), {
+        status: 400,
+        diagnostics: merged.diagnostics,
+      });
+    }
+    commitLibraryStateMutation(merged.state, () => {
+      applyLibraryStateRows(database, merged.state);
+    });
+    return {
+      ok: true,
+      restored: merged.restored,
+      skipped: merged.skipped,
+      warnings: merged.warnings,
+    };
   }
 
   function loadNote(kind, itemId) {
@@ -905,6 +1100,8 @@ export function createLibraryStore({
     addRelationship,
     saveView,
     listViews,
+    listRelationships,
+    restoreLibraryState,
     loadNote,
     saveNote,
     getItem(itemId) {

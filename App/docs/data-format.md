@@ -264,6 +264,63 @@ duplicate portable IDs, malformed required identities, backup verification
 failure, staged integrity/FK failure, search rebuild failure or activation
 failure all fail closed instead of claiming complete recovery.
 
+### File-first library state
+
+Saved views and relationships are library-level user state, not title-level
+Markdown metadata. Their durable record is one compact file:
+
+```text
+App/user-data/library-state.json
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "savedViews": [
+    {
+      "id": "...",
+      "name": "...",
+      "definition": {},
+      "revision": 1,
+      "createdAtUtc": "...",
+      "updatedAtUtc": "..."
+    }
+  ],
+  "relationships": [
+    {
+      "id": "...",
+      "sourceItemId": "read-... or watch-...",
+      "targetItemId": "read-... or watch-... or null",
+      "targetExternal": null,
+      "relationshipType": "...",
+      "direction": "directed | undirected",
+      "position": 0,
+      "provenance": {},
+      "createdAtUtc": "..."
+    }
+  ]
+}
+```
+
+The file is the durable reconstructable record. SQLite `saved_views` and
+`relationships` are runtime projections. Exactly one of `targetItemId` and
+`targetExternal` is present for a relationship. Valid external targets are
+accepted; internal targets must exist. Writes are staged, validated and
+atomically replaced, then projected into SQLite with a post-write parity check.
+A failed DB transaction restores the previous file or uses the existing
+recovery-required marker if compensation also fails. A hard crash after file
+replacement but before DB completion leaves the file winning on the next
+startup.
+
+Startup reconciliation migrates an absent mirror once, returns `HEALTHY` when
+file and DB match without rewriting the file, and projects the durable file into
+SQLite when the runtime tables are empty or stale. Malformed state or missing
+internal references enter `RECOVERY_REQUIRED` and preserve the file. Corrupt
+runtime recovery uses this file after portable title reconstruction, so an
+initialized installation can recover saved views and relationships even when
+the corrupt SQLite database is completely unreadable. Pre-mirror installations
+retain the best-effort salvage compatibility and explicit `PARTIAL` result.
+
 ## Portable title schema (v1)
 
 Every canonical title Markdown file carries a `schema_version` and a stable

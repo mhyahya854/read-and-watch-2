@@ -291,6 +291,23 @@ export function validateBackupPackage(obj: unknown): BackupPackage {
     throw new PortabilityValidationError('Backup package missing canvases array');
   }
 
+  // Optional backwards-compatible v1 extension. Older v1 backups without this
+  // section remain valid.
+  if (record.libraryState !== undefined) {
+    const state = record.libraryState as Record<string, unknown>;
+    if (!state || typeof state !== 'object' || Array.isArray(state)) {
+      throw new PortabilityValidationError('Backup libraryState must be an object');
+    }
+    if (state.schemaVersion !== 1) {
+      throw new PortabilityValidationError('Backup libraryState must use schemaVersion 1');
+    }
+    if (!Array.isArray(state.savedViews) || !Array.isArray(state.relationships)) {
+      throw new PortabilityValidationError(
+        'Backup libraryState must contain savedViews and relationships arrays',
+      );
+    }
+  }
+
   return record as unknown as BackupPackage;
 }
 
@@ -323,4 +340,3 @@ export function validateMermaidDiagramPackage(obj: unknown): Record<string, unkn
   }
   return record;
 }
-

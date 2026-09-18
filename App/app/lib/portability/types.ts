@@ -153,7 +153,35 @@ export interface LibraryMetadataExportPackage extends BaseExportEnvelope {
     readonly total: number;
   };
   readonly items: ReadonlyArray<PortableItemMetadata>;
+  readonly libraryState?: LibraryStatePackage;
   readonly checksumSha256?: string;
+}
+
+export interface LibraryStateSavedView {
+  readonly id: string;
+  readonly name: string;
+  readonly definition: unknown;
+  readonly revision: number;
+  readonly createdAtUtc: string;
+  readonly updatedAtUtc: string;
+}
+
+export interface LibraryStateRelationship {
+  readonly id: string;
+  readonly sourceItemId: string;
+  readonly targetItemId: string | null;
+  readonly targetExternal: Record<string, unknown> | null;
+  readonly relationshipType: string;
+  readonly direction: 'directed' | 'undirected';
+  readonly position: number;
+  readonly provenance: Record<string, unknown>;
+  readonly createdAtUtc: string;
+}
+
+export interface LibraryStatePackage {
+  readonly schemaVersion: 1;
+  readonly savedViews: ReadonlyArray<LibraryStateSavedView>;
+  readonly relationships: ReadonlyArray<LibraryStateRelationship>;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +206,8 @@ export interface BackupManifest {
     readonly canvasAssets: number;
     readonly knowledgeGraphs?: number;
     readonly mermaidDocuments?: number;
+    readonly savedViews?: number;
+    readonly relationships?: number;
   };
   readonly checksums: {
     readonly librarySha256: string;
@@ -185,6 +215,7 @@ export interface BackupManifest {
     readonly notesSha256: string;
     readonly canvasesSha256: string;
     readonly knowledgeSha256?: string;
+    readonly libraryStateSha256?: string;
   };
 }
 
@@ -197,6 +228,7 @@ export interface BackupPackage extends BaseExportEnvelope {
   readonly annotations: AnnotationsExportPackage;
   readonly notes: NotesExportPackage;
   readonly canvases: ReadonlyArray<CanvasExportPackage>;
+  readonly libraryState?: LibraryStatePackage;
   readonly knowledge?: {
     readonly graphs: ReadonlyArray<KnowledgeGraphDocument>;
     readonly diagrams: ReadonlyArray<MermaidDocument>;

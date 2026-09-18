@@ -269,6 +269,21 @@ export function validateBackupPackage(obj) {
     throw new PortabilityValidationError('Backup package missing canvases array');
   }
 
+  // Optional backwards-compatible v1 extension: library-level saved views and
+  // relationships. Old v1 backups remain valid when this section is absent.
+  if (record.libraryState !== undefined) {
+    const state = record.libraryState;
+    if (!state || typeof state !== 'object' || Array.isArray(state)) {
+      throw new PortabilityValidationError('Backup libraryState must be an object');
+    }
+    if (state.schemaVersion !== 1) {
+      throw new PortabilityValidationError('Backup libraryState must use schemaVersion 1');
+    }
+    if (!Array.isArray(state.savedViews) || !Array.isArray(state.relationships)) {
+      throw new PortabilityValidationError('Backup libraryState must contain savedViews and relationships arrays');
+    }
+  }
+
   return record;
 }
 

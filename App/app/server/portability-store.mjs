@@ -30,6 +30,7 @@ import {
   sanitizeExportFilename,
   validateBackupPackage,
 } from './portability-schema.mjs';
+import { normalizeLibraryState, readLibraryState } from './library-state.mjs';
 
 function nowUtc() {
   return new Date().toISOString();
@@ -77,7 +78,7 @@ function parseHexColor(hex, fallback = { r: 0.15, g: 0.15, b: 0.15 }) {
 export function createPortabilityStore({
   databasePath: _databasePath,
   libraryRoot = null,
-  userDataRoot: _userDataRoot,
+  userDataRoot = null,
   libraryStore,
   annotationStore,
   readerStore,
@@ -86,6 +87,28 @@ export function createPortabilityStore({
   searchStore = null,
   knowledgeStore = null,
 }) {
+
+  function currentLibraryStateForBackup() {
+    const file = readLibraryState(userDataRoot);
+    if (file.present) {
+      if (!file.ok) {
+        throw new Error(file.diagnostics[0]?.message ?? 'Invalid library-state.json.');
+      }
+      return file.state;
+    }
+    return normalizeLibraryState({
+      schemaVersion: 1,
+      savedViews: libraryStore.listViews().map((view) => ({
+        id: view.id,
+        name: view.name,
+        definition: view.definition,
+        revision: view.revision,
+        createdAtUtc: view.created_at_utc,
+        updatedAtUtc: view.updated_at_utc,
+      })),
+      relationships: libraryStore.listRelationships(),
+    });
+  }
 
   // -------------------------------------------------------------------------
   // P12-T002: Annotation Exports (JSON & Markdown)
@@ -351,6 +374,7 @@ export function createPortabilityStore({
 
   function exportLibraryMetadata() {
     const catalog = libraryStore.getCatalog();
+    const libraryState = currentLibraryStateForBackup();
     const portableItems = catalog.items.map((it) => {
       const mediaDescriptors = (it.media || []).map((m) => {
         assertSafePath(m.name, 'media name');
@@ -387,9 +411,12 @@ export function createPortabilityStore({
       },
       counts: catalog.counts,
       items: portableItems,
+      libraryState,
     };
 
-    payload.checksumSha256 = sha256String(JSON.stringify(portableItems));
+    payload.checksumSha256 = sha256String(
+      JSON.stringify({ items: portableItems, libraryState }),
+    );
     return payload;
   }
 
@@ -400,6 +427,10 @@ export function createPortabilityStore({
     const canvasesList = exportAllCanvases();
 
     const librarySha = sha256String(JSON.stringify(libraryPkg.items));
+    const libraryStateSha = sha256String(JSON.stringify({
+      savedViews: libraryPkg.libraryState?.savedViews ?? [],
+      relationships: libraryPkg.libraryState?.relationships ?? [],
+    }));
     const annotationsSha = sha256String(JSON.stringify({
       annotations: annotationsPkg.annotations,
       bookmarks: annotationsPkg.bookmarks,
@@ -449,9 +480,12 @@ export function createPortabilityStore({
           canvasAssets: totalCanvasAssets,
           knowledgeGraphs: knowledgeGraphs.length,
           mermaidDocuments: mermaidDiagrams.length,
+          savedViews: libraryPkg.libraryState?.savedViews?.length ?? 0,
+          relationships: libraryPkg.libraryState?.relationships?.length ?? 0,
         },
         checksums: {
           librarySha256: librarySha,
+          libraryStateSha256: libraryStateSha,
           annotationsSha256: annotationsSha,
           notesSha256: notesSha,
           canvasesSha256: canvasesSha,
@@ -459,6 +493,7 @@ export function createPortabilityStore({
         },
       },
       library: libraryPkg,
+      libraryState: libraryPkg.libraryState,
       annotations: annotationsPkg,
       notes: notesPkg,
       canvases: canvasesList,
@@ -506,7 +541,7 @@ export function createPortabilityStore({
         const item = catalog.items.find((i) => i.id === itemId);
         const pdfMedia = item?.media?.find((m) => m.extension?.toLowerCase() === '.pdf' || m.path?.toLowerCase().endsWith('.pdf'));
         if (pdfMedia) {
-          const libRoot = libraryRoot || (_userDataRoot ? resolve(_userDataRoot, '..', 'library') : null);
+          const libRoot = libraryRoot || (userDataRoot ? resolve(userDataRoot, '..', 'library') : null);
           const absPath = libRoot ? resolve(libRoot, pdfMedia.path) : resolve(pdfMedia.path);
           if (existsSync(absPath)) {
             candidate = {
@@ -800,6 +835,16 @@ export function createPortabilityStore({
       }
     }
 
+    if (checksums.libraryStateSha256) {
+      const computed = sha256String(JSON.stringify({
+        savedViews: validated.libraryState?.savedViews ?? [],
+        relationships: validated.libraryState?.relationships ?? [],
+      }));
+      if (computed !== checksums.libraryStateSha256) {
+        throw new Error('Backup tampering detected: library state checksum mismatch');
+      }
+    }
+
     if (checksums.annotationsSha256) {
       const computed = sha256String(JSON.stringify({
         annotations: validated.annotations.annotations,
@@ -947,6 +992,41 @@ export function createPortabilityStore({
       }
     }
 
+    if (validated.libraryState) {
+      const existingViews = libraryStore.listViews();
+      const existingRelationships = libraryStore.listRelationships();
+      const viewIds = new Set(existingViews.map((view) => view.id));
+      const viewNames = new Set(
+        existingViews.map((view) => view.name.toLocaleLowerCase()),
+      );
+      for (const view of validated.libraryState.savedViews) {
+        if (
+          viewIds.has(view.id) ||
+          viewNames.has(view.name.toLocaleLowerCase())
+        ) {
+          conflicts.push({
+            entityType: 'saved-view',
+            entityId: view.id,
+            kind: 'CONFLICT_DIVERGENT',
+            message: `Saved view "${view.name}" already exists locally.`,
+          });
+        }
+      }
+      const relationshipIds = new Set(
+        existingRelationships.map((relationship) => relationship.id),
+      );
+      for (const relationship of validated.libraryState.relationships) {
+        if (relationshipIds.has(relationship.id)) {
+          conflicts.push({
+            entityType: 'relationship',
+            entityId: relationship.id,
+            kind: 'CONFLICT_DIVERGENT',
+            message: `Relationship ${relationship.id} already exists locally.`,
+          });
+        }
+      }
+    }
+
     return {
       canRestore: true,
       schemaVersion: validated.schemaVersion,
@@ -960,6 +1040,8 @@ export function createPortabilityStore({
         incomingCanvases: validated.canvases.length,
         incomingKnowledgeGraphs: validated.knowledge?.graphs?.length || 0,
         incomingMermaidDocuments: validated.knowledge?.diagrams?.length || 0,
+        incomingSavedViews: validated.libraryState?.savedViews?.length || 0,
+        incomingRelationships: validated.libraryState?.relationships?.length || 0,
       },
       conflicts,
       warnings,
@@ -978,6 +1060,8 @@ export function createPortabilityStore({
       canvases: 0,
       knowledgeGraphs: 0,
       mermaidDocuments: 0,
+      savedViews: 0,
+      relationships: 0,
     };
     const skippedCounts = {
       items: 0,
@@ -987,7 +1071,10 @@ export function createPortabilityStore({
       canvases: 0,
       knowledgeGraphs: 0,
       mermaidDocuments: 0,
+      savedViews: 0,
+      relationships: 0,
     };
+    const warnings = [];
 
     // 1. Restore Annotations
     for (const a of validated.annotations.annotations) {
@@ -1159,7 +1246,29 @@ export function createPortabilityStore({
       }
     }
 
-    // 6. Post-Restore Search Rebuild (derived index is NEVER restored from backup)
+    // 6. Restore durable library state (saved views and relationships)
+    if (validated.libraryState) {
+      try {
+        const restoredLibraryState = libraryStore.restoreLibraryState(
+          validated.libraryState,
+          { conflictResolution },
+        );
+        restoredCounts.savedViews = restoredLibraryState.restored.savedViews;
+        restoredCounts.relationships = restoredLibraryState.restored.relationships;
+        skippedCounts.savedViews = restoredLibraryState.skipped.savedViews;
+        skippedCounts.relationships = restoredLibraryState.skipped.relationships;
+        warnings.push(...(restoredLibraryState.warnings ?? []));
+      } catch (error) {
+        skippedCounts.savedViews += validated.libraryState.savedViews.length;
+        skippedCounts.relationships += validated.libraryState.relationships.length;
+        warnings.push({
+          code: 'LIBRARY_STATE_RESTORE_FAILED',
+          message: String(error?.message ?? error),
+        });
+      }
+    }
+
+    // 7. Post-Restore Search Rebuild (derived index is NEVER restored from backup)
     let searchRebuilt = false;
     if (searchStore) {
       try {
@@ -1179,6 +1288,7 @@ export function createPortabilityStore({
       ok: true,
       restoredCounts,
       skippedCounts,
+      warnings,
       searchRebuilt,
     };
   }

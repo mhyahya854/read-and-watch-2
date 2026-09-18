@@ -23,6 +23,11 @@ import { DatabaseSync } from 'node:sqlite';
 import { rebuildPortableLibrary, planPortableRebuild } from './portable-rebuild.mjs';
 import { RUNTIME_SCHEMA_VERSION } from './runtime-schema.mjs';
 import { toLongPath } from './portable-library.mjs';
+import {
+  projectLibraryStateToDatabase,
+  readLibraryState,
+  validateLibraryState,
+} from './library-state.mjs';
 
 const CORRUPT_BACKUP_KEEP = 5;
 const STAGING_KEEP = 2;
@@ -803,10 +808,51 @@ export async function recoverCorruptRuntime({
   }
   counts.knowledgeGraphsRecovered = knowledge.restoredGraphs;
   counts.mermaidDocumentsRecovered = knowledge.restoredDiagrams;
-  const dbOnly = salvageDbOnlyTables(databasePath, stagingPath);
-  counts.savedViewsRecovered = dbOnly.savedViewsRecovered;
-  counts.relationshipsRecovered = dbOnly.relationshipsRecovered;
-  counts.unresolvedRelationships = dbOnly.unresolvedRelationships;
+  const libraryStateFile = readLibraryState(userDataRoot);
+  if (libraryStateFile.present && !libraryStateFile.ok) {
+    return {
+      ok: false,
+      code: CORRUPT_RUNTIME_CODES.USER_STATE_INCOMPLETE,
+      diagnostics: libraryStateFile.diagnostics,
+      backup,
+      metrics,
+    };
+  }
+  let dbOnly = {
+    savedViewsRecovered: 0,
+    relationshipsRecovered: 0,
+    unresolvedRelationships: 0,
+    unrecoverable: [],
+  };
+  if (libraryStateFile.present) {
+    const staging = new DatabaseSync(stagingPath);
+    try {
+      const validation = validateLibraryState(libraryStateFile.state, {
+        itemExists: (itemId) =>
+          Boolean(staging.prepare('SELECT 1 FROM items WHERE id=?').get(itemId)),
+      });
+      if (!validation.ok) {
+        return {
+          ok: false,
+          code: CORRUPT_RUNTIME_CODES.USER_STATE_INCOMPLETE,
+          diagnostics: validation.diagnostics,
+          backup,
+          metrics,
+        };
+      }
+      const projected = projectLibraryStateToDatabase(staging, libraryStateFile.state);
+      counts.savedViewsRecovered = projected.savedViews.length;
+      counts.relationshipsRecovered = projected.relationships.length;
+      counts.unresolvedRelationships = 0;
+    } finally {
+      staging.close();
+    }
+  } else {
+    dbOnly = salvageDbOnlyTables(databasePath, stagingPath);
+    counts.savedViewsRecovered = dbOnly.savedViewsRecovered;
+    counts.relationshipsRecovered = dbOnly.relationshipsRecovered;
+    counts.unresolvedRelationships = dbOnly.unresolvedRelationships;
+  }
   metrics.userStateRecovered = true;
 
   if (diagnostics.some((entry) =>

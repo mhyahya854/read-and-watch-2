@@ -1053,3 +1053,93 @@ completes no phase task and is not OCR benchmark evidence.
    capture. Legacy managed-library catalogs are not automatically imported by
    this path. No Raw organization, external metadata refresh, OCR benchmark,
    Phase 18 work or platform certification was started.
+
+## D-061 - File-first saved views and relationships
+
+Status: Accepted
+
+Sixth checkpoint of the same user-authorized portable-library maintenance
+prerequisite. Phase 17 remains `IN_PROGRESS`, `P17-T004` remains the current
+incomplete task, `P17-T007` remains open, Phase 18 and Phase 19 remain
+`NOT_STARTED`, and no platform certification was started. This decision
+completes no phase task and is not OCR benchmark evidence.
+
+1. **One durable library-level file.** Saved views and relationships now have a
+   single durable file-first record at
+   `App/user-data/library-state.json`. It is human-inspectable JSON and
+   machine-managed; no per-view or per-relationship sidecars were introduced.
+   Title Markdown is not used for these library-level fields.
+
+2. **Schema.** `schemaVersion` is 1 and contains:
+   - `savedViews[]`: stable `id`, `name`, JSON `definition`, positive-integer
+     `revision`, `createdAtUtc`, `updatedAtUtc`.
+   - `relationships[]`: stable `id`, `sourceItemId`, exactly one of
+     `targetItemId` or `targetExternal`, `relationshipType`, `direction`
+     (`directed`/`undirected`), non-negative `position`, JSON `provenance` and
+     `createdAtUtc`.
+   Serialization is deterministic and byte-stable for unchanged state.
+
+3. **Source of truth.** `library-state.json` is the durable reconstructable
+   record. SQLite `saved_views` and `relationships` are optimized runtime
+   projections. The file is sufficient to rebuild both tables; the tables never
+   become a second independent master.
+
+4. **Mutation paths.** The only runtime mutation paths are
+   `libraryStore.saveView(...)` and `libraryStore.addRelationship(...)`.
+   Direct SQL in the corrupt-runtime recovery helper is recovery projection, not
+   a user mutation path. Both mutation paths now use the smallest write sequence:
+   read and validate current durable state, build and validate the next state,
+   stage and atomically replace `library-state.json`, open the SQLite
+   transaction, project the same state, verify DB/file parity, then commit. A DB
+   failure rolls back and restores the previous file; if compensation also
+   fails, the existing recovery-required marker mechanism is used. A hard kill
+   after file replacement but before DB completion leaves the durable file
+   winning on the next startup.
+
+5. **Startup reconciliation.** The existing portable recovery coordinator keeps
+   the healthy fast path cheap and adds only a small library-state check:
+   - file absent + healthy DB: one-time migration from the two runtime tables to
+     the durable file, including the empty-state case.
+   - file present + DB matching: `HEALTHY`, no rewrite.
+   - file present + DB table empty or stale: durable file wins; runtime tables
+     are projected from the file.
+   - malformed file or missing referenced internal items:
+     `RECOVERY_REQUIRED`, file preserved, no fabrication.
+   Valid external relationship targets are accepted and never treated as missing
+   internal items.
+
+6. **Corrupt-runtime recovery parity.** After portable title reconstruction,
+   corrupt-runtime recovery now reads `library-state.json` when present and
+   projects saved views and relationships into the staged runtime database.
+   Best-effort salvage from the corrupt database remains only for pre-mirror
+   installations where the file is absent. With a valid initialized mirror, a
+   completely unreadable runtime database now restores the full audited set:
+   portable titles, annotations, canvases and canvas assets, knowledge and
+   Mermaid documents, notes, thoughts, bookmarks, reading state, settings,
+   saved views, relationships and search. The `PARTIAL` limitation for these two
+   classes is removed for initialized installations and retained honestly for
+   pre-mirror compatibility.
+
+7. **Backup and restore.** The v1 backup format gains an optional
+   backwards-compatible `libraryState` section containing `savedViews` and
+   `relationships`. Old valid v1 backups without the section remain accepted.
+   The manifest records saved-view and relationship member counts and a
+   `libraryStateSha256` checksum. Preflight reports incoming counts and
+   conflicts. Restore preserves current conflict semantics, uses stable IDs and
+   is idempotent on repeated restore; relationships whose referenced items are
+   absent produce structured warnings instead of fabricated targets. No source
+   media is bundled or modified.
+
+8. **Real-library migration.** The real healthy runtime database contained 0
+   saved views and 0 relationships. The durable mirror was present and valid
+   with matching 0/0 counts and was not rewritten. Healthy startup returned
+   `HEALTHY` in 9 ms with no portable Read/Watch scan, no SQLite rebuild and no
+   FTS rebuild. Read/Watch Markdown hashes and thirteen sampled source binaries
+   were unchanged. No private saved-view names, definitions or relationship
+   records are exposed in Git.
+
+9. **Limitations.** Pre-mirror corrupt databases with unreadable DB-only saved
+   views or relationships still report explicit partial compatibility. A
+   non-empty legacy `App/library/catalog.json` still blocks the JS automatic
+   disaster-recovery path. No Raw organization, external metadata refresh, OCR
+   benchmark, Phase 18 or 19 work, or platform certification was started.

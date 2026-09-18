@@ -220,9 +220,9 @@ test('full synthetic disaster recovery reconstructs portable and file-first user
   assert.equal(result.counts.knowledgeGraphsRecovered, 1);
   assert.equal(result.counts.mermaidDocumentsRecovered, 1);
   assert.equal(result.counts.notesRecoveredOrFileBacked, 2);
-  assert.equal(result.partial, true);
-  assert.ok(result.limitations.includes('saved_views_not_recoverable_from_corrupt_database'));
-  assert.ok(result.limitations.includes('relationships_not_recoverable_from_corrupt_database'));
+  assert.equal(result.partial, false);
+  assert.equal(result.counts.savedViewsRecovered, 1);
+  assert.equal(result.counts.relationshipsRecovered, 1);
 
   const libraryStore = createLibraryStore({ databasePath: fx.databasePath, readOnly: true });
   const catalog = libraryStore.getUiCatalog();
@@ -231,6 +231,8 @@ test('full synthetic disaster recovery reconstructs portable and file-first user
   assert.ok(catalog.items.some((item) => item.id === fx.watchId));
   assert.equal(libraryStore.loadNote('notes', fx.readId).content, 'Recovered note body.\n');
   assert.equal(libraryStore.loadNote('thoughts', fx.readId).content, 'Recovered thought body.\n');
+  assert.equal(libraryStore.listViews().length, 1);
+  assert.equal(libraryStore.listRelationships().length, 1);
   libraryStore.close();
 
   const annotationStore = createAnnotationStore({
@@ -280,6 +282,21 @@ test('full synthetic disaster recovery reconstructs portable and file-first user
     JSON.stringify({ schemaVersion: 1, theme: 'dark' }),
   );
   assert.equal(existsSync(join(fx.root, 'App', 'backups', 'corrupt-runtime')), true);
+});
+
+test('a pre-mirror corrupt database keeps honest partial compatibility', async (t) => {
+  const fx = await fullFixture(t);
+  rmSync(join(fx.userDataRoot, 'library-state.json'), { force: true });
+  corruptBytes(fx.databasePath);
+  const result = await runPortableStartupRecovery({
+    root: fx.root,
+    databasePath: fx.databasePath,
+    userDataRoot: fx.userDataRoot,
+  });
+  assert.equal(result.code, PORTABLE_RECOVERY_CODES.RECOVERED_CORRUPT_RUNTIME);
+  assert.equal(result.partial, true);
+  assert.ok(result.limitations.some((item) => item.includes('saved_views')));
+  assert.ok(result.limitations.some((item) => item.includes('relationships')));
 });
 
 test('truncated SQLite database follows the same recovery path', async (t) => {

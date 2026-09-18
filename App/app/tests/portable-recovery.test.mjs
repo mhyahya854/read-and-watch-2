@@ -152,12 +152,18 @@ test('healthy runtime with no journal is HEALTHY and does not scan or rebuild', 
     databasePath: fx.databasePath,
     userDataRoot: join(fx.root, 'App', 'user-data'),
   });
-  assert.equal(result.status, PORTABLE_RECOVERY_STATUS.HEALTHY);
-  assert.equal(result.code, PORTABLE_RECOVERY_CODES.HEALTHY);
+  assert.equal(result.status, PORTABLE_RECOVERY_STATUS.RECOVERED);
+  assert.equal(result.code, PORTABLE_RECOVERY_CODES.RECOVERED_LIBRARY_STATE_MIGRATED);
   assert.equal(result.metrics.portableRootScanned, false);
   assert.equal(result.metrics.rebuildApplied, false);
   assert.equal(result.metrics.searchRebuilt, false);
   assert.equal(existsSync(markerPath(fx.root)), false);
+  const second = await runPortableStartupRecovery({
+    root: fx.root,
+    databasePath: fx.databasePath,
+    userDataRoot: join(fx.root, 'App', 'user-data'),
+  });
+  assert.equal(second.status, PORTABLE_RECOVERY_STATUS.HEALTHY);
 });
 
 test('missing runtime database rebuilds runtime and search from portable Markdown', async (t) => {

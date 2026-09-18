@@ -371,9 +371,11 @@ categories, paths and assets are rebuilt first. Then annotations JSON, canvas
 documents plus asset files, knowledge graph JSON, Mermaid diagram JSON, notes and
 thoughts are reconstructed from file-first inputs into the staged database.
 Bookmarks, reading state, settings and reader settings remain file-first and are
-not overwritten. `saved_views` and `relationships` are DB-only classes and are
-best-effort salvaged when readable; otherwise the result is explicitly
-`PARTIAL` and the limitation is disclosed.
+not overwritten. Saved views and relationships are now restored from the durable
+`App/user-data/library-state.json` mirror when it exists. Best-effort salvage
+from the corrupt database remains only as compatibility for pre-mirror
+installations; otherwise the result is explicitly `PARTIAL` and the limitation
+is disclosed.
 
 **Validation and activation.** The staged database must pass `quick_check`,
 `integrity_check`, foreign-key validation, supported `user_version`,
@@ -409,3 +411,57 @@ Runtime database hash, Read/Watch Markdown hashes and thirteen sampled source
 binaries were unchanged. The real library currently has no file-first
 annotation/canvas/knowledge/notes/bookmark/reading-state/settings substrates; the
 full all-class disaster path is proven by synthetic tests.
+
+## File-first saved views and relationships
+
+Added by the final library-state parity checkpoint. No later slice is claimed by
+this section.
+
+**Durable record.** Saved views and relationships are library-level user state,
+not title Markdown metadata. Their durable record is one compact file at
+`App/user-data/library-state.json` with `schemaVersion: 1`, a `savedViews` array
+and a `relationships` array. The file preserves stable IDs, saved-view names,
+definitions, revisions and timestamps; relationship source, internal or external
+target, relationship type, direction, position, provenance JSON and creation
+time. Valid external targets are accepted; internal source and target item IDs
+must exist. Serialization is deterministic and byte-stable for unchanged state.
+
+**Runtime role.** SQLite `saved_views` and `relationships` are optimized runtime
+projections. They are no longer independent canonical masters. `saveView` and
+`addRelationship` are the only runtime mutation paths; both stage and atomically
+replace the durable file first, then project the same state into SQLite, verify
+parity, and commit. A failed DB transaction restores the previous file or uses
+the existing recovery-required marker if compensation also fails. A hard crash
+after file replacement but before DB completion leaves the durable file winning
+on the next startup.
+
+**Startup reconciliation.** The existing portable recovery coordinator performs
+a cheap library-state check on healthy startup:
+
+- file absent and DB healthy: one-time migration from DB to file, including an
+  empty 0/0 state
+- file present and DB matching: `HEALTHY`, no rewrite
+- file present and DB table empty or stale: durable file wins and the runtime
+  tables are projected from it
+- malformed file or missing internal references: `RECOVERY_REQUIRED`, file
+  preserved, no fabricated targets
+
+**Corrupt-runtime recovery.** When a valid initialized mirror exists, staged
+corrupt-runtime recovery restores saved views and relationships from the file
+after portable title reconstruction. The result is full recovery without the
+former `PARTIAL` limitation for these classes. Pre-mirror installations without
+the file retain best-effort salvage and honest partial compatibility.
+
+**Backup and restore.** The optional v1 `libraryState` backup section carries
+the complete saved-view and relationship arrays. The manifest records saved-view
+and relationship member counts and a `libraryStateSha256` checksum. Old valid v1
+backups without the section remain accepted. Restore uses stable IDs, preserves
+existing conflict semantics and is idempotent on repeated restore; relationships
+with absent referenced items produce structured warnings instead of fabricated
+targets. Source books and media remain excluded and untouched.
+
+**Measured real-library result.** The real runtime database contained 0 saved
+views and 0 relationships. The mirror was present, valid and matched 0/0; it was
+not rewritten. Healthy startup returned `HEALTHY` in 9 ms with no portable-root
+scan, SQLite rebuild or FTS rebuild. No canonical Markdown or sampled source
+binary changed. No private saved-view or relationship content is committed.

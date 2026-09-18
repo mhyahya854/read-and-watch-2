@@ -49,6 +49,11 @@ export function createLibraryStore(options: {
   ): unknown;
   saveView(name: string, definition: unknown): unknown;
   listViews(): unknown[];
+  listRelationships(): unknown[];
+  restoreLibraryState(
+    incomingState: unknown,
+    options?: { conflictResolution?: string },
+  ): unknown;
   loadNote(
     kind: string,
     itemId: string,

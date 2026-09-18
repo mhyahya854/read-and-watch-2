@@ -455,3 +455,61 @@ test('P12-T007 & P12-G001/P12-G003: Restore preflight, conflict handling, and fu
     envB.cleanup();
   }
 });
+
+test('P12-T004 extension: saved views and relationships round-trip through backup', () => {
+  const envA = setupTestEnvironment();
+  const envB = setupTestEnvironment();
+  try {
+    envA.libraryStore.saveView('Recovered View', {
+      collection: 'read',
+      status: 'reading',
+    });
+    envA.libraryStore.restoreLibraryState({
+      schemaVersion: 1,
+      savedViews: [],
+      relationships: [{
+        id: 'relationship-roundtrip-1',
+        sourceItemId: envA.testItemId,
+        targetItemId: null,
+        targetExternal: { kind: 'url', value: 'https://example.test/source' },
+        relationshipType: 'cites',
+        direction: 'undirected',
+        position: 3,
+        provenance: { source: 'backup-test' },
+        createdAtUtc: '2026-01-01T00:00:00.000Z',
+      }],
+    }, { conflictResolution: 'overwrite' });
+
+    const backup = envA.portabilityStore.createBackupBundle();
+    assert.equal(backup.libraryState.savedViews.length, 1);
+    assert.equal(backup.libraryState.relationships.length, 1);
+    assert.equal(backup.manifest.memberCounts.savedViews, 1);
+    assert.equal(backup.manifest.memberCounts.relationships, 1);
+    assert.ok(backup.manifest.checksums.libraryStateSha256);
+    assert.doesNotThrow(() => validateBackupPackage(backup));
+
+    const preflight = envB.portabilityStore.preflightRestore(backup);
+    assert.equal(preflight.counts.incomingSavedViews, 1);
+    assert.equal(preflight.counts.incomingRelationships, 1);
+    const restored = envB.portabilityStore.applyRestore(backup);
+    assert.equal(restored.restoredCounts.savedViews, 1);
+    assert.equal(restored.restoredCounts.relationships, 1);
+    assert.equal(envB.libraryStore.listViews().length, 1);
+    assert.equal(envB.libraryStore.listRelationships().length, 1);
+    assert.equal(envB.libraryStore.listRelationships()[0].targetExternal.value, 'https://example.test/source');
+
+    const second = envB.portabilityStore.applyRestore(backup, { conflictResolution: 'skip' });
+    assert.equal(second.skippedCounts.savedViews, 1);
+    assert.equal(second.skippedCounts.relationships, 1);
+    assert.equal(envB.libraryStore.listViews().length, 1);
+    assert.equal(envB.libraryStore.listRelationships().length, 1);
+
+    const oldBackup = JSON.parse(JSON.stringify(backup));
+    delete oldBackup.libraryState;
+    delete oldBackup.manifest.checksums.libraryStateSha256;
+    assert.doesNotThrow(() => validateBackupPackage(oldBackup));
+  } finally {
+    envA.cleanup();
+    envB.cleanup();
+  }
+});
