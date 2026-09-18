@@ -949,3 +949,107 @@ completes no phase task and is not OCR benchmark evidence.
     bounded to the newest 20 journal records. No Raw organization, external
     metadata refresh, OCR benchmark, Phase 18 work or platform certification was
     started.
+
+## D-060 - Corrupt runtime database disaster recovery
+
+Status: Accepted
+
+Fifth checkpoint of the same user-authorized portable-library maintenance
+prerequisite. Phase 17 remains `IN_PROGRESS`, `P17-T004` remains the current
+incomplete task, `P17-T007` remains open, Phase 18 and Phase 19 remain
+`NOT_STARTED`, and no platform certification was started. This decision
+completes no phase task and is not OCR benchmark evidence.
+
+1. **Runtime database corruption is not library corruption.** The durable
+   portable record remains `Read/` and `Watch/` Markdown plus their local
+   assets. A corrupt `App/state/read-watch.sqlite3` triggers runtime
+   reconstruction, not canonical library replacement.
+
+2. **Recoverability audit results.**
+   - Portable titles, categories, paths and assets: reconstructable from
+     portable Markdown (`portable-rebuild.mjs`).
+   - Annotations: reconstructable from `App/user-data/items/<id>/annotations.json`
+     through `annotationStore.recoverFromExternalFile`.
+   - Canvases and links: reconstructable from
+     `App/user-data/canvases/<id>/canvas.json` through
+     `canvasStore.recoverCanvasFromExternal`; canvas assets are recovered from
+     the existing `assets/` files through the new
+     `recoverCanvasAssetsFromExternal`. Canvas link mutations now also mirror
+     the current links into `canvas.json` so links are genuinely file-first.
+   - Knowledge graphs, nodes, edges and Mermaid documents: reconstructable from
+     `App/user-data/knowledge/graphs/*.json` and
+     `App/user-data/knowledge/diagrams/*.json` through
+     `knowledgeStore.rebuildFromFiles`.
+   - Notes and thoughts: reconstructable from
+     `App/user-data/items/<id>/notes.md` and `thoughts.md`.
+   - Bookmarks and reading state: already file-first under
+     `App/user-data/items/<id>/bookmarks.json` and `reading-state.json`.
+   - Settings and reader settings: already file-first and untouched by runtime
+     database replacement.
+   - Search and runtime projections: derived and rebuilt through the existing
+     FTS store.
+   - `saved_views` and `relationships` are DB-only convenience/user state. They
+     are best-effort salvaged from the corrupt database when it is readable; when
+     not readable, recovery proceeds as explicit `PARTIAL` recovery with the
+     limitation disclosed and the corrupt database preserved.
+   - A non-empty legacy `App/library/catalog.json` is treated as a recovery
+     blocker because this JS recovery path does not own the legacy importer.
+
+3. **Forensic database-family preservation happens before writable access.**
+   Startup recovery discovers the full SQLite family
+   (`read-watch.sqlite3`, `-wal`, `-shm`, `-journal`), copies every present file
+   into `App/backups/corrupt-runtime/<timestamp>/`, and verifies byte size and
+   SHA-256 for each copy before any quarantine or activation. A private
+   `manifest.json` records relative locations, sizes, hashes, capture time,
+   recovery reason and best-effort schema information. Backup capture directories
+   are bounded to the newest five and the newest/only capture is never deleted;
+   failed recoveries do not prune.
+
+4. **Replacement is staged, reconstructed and validated.** A sibling
+   `read-watch.sqlite3.recovery-<timestamp>.staging` database is built with the
+   existing `applyRuntimeSchema`/`planPortableRebuild`/`rebuildPortableLibrary`
+   path. Portable rows are rebuilt first; then annotations, canvases and assets,
+   knowledge and Mermaid documents, notes and thoughts are reconstructed into the
+   staged database from file-first inputs. Search is rebuilt only from the
+   staged canonical runtime state. Staged validation requires `quick_check`,
+   `integrity_check`, no foreign-key violations, supported `user_version`,
+   expected tables, unique item IDs and paths, and an application-level smoke
+   test for catalog/reader/search access.
+
+5. **Activation is atomic and reversible.** Only after verified backup,
+   successful reconstruction, integrity validation, search rebuild and smoke
+   test, the original runtime family is moved into the verified capture's
+   `original/` area and the staged database is renamed to the canonical runtime
+   path. If activation fails, the original family is moved back where possible
+   and recovery returns `CORRUPT_RUNTIME_ACTIVATION_FAILED`; the verified backup
+   and staged database remain for diagnosis. No canonical Markdown or source
+   media is touched.
+
+6. **Newer readable schemas remain unsupported, not corrupt.** A readable
+   database with a newer `user_version` still returns
+   `RUNTIME_SCHEMA_UNSUPPORTED`, is never quarantined, and is never replaced by
+   this path.
+
+7. **Failure is explicit.** Malformed annotation, canvas or knowledge recovery
+   files, duplicate portable IDs, malformed required title identities,
+   backup-copy verification failure, staged integrity/FK failure, search rebuild
+   failure, activation failure and a non-empty legacy managed library all fail
+   closed with structured recovery-required codes. Warning-only missing
+   recommendation-evidence references remain non-fatal.
+
+8. **Real-library record.** The real runtime database remained healthy and was
+   not corrupted or replaced: 145 Read, 74 Watch, 219 total, 219 unique IDs,
+   219 search records, no journal, no recovery marker, no corrupt-runtime backup,
+   `HEALTHY` in 6 ms with `portableRootScanned: false`, `rebuildApplied: false`
+   and `searchRebuilt: false`. Runtime database hash, Read/Watch Markdown hashes
+   and thirteen sampled source binaries were unchanged. The real library
+   currently has no file-first annotation/canvas/knowledge/notes/bookmark/
+   reading-state/settings substrates; the full-state disaster path is proven by
+   synthetic tests instead.
+
+9. **Limitations.** A corrupt database that is completely unreadable cannot
+   salvage DB-only `saved_views` or `relationships`; the recovery result is
+   explicitly partial and discloses those classes while preserving the forensic
+   capture. Legacy managed-library catalogs are not automatically imported by
+   this path. No Raw organization, external metadata refresh, OCR benchmark,
+   Phase 18 work or platform certification was started.

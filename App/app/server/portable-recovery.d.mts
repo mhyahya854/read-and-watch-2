@@ -10,6 +10,8 @@ export type PortableRecoveryState = {
   details: Record<string, unknown>;
   actions: string[];
   counts: { read: number; watch: number; total: number } | null;
+  partial: boolean;
+  limitations: string[];
   mutationBlocked: boolean;
   message: string;
   metrics: Record<string, unknown>;

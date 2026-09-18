@@ -27,6 +27,10 @@ import { parseTitleMarkdown, readIdentity } from './portable-metadata.mjs';
 import { planPortableRebuild, rebuildPortableLibrary } from './portable-rebuild.mjs';
 import { createSearchStore } from './search-store.mjs';
 import { RUNTIME_SCHEMA_VERSION, applyRuntimeSchema } from './runtime-schema.mjs';
+import {
+  CORRUPT_RUNTIME_CODES,
+  recoverCorruptRuntime,
+} from './corrupt-runtime-recovery.mjs';
 
 export const PORTABLE_RECOVERY_STATUS = Object.freeze({
   HEALTHY: 'HEALTHY',
@@ -51,6 +55,14 @@ export const PORTABLE_RECOVERY_CODES = Object.freeze({
   MALFORMED_RECOVERY_JOURNAL: 'MALFORMED_RECOVERY_JOURNAL',
   DIVERGENCE_REQUIRES_REVIEW: 'DIVERGENCE_REQUIRES_REVIEW',
   RECOVERY_EVIDENCE_ARCHIVE_FAILED: 'RECOVERY_EVIDENCE_ARCHIVE_FAILED',
+  CORRUPT_RUNTIME_BACKUP_FAILED: CORRUPT_RUNTIME_CODES.BACKUP_FAILED,
+  CORRUPT_RUNTIME_BACKUP_VERIFIED: CORRUPT_RUNTIME_CODES.BACKUP_VERIFIED,
+  CORRUPT_RUNTIME_STAGING_FAILED: CORRUPT_RUNTIME_CODES.STAGING_FAILED,
+  CORRUPT_RUNTIME_USER_STATE_INCOMPLETE: CORRUPT_RUNTIME_CODES.USER_STATE_INCOMPLETE,
+  CORRUPT_RUNTIME_INTEGRITY_FAILED: CORRUPT_RUNTIME_CODES.INTEGRITY_FAILED,
+  CORRUPT_RUNTIME_ACTIVATION_FAILED: CORRUPT_RUNTIME_CODES.ACTIVATION_FAILED,
+  LEGACY_MANAGED_LIBRARY_PRESENT: CORRUPT_RUNTIME_CODES.LEGACY_LIBRARY_PRESENT,
+  RECOVERED_CORRUPT_RUNTIME: CORRUPT_RUNTIME_CODES.RECOVERED,
 });
 
 const JOURNAL_FILE = 'portable-writeback-journal.json';
@@ -131,6 +143,20 @@ function messageFor(code) {
       return 'The runtime database cannot be opened safely. Your library files have not been changed.';
     case PORTABLE_RECOVERY_CODES.RUNTIME_SCHEMA_UNSUPPORTED:
       return 'The runtime database was written by a newer version. Your library files have not been changed.';
+    case PORTABLE_RECOVERY_CODES.CORRUPT_RUNTIME_BACKUP_FAILED:
+      return 'The damaged runtime database could not be preserved safely, so recovery was stopped. Your library files have not been changed.';
+    case PORTABLE_RECOVERY_CODES.CORRUPT_RUNTIME_STAGING_FAILED:
+      return 'The runtime database could not be reconstructed safely. Your library files have not been changed.';
+    case PORTABLE_RECOVERY_CODES.CORRUPT_RUNTIME_USER_STATE_INCOMPLETE:
+      return 'Some runtime user data could not be reconstructed safely. Your library files have not been changed.';
+    case PORTABLE_RECOVERY_CODES.CORRUPT_RUNTIME_INTEGRITY_FAILED:
+      return 'The reconstructed runtime database failed validation. Your library files have not been changed.';
+    case PORTABLE_RECOVERY_CODES.CORRUPT_RUNTIME_ACTIVATION_FAILED:
+      return 'The reconstructed runtime database could not be activated safely. The damaged database backup was preserved.';
+    case PORTABLE_RECOVERY_CODES.LEGACY_MANAGED_LIBRARY_PRESENT:
+      return 'A legacy managed library is present and needs review before automatic runtime reconstruction. Your library files have not been changed.';
+    case PORTABLE_RECOVERY_CODES.RECOVERED_CORRUPT_RUNTIME:
+      return 'The runtime database was reconstructed from your portable library and file-first recovery data. The damaged runtime database was preserved safely.';
     default:
       return 'Startup recovery completed.';
   }
@@ -143,6 +169,8 @@ function state({
   details = {},
   actions = [],
   counts = null,
+  partial = false,
+  limitations = [],
   mutationBlocked = false,
   metrics = {},
 }) {
@@ -153,6 +181,8 @@ function state({
     details,
     actions,
     counts,
+    partial,
+    limitations,
     mutationBlocked,
     message: messageFor(code),
     metrics,
@@ -167,24 +197,39 @@ function healthyState(metrics) {
   });
 }
 
-function recoveredState(code, metrics, { reasons = [], counts = null, actions = [] } = {}) {
+function recoveredState(code, metrics, {
+  reasons = [],
+  counts = null,
+  actions = [],
+  partial = false,
+  limitations = [],
+} = {}) {
   return state({
     status: PORTABLE_RECOVERY_STATUS.RECOVERED,
     code,
     reasons,
     counts,
     actions,
+    partial,
+    limitations,
     metrics,
   });
 }
 
-function requiredState(code, metrics, { reasons = [code], details = {}, actions = [] } = {}) {
+function requiredState(code, metrics, {
+  reasons = [code],
+  details = {},
+  actions = [],
+  limitations = [],
+} = {}) {
   return state({
     status: PORTABLE_RECOVERY_STATUS.RECOVERY_REQUIRED,
     code,
     reasons,
     details,
     actions,
+    partial: false,
+    limitations,
     mutationBlocked: true,
     metrics,
   });
@@ -208,6 +253,8 @@ export function publicRecoveryState(value) {
     message: value.message,
     actions: value.actions,
     counts: value.counts,
+    partial: value.partial,
+    limitations: value.limitations,
     mutationBlocked: value.mutationBlocked,
     metrics: value.metrics,
   };
@@ -764,8 +811,46 @@ export async function runPortableStartupRecovery({
   const runtime = inspectRuntime(databasePath);
   metrics.dbInspected = true;
   if (!runtime.usable) {
-    const result = requiredState(PORTABLE_RECOVERY_CODES.RUNTIME_DB_UNUSABLE, metrics, {
-      details: { message: runtime.error ?? null },
+    const disaster = await recoverCorruptRuntime({
+      root: absoluteRoot,
+      databasePath,
+      userDataRoot: userDataRoot ?? join(absoluteRoot, 'App', 'user-data'),
+      now,
+    });
+    metrics.corruptRuntime = disaster.metrics;
+    if (disaster.ok) {
+      metrics.portableRootScanned = true;
+      metrics.rebuildApplied = disaster.metrics.stagingBuilt;
+      metrics.searchRebuilt = disaster.metrics.searchRebuilt;
+      const result = recoveredState(
+        PORTABLE_RECOVERY_CODES.RECOVERED_CORRUPT_RUNTIME,
+        metrics,
+        {
+          reasons: [PORTABLE_RECOVERY_CODES.CORRUPT_RUNTIME_BACKUP_VERIFIED],
+          counts: disaster.counts ?? null,
+          actions: [
+            'corrupt_runtime_backup',
+            'portable_rebuild',
+            'user_state_recovery',
+            'search_rebuild',
+            'atomic_activation',
+          ],
+          partial: disaster.partial,
+          limitations: disaster.limitations ?? [],
+        },
+      );
+      clearRecoveryMarker(absoluteRoot);
+      metrics.durationMs = Date.now() - startedAt;
+      result.metrics = metrics;
+      return result;
+    }
+    const result = requiredState(disaster.code, metrics, {
+      reasons: [disaster.code],
+      details: {
+        message: disaster.diagnostics?.[0]?.message ?? null,
+        diagnostics: (disaster.diagnostics ?? []).map(({ code, message }) => ({ code, message })),
+      },
+      limitations: disaster.limitations ?? [],
     });
     writeRecoveryMarker(absoluteRoot, {
       code: result.code,

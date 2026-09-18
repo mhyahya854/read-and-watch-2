@@ -337,8 +337,75 @@ Runtime database hash, Read/Watch Markdown hashes and thirteen sampled source
 binaries were unchanged. The same three missing recommendation-evidence
 references remained warning-level diagnostics and did not trigger recovery.
 
-**Limitations.** An unreadable or corrupt runtime database surfaces
-`RUNTIME_DB_UNUSABLE` rather than attempting an automatic destructive repair.
-Automatic reconstruction does not run while any title has a malformed required
-identity. No Raw organization, external metadata refresh, OCR benchmark, Phase
-18 work or platform certification is claimed by this section.
+**Limitations.** An unreadable or corrupt runtime database is now handled by
+the staged, verified disaster recovery path described below; it is never
+silently replaced. Automatic reconstruction does not run while any title has a
+malformed required identity. No Raw organization, external metadata refresh, OCR
+benchmark, Phase 18 work or platform certification is claimed by this section.
+
+## Corrupt runtime SQLite disaster recovery
+
+Added by the corrupt-runtime disaster recovery checkpoint. No later slice is
+claimed by this section.
+
+**Scope.** Only a genuinely unreadable or unusable
+`App/state/read-watch.sqlite3` triggers this path. A readable database with a
+newer unsupported `user_version` remains `RUNTIME_SCHEMA_UNSUPPORTED` and is
+never quarantined or replaced. Runtime database corruption is never described as
+corruption of the portable Markdown library.
+
+**Forensic preservation.** The full SQLite family
+(`read-watch.sqlite3`, `-wal`, `-shm`, `-journal`) is discovered before writable
+access. Every present file is copied byte-for-byte into
+`App/backups/corrupt-runtime/<timestamp>/`, then source and copy are verified by
+byte size and SHA-256. A private manifest records relative location, size, hash,
+capture time, recovery reason and best-effort schema state. Capture directories
+are bounded to the newest five; the newest/only capture is never deleted and
+failed recoveries are not pruned. No forensic capture, sidecar or manifest is
+committed to Git.
+
+**Staged reconstruction.** A new
+`read-watch.sqlite3.recovery-<timestamp>.staging` database is constructed with
+the existing runtime schema and portable rebuild path. Portable items,
+categories, paths and assets are rebuilt first. Then annotations JSON, canvas
+documents plus asset files, knowledge graph JSON, Mermaid diagram JSON, notes and
+thoughts are reconstructed from file-first inputs into the staged database.
+Bookmarks, reading state, settings and reader settings remain file-first and are
+not overwritten. `saved_views` and `relationships` are DB-only classes and are
+best-effort salvaged when readable; otherwise the result is explicitly
+`PARTIAL` and the limitation is disclosed.
+
+**Validation and activation.** The staged database must pass `quick_check`,
+`integrity_check`, foreign-key validation, supported `user_version`,
+expected-table checks, unique portable IDs and paths, and a catalog/reader/search
+smoke test. Search is rebuilt from staged canonical state through the existing
+FTS store. Only then is the original runtime family moved into the verified
+capture's `original/` area and the staged database atomically renamed to the
+canonical runtime path. Activation failure restores the original family where
+possible and returns `CORRUPT_RUNTIME_ACTIVATION_FAILED`; the forensic capture
+remains.
+
+**Fail-closed cases.** Backup copy verification failure, malformed annotation,
+canvas or knowledge recovery files, duplicate portable IDs, malformed required
+title identities, staged integrity or foreign-key failure, search rebuild
+failure, activation failure and a non-empty legacy managed library all stop
+automatic replacement. Warning-only missing recommendation-evidence references
+remain non-fatal. No canonical Markdown, book, video or other source media is
+modified.
+
+**UI.** The existing portable recovery notice reports automatic success with a
+calm message that runtime data was reconstructed and the damaged runtime
+database was preserved safely. If recovery is partial, it states that some
+runtime-only data could not be reconstructed from the damaged database and that
+the damaged database was preserved for review. Recovery-required failures keep
+the existing `Library recovery needed` presentation and never expose hashes,
+absolute paths, SQL or stack traces.
+
+**Measured real-library result.** The real runtime database remained healthy and
+was not corrupted or replaced: 145 Read, 74 Watch, 219 total, 219 unique IDs,
+219 search records, no journal, no recovery marker, no corrupt-runtime backup,
+`HEALTHY` in 6 ms with no portable-root scan, no rebuild and no FTS rebuild.
+Runtime database hash, Read/Watch Markdown hashes and thirteen sampled source
+binaries were unchanged. The real library currently has no file-first
+annotation/canvas/knowledge/notes/bookmark/reading-state/settings substrates; the
+full all-class disaster path is proven by synthetic tests.

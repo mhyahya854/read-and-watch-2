@@ -608,12 +608,34 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
       throw err;
     }
 
-    return rowToLink(db.prepare('SELECT * FROM canvas_links WHERE id = ?').get(id));
+    const created = rowToLink(db.prepare('SELECT * FROM canvas_links WHERE id = ?').get(id));
+    const doc = readDocumentFile(canvasId) || {
+      schemaVersion: 1,
+      canvasId,
+      links: [],
+    };
+    doc.links = db
+      .prepare('SELECT * FROM canvas_links WHERE canvas_id = ?')
+      .all(canvasId)
+      .map(rowToLink);
+    saveDocumentFile(doc);
+    return created;
   }
 
   /** Remove a specific canvas link by ID. */
   function removeCanvasLink(linkId) {
+    const row = db.prepare('SELECT canvas_id FROM canvas_links WHERE id = ?').get(linkId);
     db.prepare('DELETE FROM canvas_links WHERE id = ?').run(linkId);
+    if (row) {
+      const doc = readDocumentFile(row.canvas_id);
+      if (doc) {
+        doc.links = db
+          .prepare('SELECT * FROM canvas_links WHERE canvas_id = ?')
+          .all(row.canvas_id)
+          .map(rowToLink);
+        saveDocumentFile(doc);
+      }
+    }
     return { ok: true };
   }
 
@@ -819,6 +841,80 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     return { ok: true, recovered: true, canvas: getCanvasMetadata(canvasId) };
   }
 
+  /**
+   * Recover canvas asset rows from the existing file-first asset directory.
+   * This never rewrites or deletes the asset files.
+   */
+  function recoverCanvasAssetsFromExternal(canvasId) {
+    if (typeof canvasId !== 'string' || !canvasId.trim()) fail('Invalid canvasId');
+    const canvas = db.prepare('SELECT id FROM canvases WHERE id = ?').get(canvasId);
+    if (!canvas) fail('Canvas not found', 404);
+
+    const docs = readDocumentFile(canvasId);
+    const candidates = new Set();
+    if (docs && Array.isArray(docs.assets)) {
+      for (const asset of docs.assets) {
+        const reference = asset?.relativePath ?? asset?.path ?? asset?.filename;
+        if (typeof reference !== 'string' || !reference.trim() || isAbsolute(reference)) continue;
+        const absolute = resolve(userDataRoot, reference);
+        if (
+          isInside(canvasAssetsDir(canvasId), absolute) &&
+          existsSync(absolute) &&
+          statSync(absolute).isFile()
+        ) {
+          candidates.add(absolute);
+        }
+      }
+    }
+    const assetsDir = canvasAssetsDir(canvasId);
+    if (existsSync(assetsDir)) {
+      for (const entry of readdirSync(assetsDir, { withFileTypes: true })) {
+        if (entry.isFile()) candidates.add(join(assetsDir, entry.name));
+      }
+    }
+
+    const mimeByExtension = new Map([
+      ['.png', 'image/png'],
+      ['.jpg', 'image/jpeg'],
+      ['.jpeg', 'image/jpeg'],
+      ['.webp', 'image/webp'],
+      ['.gif', 'image/gif'],
+    ]);
+    let recovered = 0;
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const insert = db.prepare(`
+        INSERT OR IGNORE INTO canvas_assets
+          (id, canvas_id, mime_type, size_bytes, sha256, original_name, relative_path, created_at_utc)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const absolute of candidates) {
+        const mimeType = mimeByExtension.get(extname(absolute).toLowerCase());
+        if (!mimeType) continue;
+        const buffer = readFileSync(absolute);
+        const digest = sha256Buffer(buffer);
+        const assetId = digest.slice(0, 32);
+        const relativePath = `canvases/${canvasId}/assets/${basename(absolute)}`;
+        const result = insert.run(
+          assetId,
+          canvasId,
+          mimeType,
+          buffer.length,
+          digest,
+          basename(absolute),
+          relativePath,
+          nowUtc(),
+        );
+        if (result.changes > 0) recovered += 1;
+      }
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+    return { ok: true, recovered };
+  }
+
   function close() {
     try {
       db.close();
@@ -844,6 +940,7 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     exportCanvas,
     importCanvas,
     recoverCanvasFromExternal,
+    recoverCanvasAssetsFromExternal,
     close,
   };
 }

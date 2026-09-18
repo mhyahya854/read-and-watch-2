@@ -222,6 +222,48 @@ shows a calm recovery notice only when human recovery is required. Missing
 recommendation-evidence references remain warning-level diagnostics and do not
 turn into recovery failures.
 
+### Corrupt runtime database recovery
+
+If startup establishes that `App/state/read-watch.sqlite3` is genuinely
+unusable, the runtime database family (`read-watch.sqlite3`, `-wal`, `-shm`,
+`-journal`) is copied byte-for-byte to
+`App/backups/corrupt-runtime/<timestamp>/` and verified by size and SHA-256
+before any quarantine or replacement. The capture directory keeps a private
+`manifest.json` and is bounded to the newest five captures; the newest or only
+capture is never deleted.
+
+A replacement is built at
+`App/state/read-watch.sqlite3.recovery-<timestamp>.staging`, never directly at
+the canonical path. The staged database is rebuilt from portable Markdown first,
+then reconstructed from file-first recovery inputs: annotations JSON, canvas
+documents plus asset files, knowledge graph JSON, Mermaid diagram JSON, notes
+and thoughts Markdown. Bookmarks and reading state are already file-first;
+settings and reader settings remain file-first and untouched. Search is rebuilt
+from the staged canonical runtime state through the existing FTS store.
+
+The staged database must pass `PRAGMA quick_check`,
+`PRAGMA integrity_check`, foreign-key validation, supported `user_version`,
+expected-table checks, portable ID/path uniqueness and an application-level
+catalog/reader/search smoke test before activation. Only then is the original
+runtime family quarantined inside the verified capture and the staged database
+atomically renamed into the canonical path. Activation failure restores the
+original family where possible and returns
+`CORRUPT_RUNTIME_ACTIVATION_FAILED`; the forensic capture remains.
+
+A readable database with a newer unsupported `user_version` remains
+`RUNTIME_SCHEMA_UNSUPPORTED` and is never quarantined or replaced. A non-empty
+legacy `App/library/catalog.json` blocks automatic recovery because the legacy
+importer is not part of this path.
+
+`saved_views` and `relationships` are the only runtime classes without a
+file-first recovery source. They are best-effort salvaged when the corrupt
+database is still readable. If that is not possible, recovery is reported as
+explicit `PARTIAL` recovery with the limitation disclosed, and the forensic
+capture is preserved. Malformed annotation, canvas or knowledge recovery files,
+duplicate portable IDs, malformed required identities, backup verification
+failure, staged integrity/FK failure, search rebuild failure or activation
+failure all fail closed instead of claiming complete recovery.
+
 ## Portable title schema (v1)
 
 Every canonical title Markdown file carries a `schema_version` and a stable

@@ -239,13 +239,23 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     try {
       await initializeStores();
     } catch (error) {
-      recoveryState = makeRecoveryRequiredState(
-        PORTABLE_RECOVERY_CODES.RUNTIME_DB_UNUSABLE,
-        {
-          details: { message: String(error?.message ?? error) },
-          metrics: recoveryState?.metrics ?? {},
-        },
-      );
+      if (!recoveryState || recoveryState.status !== 'RECOVERY_REQUIRED') {
+        recoveryState = makeRecoveryRequiredState(
+          PORTABLE_RECOVERY_CODES.RUNTIME_DB_UNUSABLE,
+          {
+            details: { message: String(error?.message ?? error) },
+            metrics: recoveryState?.metrics ?? {},
+          },
+        );
+      } else {
+        recoveryState = {
+          ...recoveryState,
+          details: {
+            ...recoveryState.details,
+            storeInitializationError: String(error?.message ?? error),
+          },
+        };
+      }
     }
     return recoveryState;
   }

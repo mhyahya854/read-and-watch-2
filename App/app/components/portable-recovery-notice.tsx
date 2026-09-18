@@ -16,6 +16,7 @@ export function PortableRecoveryNotice({
 }) {
   const [recovery, setRecovery] = useState<PortableRecoveryState | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -25,7 +26,37 @@ export function PortableRecoveryNotice({
     return () => controller.abort();
   }, []);
 
-  if (!recovery || recovery.status !== 'RECOVERY_REQUIRED') return null;
+  if (!recovery || dismissed) return null;
+
+  if (
+    recovery.status === 'RECOVERED' &&
+    recovery.code === 'RECOVERED_CORRUPT_RUNTIME'
+  ) {
+    return (
+      <output className="mb-4 block rounded-md border border-border bg-surface-muted p-4 text-sm">
+        <h2 className="font-editorial text-lg font-semibold">
+          Runtime data reconstructed
+        </h2>
+        <p className="mt-1 text-muted-foreground">{recovery.message}</p>
+        {recovery.partial && (
+          <p className="mt-1 text-muted-foreground">
+            Some runtime-only data could not be reconstructed from the damaged
+            database. The damaged database was preserved for review.
+          </p>
+        )}
+        <Button
+          className="mt-3"
+          size="sm"
+          variant="ghost"
+          onClick={() => setDismissed(true)}
+        >
+          Dismiss
+        </Button>
+      </output>
+    );
+  }
+
+  if (recovery.status !== 'RECOVERY_REQUIRED') return null;
 
   async function retry() {
     setRetrying(true);
