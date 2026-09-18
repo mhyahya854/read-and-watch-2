@@ -17,8 +17,10 @@ import {
 
 test('embedded runtime schema templates match the canonical migrations', () => {
   const migrations = resolve(import.meta.dirname, '..', '..', 'import', 'migrations');
-  const initial = readFileSync(join(migrations, '001_initial.sql'), 'utf8');
-  const relax = readFileSync(join(migrations, '002_relax_item_identity.sql'), 'utf8');
+  const initial = readFileSync(join(migrations, '001_initial.sql'), 'utf8')
+    .replaceAll('\r\n', '\n');
+  const relax = readFileSync(join(migrations, '002_relax_item_identity.sql'), 'utf8')
+    .replaceAll('\r\n', '\n');
   assert.equal(RUNTIME_SCHEMA_TEMPLATES.initial, initial);
   assert.equal(RUNTIME_SCHEMA_TEMPLATES.relaxItemIdentity, relax);
   assert.equal(RUNTIME_SCHEMA_VERSION, 2);
