@@ -10,6 +10,7 @@ export function Dialog({
   title,
   description,
   children,
+  footer,
   maxWidth = 'max-w-md',
 }: {
   open: boolean;
@@ -17,6 +18,7 @@ export function Dialog({
   title: string;
   description?: string;
   children: ReactNode;
+  footer?: ReactNode;
   maxWidth?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -47,7 +49,7 @@ export function Dialog({
   return (
     <div
       role="presentation"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-foreground/25 backdrop-blur-[2px] overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -58,20 +60,20 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby={description ? 'dialog-description' : undefined}
-        className={`w-full ${maxWidth} rounded-lg border border-border bg-surface p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150 m-0`}
+        className={`relative w-full ${maxWidth} max-h-[calc(100dvh-3.5rem)] flex flex-col rounded-lg border border-border bg-surface shadow-2xl overflow-hidden m-0 p-0 text-foreground animate-in fade-in-0 zoom-in-95 duration-150`}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 bg-surface shrink-0">
+          <div className="min-w-0 flex-1">
             <h2
               id="dialog-title"
-              className="font-editorial text-xl font-semibold text-foreground"
+              className="font-editorial text-lg font-semibold text-foreground truncate"
             >
               {title}
             </h2>
             {description && (
               <p
                 id="dialog-description"
-                className="mt-1 text-xs text-muted-foreground"
+                className="mt-0.5 text-xs text-muted-foreground truncate"
               >
                 {description}
               </p>
@@ -82,11 +84,17 @@ export function Dialog({
             size="icon-sm"
             aria-label="Close dialog"
             onClick={onClose}
+            className="shrink-0 -mr-1 -mt-0.5"
           >
-            <X />
+            <X size={16} />
           </Button>
         </div>
-        <div className="mt-4">{children}</div>
+        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+        {footer && (
+          <div className="border-t border-border px-5 py-3 bg-surface-muted/30 shrink-0 flex items-center justify-end gap-2">
+            {footer}
+          </div>
+        )}
       </dialog>
     </div>
   );
