@@ -153,6 +153,8 @@ function validateContent(kind: AnnotationKind, v: unknown): AnnotationContent {
       return {
         subKind: c.subKind as TextMarkSubKind,
         ...(typeof c.color === 'string' ? { color: c.color } : {}),
+        ...(typeof c.note === 'string' ? { note: c.note } : {}),
+        ...(typeof c.noteUpdatedAt === 'string' ? { noteUpdatedAt: c.noteUpdatedAt } : {}),
       };
     }
     case 'comment': {
@@ -181,6 +183,8 @@ function validateContent(kind: AnnotationKind, v: unknown): AnnotationContent {
         strokeWidth: c.strokeWidth as number,
         ...(typeof c.fill === 'string' ? { fill: c.fill } : {}),
         ...(typeof c.text === 'string' ? { text: c.text } : {}),
+        ...(typeof c.note === 'string' ? { note: c.note } : {}),
+        ...(typeof c.noteUpdatedAt === 'string' ? { noteUpdatedAt: c.noteUpdatedAt } : {}),
       };
     }
     default:

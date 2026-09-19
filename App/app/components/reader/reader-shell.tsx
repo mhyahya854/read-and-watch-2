@@ -14,7 +14,14 @@ import { ReaderSidebar } from './reader-sidebar';
 import { ReaderViewport } from './reader-viewport';
 import { ReaderStatus } from './reader-status';
 import { ReaderSettingsDialog } from './reader-settings-dialog';
+import { ReaderStudyPane } from './reader-study-pane';
 import { ReadWatchCanvas, CanvasList } from '@/components/canvas';
+import {
+  readerPaneClass,
+  readerPaneVisible,
+  sidePaneClass,
+  sidePaneVisible,
+} from '@/lib/reader/layout';
 
 export function ReaderShell() {
   const {
@@ -32,7 +39,9 @@ export function ReaderShell() {
     setIsCanvasOpen,
     activeCanvasId,
     setActiveCanvasId,
-    mobileViewTab,
+    readerLayout,
+    studyPane,
+    setStudyPane,
   } = useReader();
 
   const themeClass =
@@ -128,6 +137,8 @@ export function ReaderShell() {
   };
 
   const bookTitle = snapshot.metadata?.title || readerStatus?.candidates[0]?.name || 'Book';
+  const showSide =
+    readerLayout !== 'full' && (isCanvasOpen || studyPane !== 'none');
 
   return (
     <div
@@ -141,27 +152,31 @@ export function ReaderShell() {
       <div className="flex-1 relative flex overflow-hidden">
         <ReaderSidebar />
 
-        {/* Reader Viewport Pane */}
+        {/* Reader Viewport Pane. Hidden entirely in minimized mode; the reader
+            keeps its live session and source position either way. */}
+        {/* Always mounted: minimizing hides this pane with CSS so the document
+            adapter keeps its container and the live source position. */}
         <div
-          className={`h-full overflow-hidden transition-all duration-150 ${
-            isCanvasOpen
-              ? mobileViewTab === 'canvas'
-                ? 'hidden md:flex md:w-1/2 min-w-[320px] border-r border-border'
-                : 'flex flex-1 md:w-1/2 min-w-[320px] border-r border-border'
-              : 'flex-1'
-          }`}
+          data-reader-pane={readerLayout}
+          aria-hidden={readerPaneVisible(readerLayout) ? undefined : true}
+          className={`h-full overflow-hidden transition-all duration-150 ${readerPaneClass(
+            readerLayout,
+            showSide,
+          )}`}
         >
           <ReaderViewport />
         </div>
 
-        {/* Beside-Reader Canvas Workspace (Phase 10 — P10-T006) */}
-        {isCanvasOpen && (
+        {/* Side surface: the book's Knowledge Canvas when one is open, otherwise
+            its annotation/study pane. Hidden in full-reader mode. */}
+        {sidePaneVisible(readerLayout, showSide) && (
           <div
-            className={`h-full overflow-hidden bg-surface transition-all duration-150 ${
-              mobileViewTab === 'reader'
-                ? 'hidden md:flex md:w-1/2 min-w-[320px]'
-                : 'flex flex-1 md:w-1/2 min-w-[320px]'
-            }`}
+            data-side-pane={
+              activeCanvasId ? 'canvas' : isCanvasOpen ? 'canvas-list' : 'study'
+            }
+            className={`h-full overflow-hidden bg-surface transition-all duration-150 ${sidePaneClass(
+              readerLayout,
+            )}`}
           >
             {activeCanvasId ? (
               <ReadWatchCanvas
@@ -169,20 +184,28 @@ export function ReaderShell() {
                 bookTitle={bookTitle}
                 itemId={itemId}
                 isBesideReader={true}
-                onClose={() => setActiveCanvasId(null)}
+                onClose={() => {
+                  setActiveCanvasId(null);
+                  setIsCanvasOpen(false);
+                  setStudyPane('canvas');
+                }}
               />
-            ) : (
+            ) : isCanvasOpen ? (
               <div className="flex flex-col h-full w-full">
                 <div className="p-3 border-b border-border bg-surface flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-foreground">Canvas Notes</span>
+                    <span className="text-xs font-semibold text-foreground">Knowledge Canvas</span>
                     <span className="text-[11px] text-muted-foreground font-mono">({bookTitle})</span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsCanvasOpen(false)}
+                    onClick={() => {
+                      setIsCanvasOpen(false);
+                      setStudyPane('canvas');
+                    }}
                     className="text-xs text-muted-foreground hover:text-foreground p-1 rounded"
                     title="Close Canvas"
+                    aria-label="Close canvas workspace"
                   >
                     ✕
                   </button>
@@ -195,6 +218,8 @@ export function ReaderShell() {
                   />
                 </div>
               </div>
+            ) : (
+              <ReaderStudyPane />
             )}
           </div>
         )}

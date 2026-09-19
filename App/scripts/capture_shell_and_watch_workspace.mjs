@@ -293,6 +293,16 @@ class CdpClient {
 const captured = [];
 
 async function expectText(cdp, label, text) {
+  // The first request after a cold dev-server start includes route compilation,
+  // so allow the client-side catalog fetch to settle before failing.
+  const deadline = Date.now() + 20000;
+  while (Date.now() < deadline) {
+    const found = await cdp.evaluate(
+      `document.body.innerText.includes(${JSON.stringify(text)})`,
+    );
+    if (found) return;
+    await sleep(400);
+  }
   const found = await cdp.evaluate(
     `document.body.innerText.includes(${JSON.stringify(text)})`,
   );
@@ -653,7 +663,19 @@ async function main() {
       await expectText(cdp, 'shell', 'Synthetic Watch Alpha');
       await expectPresent(cdp, 'sidebar', 'aside[data-sidebar="expanded"]');
       await expectText(cdp, 'sidebar settings anchor', 'Settings');
-      await expectText(cdp, 'shell', 'Knowledge & Diagrams');
+      // The primary sidebar now carries only the collections and Settings; the
+      // global study destinations moved into the per-title workspaces.
+      await expectText(cdp, 'shell', 'Read');
+      await expectText(cdp, 'shell', 'Watch');
+      await expectText(cdp, 'shell', 'Settings');
+      const globalLinks = await cdp.evaluate(`
+        Array.from(document.querySelectorAll('aside[data-sidebar] a'))
+          .filter((a) => ['/highlights', '/knowledge', '/canvas-notes'].includes(a.getAttribute('href')))
+          .length
+      `);
+      if (globalLinks !== 0) {
+        throw new Error(`primary sidebar still links ${globalLinks} global study destinations`);
+      }
     });
 
     await clickSelector(cdp, 'collapse sidebar', 'button[aria-label="Collapse sidebar"]');
@@ -1046,8 +1068,17 @@ async function main() {
       if (hasWorkspaceTab) {
         throw new Error('Assertion failed: Read items must not expose the Watch Workspace tab.');
       }
-      await expectText(cdp, 'read keeps highlights', 'Highlights');
-      await expectText(cdp, 'read keeps canvas', 'Canvas');
+      // Read now owns a book-scoped Study tab instead of the old empty
+      // Highlights/Canvas placeholders.
+      const readTabs = await cdp.evaluate(`
+        Array.from(document.querySelectorAll('[role="tab"]')).map((t) => (t.textContent || '').trim())
+      `);
+      if (!readTabs.includes('Study')) {
+        throw new Error(`Read must expose a Study tab, found: ${readTabs.join(' | ')}`);
+      }
+      if (readTabs.includes('Highlights') || readTabs.includes('Canvas')) {
+        throw new Error('Read must not keep the old separate Canvas/Highlights tabs');
+      }
     });
 
     // ---------------------------------------------------------------------

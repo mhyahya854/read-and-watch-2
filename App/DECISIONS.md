@@ -1255,3 +1255,76 @@ function of the edge list (`lib/knowledge/edge-routing.ts`): each relationship i
 a group gets a deterministic anchor pair, with an alternating bezier curvature
 once the four anchor combinations are exhausted. React Flow is never allowed to
 render two relationships as one indistinguishable line.
+
+## D-066 - Read uses one unified Knowledge Canvas, not a graph plus a canvas
+
+Status: Accepted
+
+For `collection = 'read'`, canvas and knowledge graph are the same feature. The
+existing canvas document was extended with `scope` and `knowledge` (`blocks`,
+`relationships`, `importedGraphIds`) instead of adding a Read knowledge graph.
+Read never creates an item-owned `knowledge_graphs` row as its workspace, and
+there are no parallel Graph/Canvas tabs holding the same information twice.
+
+Structured blocks and named relationships live in the same document as the
+freeform Excalidraw scene. A structured block gets a real visual element and a
+relationship gets a real connector; an ordinary hand-drawn arrow is never
+silently promoted into a semantic relationship.
+
+## D-067 - Canvas scope is explicit, and legacy canvases become whole-book
+
+Status: Accepted
+
+Every Read Knowledge Canvas carries `scope.kind` of `book` or `location`.
+Location scope stores the canonical reader `DocumentLocation` plus source hash
+and a human label, so a PDF canvas resolves to a page and a reflowable canvas
+resolves to its CFI/section. No page number is fabricated for reflowable
+documents and no scroll-percentage anchor is used.
+
+Canvases written before scope existed have no scope metadata; they migrate to
+whole-book scope and no location is invented for them. Scope columns are added by
+the repository's idempotent migration style, and the scope travels in the
+file-first canvas document so recovery, history and backup/restore keep it.
+
+## D-068 - Annotation notes live inside the annotation
+
+Status: Accepted
+
+Every annotation may carry a note. The note is stored in the annotation's own
+`content_json` (`content.note`, `content.noteUpdatedAt`) rather than in a new
+table or a separate notes document, so the note belongs to that mark and deleting
+the note never deletes the mark. This applies to highlights (mandatory), and also
+to underline, strike and drawing marks.
+
+## D-069 - The reader pane is hidden, never unmounted, in minimized mode
+
+Status: Accepted
+
+The reader has three states: split, full and minimized. The reader pane stays
+mounted in every state; minimized hides it with CSS. Document adapters render
+into a container owned by that pane, so unmounting it would destroy the live
+source position the user expects to return to. Layout changes preserve the book,
+page/CFI, zoom, annotations and open canvas.
+
+## D-070 - Reflowable marks are stored and listed, not painted with fake geometry
+
+Status: Accepted
+
+PDF marks and freehand markup are painted from normalized page-relative
+coordinates, so they stay attached through reload, zoom, rotation and resize.
+Reflowable documents have no stable page geometry, so EPUB marks are created,
+stored, listed and navigable to source but are not painted as page overlays, and
+freehand drawing on reflowable text is not offered. The page/location Knowledge
+Canvas is the supported drawing surface for reflowable books. This limitation is
+explicit rather than faked.
+
+## D-071 - Per-title study surfaces replace the global workspace destinations
+
+Status: Accepted
+
+Watch titles own a title-scoped knowledge workspace and Read titles own a
+book-scoped study workspace, so the permanent primary sidebar no longer lists
+`/highlights`, `/knowledge` or `/canvas-notes`. Those routes remain for
+compatibility, deep links, migration and recovery, and are still reachable
+directly; they are simply not primary navigation. Read, Watch and Settings remain
+in the sidebar.

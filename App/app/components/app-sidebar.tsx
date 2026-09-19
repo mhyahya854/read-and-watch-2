@@ -12,12 +12,10 @@ import Link from 'next/link';
 import {
   BookOpen,
   Clapperboard,
-  Highlighter,
   PanelLeftClose,
   PanelLeftOpen,
   PenTool,
   Settings,
-  Workflow,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sidebarWidthClass, type SidebarMode } from '@/lib/shell/shell-state';
@@ -33,15 +31,21 @@ const COLLECTIONS: ReadonlyArray<{
   { value: 'watch', label: 'Watch', Icon: Clapperboard },
 ];
 
+/**
+ * The primary sidebar is deliberately limited to the two global collections and
+ * Settings.
+ *
+ * Watch titles own their knowledge workspace and Read titles own their study
+ * workspace, so the old global Highlights / Knowledge & Diagrams / Canvas Notes
+ * destinations are no longer primary navigation. Their routes still exist for
+ * compatibility, deep links, migration and recovery, and can be reached
+ * directly (and from the reader's canvas pane).
+ */
 const WORKSPACE_LINKS: ReadonlyArray<{
   href: string;
   label: string;
   Icon: typeof PenTool;
-}> = [
-  { href: '/highlights', label: 'Highlights', Icon: Highlighter },
-  { href: '/knowledge', label: 'Knowledge & Diagrams', Icon: Workflow },
-  { href: '/canvas-notes', label: 'Canvas Notes', Icon: PenTool },
-];
+}> = [];
 
 export interface AppSidebarProps {
   sidebar: SidebarMode;
@@ -203,4 +207,3 @@ export function AppSidebar({
     </aside>
   );
 }
-

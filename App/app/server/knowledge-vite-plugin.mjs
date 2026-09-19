@@ -20,6 +20,10 @@
 import { parse as parseUrl } from 'node:url';
 import { createKnowledgeStore } from './knowledge-store.mjs';
 import { createCanvasStore } from './canvas-store.mjs';
+import {
+  convertLegacyGraphToKnowledgeCanvas,
+  findImportedCanvas,
+} from './canvas-knowledge.mjs';
 
 function sendJson(res, statusCode, data) {
   const json = JSON.stringify(data, null, 2);
@@ -209,6 +213,68 @@ export function knowledgePlugin(options = {}) {
               const result = store.deleteDiagram(diagramId, { itemId });
               return sendJson(res, 200, result);
             }
+          }
+
+          // ---------------------------------------------------------------
+          // Legacy item-owned knowledge graphs (Read study workspace)
+          // GET  /api/knowledge/legacy-graphs?itemId=<item>
+          // POST /api/knowledge/legacy-graphs/:graphId/import  { itemId }
+          //
+          // The original graph is never modified or deleted; import creates a
+          // separate Knowledge Canvas that records the graph id as provenance.
+          // ---------------------------------------------------------------
+          if (path === '/api/knowledge/legacy-graphs' && req.method === 'GET') {
+            const itemId = parsed.query.itemId ? String(parsed.query.itemId) : null;
+            if (!itemId) {
+              return sendJson(res, 400, { error: 'itemId is required' });
+            }
+            const graphs = store.listGraphs({ associatedItemId: itemId });
+            const results = graphs.map((graph) => {
+              const imported = findImportedCanvas(canvasStore, itemId, graph.id);
+              return {
+                id: graph.id,
+                title: graph.title,
+                nodeCount: graph.nodeCount,
+                edgeCount: graph.edgeCount,
+                updatedAt: graph.updatedAt,
+                importedCanvasId: imported ? imported.id : null,
+              };
+            });
+            return sendJson(res, 200, results);
+          }
+
+          const legacyImportMatch = path.match(
+            /^\/api\/knowledge\/legacy-graphs\/([^/]+)\/import$/,
+          );
+          if (legacyImportMatch && req.method === 'POST') {
+            const graphId = decodeURIComponent(legacyImportMatch[1]);
+            const body = (await readBody(req)) || {};
+            const itemId = body.itemId ? String(body.itemId) : null;
+            if (!itemId) {
+              return sendJson(res, 400, { error: 'itemId is required' });
+            }
+            // Ownership: the graph must belong to exactly this item.
+            const graph = store.getGraph(graphId, { itemId });
+            const existing = findImportedCanvas(canvasStore, itemId, graphId);
+            if (existing) {
+              return sendJson(res, 409, {
+                error: 'This legacy graph has already been imported',
+                canvasId: existing.id,
+              });
+            }
+            const converted = convertLegacyGraphToKnowledgeCanvas(graph, { itemId });
+            const created = canvasStore.createCanvas({
+              itemId,
+              title: converted.title,
+              scope: converted.scope,
+              knowledge: converted.knowledge,
+            });
+            return sendJson(res, 201, {
+              canvasId: created.canvasId,
+              legacyGraphId: graphId,
+              blockCount: converted.knowledge.blocks.length,
+              relationshipCount: converted.knowledge.relationships.length,
+            });
           }
 
           // Route not matched

@@ -5,9 +5,17 @@
 
 import {
   CANVAS_SCHEMA_VERSION,
+  type CanvasKnowledge,
   type CanvasLifecycle,
+  type CanvasScope,
+  type CanvasScopeAnchor,
+  type CanvasScopeKind,
   type CanvasLinkRecord,
   type CanvasAssetMeta,
+  type KnowledgeBlock,
+  type KnowledgeRelationship,
+  type KnowledgeRelationshipDirection,
+  type KnowledgeSourceLink,
   type ReadWatchCanvasDocument,
   type ExcalidrawSceneData,
 } from './types.ts';
@@ -198,6 +206,134 @@ export function validateSceneData(raw: unknown): ExcalidrawSceneData {
 }
 
 /** Validate a complete ReadWatchCanvasDocument. */
+const VALID_SCOPE_KINDS: ReadonlySet<CanvasScopeKind> = new Set(['book', 'location']);
+const MAX_KNOWLEDGE_BLOCKS = 1000;
+const MAX_KNOWLEDGE_RELATIONSHIPS = 4000;
+
+/**
+ * Validate a canvas scope. A missing scope (every canvas written before Read
+ * study scopes existed) migrates to whole-book scope, which is the documented
+ * legacy behaviour: old read-linked canvases are book-level, and no location is
+ * fabricated for them.
+ */
+export function validateCanvasScope(raw: unknown): CanvasScope {
+  if (!raw || typeof raw !== 'object') return { kind: 'book' };
+  const r = raw as Record<string, unknown>;
+  const kind = VALID_SCOPE_KINDS.has(r.kind as CanvasScopeKind)
+    ? (r.kind as CanvasScopeKind)
+    : 'book';
+  const label = typeof r.label === 'string' && r.label.trim() ? r.label.slice(0, 200) : undefined;
+
+  let anchor: CanvasScopeAnchor | undefined;
+  if (r.anchor && typeof r.anchor === 'object') {
+    const a = r.anchor as Record<string, unknown>;
+    const candidate: CanvasScopeAnchor = {
+      ...(typeof a.sourceHash === 'string' ? { sourceHash: a.sourceHash } : {}),
+      ...(a.location !== undefined && a.location !== null ? { location: a.location } : {}),
+      ...(typeof a.locationLabel === 'string' ? { locationLabel: a.locationLabel.slice(0, 200) } : {}),
+      ...(typeof a.assetId === 'string' ? { assetId: a.assetId } : {}),
+    };
+    anchor = Object.keys(candidate).length > 0 ? candidate : undefined;
+  }
+
+  // A location scope without an anchor cannot resolve to a source location.
+  if (kind === 'location' && !anchor) {
+    return { kind: 'book', ...(label ? { label } : {}) };
+  }
+
+  return {
+    kind,
+    ...(label ? { label } : {}),
+    ...(kind === 'location' && anchor ? { anchor } : {}),
+  };
+}
+
+function validateKnowledgeSourceLink(raw: unknown): KnowledgeSourceLink | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const link: KnowledgeSourceLink = {
+    ...(typeof r.itemId === 'string' ? { itemId: r.itemId.slice(0, 128) } : {}),
+    ...(typeof r.annotationId === 'string' ? { annotationId: r.annotationId.slice(0, 128) } : {}),
+    ...(r.location !== undefined && r.location !== null ? { location: r.location } : {}),
+    ...(typeof r.label === 'string' ? { label: r.label.slice(0, 200) } : {}),
+    ...(typeof r.quote === 'string' ? { quote: r.quote.slice(0, 4000) } : {}),
+    ...(typeof r.legacyGraphId === 'string' ? { legacyGraphId: r.legacyGraphId.slice(0, 128) } : {}),
+  };
+  return Object.keys(link).length > 0 ? link : null;
+}
+
+export function validateKnowledgeBlock(raw: unknown): KnowledgeBlock {
+  if (!raw || typeof raw !== 'object') fail('knowledge block must be an object');
+  const r = raw as Record<string, unknown>;
+  const id = assertString(r.id, 'knowledge block id', 128);
+  const source = validateKnowledgeSourceLink(r.source);
+  return {
+    id,
+    ...(typeof r.elementId === 'string' && r.elementId ? { elementId: r.elementId.slice(0, 128) } : {}),
+    type: typeof r.type === 'string' && r.type.trim() ? r.type.slice(0, 64) : 'concept',
+    title: typeof r.title === 'string' ? r.title.slice(0, MAX_TITLE_LENGTH) : '',
+    ...(typeof r.body === 'string' ? { body: r.body.slice(0, 20000) } : {}),
+    source,
+    ...(r.metadata && typeof r.metadata === 'object' && !Array.isArray(r.metadata)
+      ? { metadata: r.metadata as Record<string, unknown> }
+      : {}),
+    ...(typeof r.createdAt === 'string' ? { createdAt: r.createdAt } : {}),
+    ...(typeof r.updatedAt === 'string' ? { updatedAt: r.updatedAt } : {}),
+  };
+}
+
+export function validateKnowledgeRelationship(raw: unknown): KnowledgeRelationship {
+  if (!raw || typeof raw !== 'object') fail('knowledge relationship must be an object');
+  const r = raw as Record<string, unknown>;
+  const direction: KnowledgeRelationshipDirection =
+    r.direction === 'mutual' ? 'mutual' : 'directed';
+  return {
+    id: assertString(r.id, 'knowledge relationship id', 128),
+    sourceBlockId: assertString(r.sourceBlockId, 'knowledge relationship sourceBlockId', 128),
+    targetBlockId: assertString(r.targetBlockId, 'knowledge relationship targetBlockId', 128),
+    label: typeof r.label === 'string' ? r.label.slice(0, 500) : '',
+    direction,
+    ...(typeof r.linkedElementId === 'string' && r.linkedElementId
+      ? { linkedElementId: r.linkedElementId.slice(0, 128) }
+      : {}),
+    ...(typeof r.createdAt === 'string' ? { createdAt: r.createdAt } : {}),
+    ...(typeof r.updatedAt === 'string' ? { updatedAt: r.updatedAt } : {}),
+  };
+}
+
+/** Validate the structured knowledge half of a canvas document. */
+export function validateCanvasKnowledge(raw: unknown): CanvasKnowledge {
+  if (!raw || typeof raw !== 'object') return { blocks: [], relationships: [] };
+  const r = raw as Record<string, unknown>;
+  const blocksRaw = Array.isArray(r.blocks) ? r.blocks : [];
+  const relationshipsRaw = Array.isArray(r.relationships) ? r.relationships : [];
+  if (blocksRaw.length > MAX_KNOWLEDGE_BLOCKS) {
+    fail(`knowledge.blocks count ${blocksRaw.length} exceeds maximum ${MAX_KNOWLEDGE_BLOCKS}`);
+  }
+  if (relationshipsRaw.length > MAX_KNOWLEDGE_RELATIONSHIPS) {
+    fail(
+      `knowledge.relationships count ${relationshipsRaw.length} exceeds maximum ${MAX_KNOWLEDGE_RELATIONSHIPS}`,
+    );
+  }
+
+  const blocks = blocksRaw.map(validateKnowledgeBlock);
+  const knownBlockIds = new Set(blocks.map((b) => b.id));
+  const relationships = relationshipsRaw
+    .map(validateKnowledgeRelationship)
+    .filter((rel) => knownBlockIds.has(rel.sourceBlockId) && knownBlockIds.has(rel.targetBlockId));
+
+  const importedGraphIds = Array.isArray(r.importedGraphIds)
+    ? r.importedGraphIds.filter((id): id is string => typeof id === 'string').slice(0, 200)
+    : [];
+
+  return {
+    blocks,
+    relationships,
+    ...(importedGraphIds.length ? { importedGraphIds } : {}),
+  };
+}
+
+/** Validate a complete ReadWatchCanvasDocument. */
 export function validateCanvasDocument(raw: unknown): ReadWatchCanvasDocument {
   if (!raw || typeof raw !== 'object') fail('Canvas document must be an object');
   const r = raw as Record<string, unknown>;
@@ -226,6 +362,8 @@ export function validateCanvasDocument(raw: unknown): ReadWatchCanvasDocument {
   const deletedAt = typeof r.deletedAt === 'string' ? r.deletedAt : null;
 
   const scene = validateSceneData(r.scene || { elements: [] });
+  const scope = validateCanvasScope(r.scope);
+  const knowledge = validateCanvasKnowledge(r.knowledge);
 
   const links: CanvasLinkRecord[] = Array.isArray(r.links)
     ? r.links.map(validateCanvasLink)
@@ -240,6 +378,8 @@ export function validateCanvasDocument(raw: unknown): ReadWatchCanvasDocument {
     canvasId,
     itemId,
     title,
+    scope,
+    knowledge,
     revision,
     lifecycle,
     createdAt,

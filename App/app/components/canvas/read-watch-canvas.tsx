@@ -26,14 +26,24 @@ import {
   CheckCircle2,
   RefreshCw,
   ExternalLink,
+  Blocks,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { KnowledgePanel } from './knowledge-panel';
 import type {
   ReadWatchCanvasDocument,
   CanvasLinkRecord,
   CanvasMetadata,
   CanvasAssetMeta,
+  CanvasKnowledge,
+  KnowledgeBlock,
+  KnowledgeRelationship,
 } from '@/lib/canvas';
+import {
+  createKnowledgeBlock,
+  findBlockByAnnotation,
+  updateBlock,
+} from '@/lib/canvas/knowledge';
 import '@excalidraw/excalidraw/index.css';
 
 interface ExcalidrawApi {
@@ -42,6 +52,7 @@ interface ExcalidrawApi {
   getFiles: () => Record<string, unknown>;
   updateScene: (scene: { elements?: readonly unknown[]; appState?: Record<string, unknown> }) => void;
   addFiles: (files: Array<{ id: string; dataURL: string; mimeType: string; created: number }>) => void;
+  scrollToContent?: (target?: unknown, opts?: Record<string, unknown>) => void;
 }
 
 interface ExcalidrawModuleType {
@@ -102,10 +113,33 @@ export function ReadWatchCanvas({
   const [availableAnnotations, setAvailableAnnotations] = useState<BookAnnotationItem[]>([]);
   const [loadingAnnotations, setLoadingAnnotations] = useState(false);
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [knowledge, setKnowledge] = useState<CanvasKnowledge>({ blocks: [], relationships: [] });
+  const knowledgeRef = useRef<CanvasKnowledge>(knowledge);
+  const titleRef = useRef(title);
+  const docRef = useRef<ReadWatchCanvasDocument | null>(doc);
+
+  // Mirror live values into refs so the serialized save queue always reads the
+  // newest state instead of a stale closure.
+  useEffect(() => {
+    knowledgeRef.current = knowledge;
+  }, [knowledge]);
+  useEffect(() => {
+    titleRef.current = title;
+  }, [title]);
+  useEffect(() => {
+    docRef.current = doc;
+  }, [doc]);
 
   const excalidrawApiRef = useRef<ExcalidrawApi | null>(null);
   const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentRevisionRef = useRef<number>(1);
+  /**
+   * Saves are serialized. The scene autosave and the structured-knowledge saves
+   * both use optimistic concurrency, so two overlapping PUTs would otherwise
+   * both send the same expectedRevision and the second would fail with 409.
+   */
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
 
   /**
    * Item-scoped canvas access. Supplying the owning item makes the API refuse a
@@ -141,6 +175,19 @@ export function ReadWatchCanvas({
         if (active) {
           setDoc(data);
           setTitle(data.title);
+          setKnowledge(
+            data.knowledge && Array.isArray(data.knowledge.blocks)
+              ? {
+                  blocks: data.knowledge.blocks,
+                  relationships: Array.isArray(data.knowledge.relationships)
+                    ? data.knowledge.relationships
+                    : [],
+                  ...(data.knowledge.importedGraphIds
+                    ? { importedGraphIds: data.knowledge.importedGraphIds }
+                    : {}),
+                }
+              : { blocks: [], relationships: [] },
+          );
           currentRevisionRef.current = data.revision;
           setSaveStatus('saved');
           setConflictMessage(null);
@@ -160,64 +207,260 @@ export function ReadWatchCanvas({
 
   // 3. Save canvas document
   const saveCanvas = useCallback(
-    async (
+    (
       sceneToSave?: {
         elements?: readonly unknown[];
         appState?: Record<string, unknown>;
         files?: Record<string, unknown>;
       },
       newLinks?: CanvasLinkRecord[],
+      knowledgeToSave?: CanvasKnowledge,
     ) => {
-      if (!doc) return;
-      const api = excalidrawApiRef.current;
-      const elements = sceneToSave?.elements || (api ? api.getSceneElements() : doc.scene.elements);
-      const appState = sceneToSave?.appState || (api ? api.getAppState() : doc.scene.appState);
-      const files = sceneToSave?.files || (api ? api.getFiles() : doc.scene.files);
+      const run = async () => {
+        if (!docRef.current) return;
+        const api = excalidrawApiRef.current;
+        const currentDoc = docRef.current;
+        const elements =
+          sceneToSave?.elements || (api ? api.getSceneElements() : currentDoc.scene.elements);
+        const appState =
+          sceneToSave?.appState || (api ? api.getAppState() : currentDoc.scene.appState);
+        const files = sceneToSave?.files || (api ? api.getFiles() : currentDoc.scene.files);
 
-      const payload = {
-        title,
-        expectedRevision: currentRevisionRef.current,
-        scene: {
-          elements,
-          appState: {
-            viewBackgroundColor: (appState?.viewBackgroundColor as string) || '#ffffff',
-            gridSize: (appState?.gridSize as number | null) ?? null,
-            theme: (appState?.theme as 'light' | 'dark') || 'light',
-            scrollX: (appState?.scrollX as number) || 0,
-            scrollY: (appState?.scrollY as number) || 0,
-            zoom: (appState?.zoom as { value: number }) || { value: 1 },
+        const payload = {
+          title: titleRef.current,
+          expectedRevision: currentRevisionRef.current,
+          scene: {
+            elements,
+            appState: {
+              viewBackgroundColor: (appState?.viewBackgroundColor as string) || '#ffffff',
+              gridSize: (appState?.gridSize as number | null) ?? null,
+              theme: (appState?.theme as 'light' | 'dark') || 'light',
+              scrollX: (appState?.scrollX as number) || 0,
+              scrollY: (appState?.scrollY as number) || 0,
+              zoom: (appState?.zoom as { value: number }) || { value: 1 },
+            },
+            files: (files as Record<string, unknown>) || {},
           },
-          files: (files as Record<string, unknown>) || {},
-        },
-        links: newLinks || doc.links || [],
+          links: newLinks || currentDoc.links || [],
+          knowledge: knowledgeToSave ?? knowledgeRef.current,
+        };
+
+        try {
+          setSaveStatus('saving');
+          const res = await fetch(
+            `/api/reader/canvases/${encodeURIComponent(canvasId)}${scopeQuery}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            },
+          );
+
+          if (res.status === 409) {
+            setSaveStatus('conflict');
+            setConflictMessage(
+              'Another edit was saved. Reload to preserve data consistency.',
+            );
+            return;
+          }
+
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const updatedDoc: ReadWatchCanvasDocument = await res.json();
+          currentRevisionRef.current = updatedDoc.revision;
+          docRef.current = updatedDoc;
+          setDoc(updatedDoc);
+          setSaveStatus('saved');
+          setConflictMessage(null);
+        } catch (err) {
+          console.error('Failed to save canvas:', err);
+          setSaveStatus('error');
+        }
       };
 
-      try {
-        setSaveStatus('saving');
-        const res = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}${scopeQuery}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.status === 409) {
-          setSaveStatus('conflict');
-          setConflictMessage('Another edit was saved. Reload to preserve data consistency.');
-          return;
-        }
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const updatedDoc: ReadWatchCanvasDocument = await res.json();
-        currentRevisionRef.current = updatedDoc.revision;
-        setDoc(updatedDoc);
-        setSaveStatus('saved');
-        setConflictMessage(null);
-      } catch (err) {
-        console.error('Failed to save canvas:', err);
-        setSaveStatus('error');
-      }
+      const chained = saveChainRef.current.then(run, run);
+      saveChainRef.current = chained.catch(() => {});
+      return chained;
     },
-    [doc, title, canvasId, scopeQuery],
+    [canvasId, scopeQuery],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Structured knowledge surface helpers. Blocks and named relationships live in
+  // the same canvas document as the freeform scene, and each block gets a real
+  // visual element so both halves stay one workspace.
+  // ---------------------------------------------------------------------------
+
+  const handleKnowledgeChange = useCallback(
+    (next: CanvasKnowledge) => {
+      setKnowledge(next);
+      void saveCanvas(undefined, undefined, next);
+    },
+    [saveCanvas],
+  );
+
+  /** Create a bound rectangle + text element so the block exists visually too. */
+  const handlePlaceBlock = useCallback(
+    (block: KnowledgeBlock) => {
+      const api = excalidrawApiRef.current;
+      if (!api) return;
+      const existing = api.getSceneElements();
+      const rectId = `kb-${block.id}`;
+      const textId = `kb-${block.id}-label`;
+      const nonce = Math.floor(Math.random() * 2 ** 31);
+      const baseY = 120 + (knowledge.blocks.findIndex((b) => b.id === block.id) % 6) * 130;
+      const rect = {
+        id: rectId,
+        type: 'rectangle',
+        x: 140,
+        y: baseY,
+        width: 240,
+        height: 84,
+        angle: 0,
+        strokeColor: '#2f6f63',
+        backgroundColor: '#f4f1ea',
+        fillStyle: 'solid',
+        strokeWidth: 1,
+        strokeStyle: 'solid',
+        roughness: 1,
+        opacity: 100,
+        groupIds: [],
+        frameId: null,
+        roundness: { type: 3 },
+        seed: nonce,
+        version: 1,
+        versionNonce: nonce,
+        isDeleted: false,
+        boundElements: [{ type: 'text', id: textId }],
+        updated: Date.now(),
+        link: null,
+        locked: false,
+      };
+      const label = {
+        id: textId,
+        type: 'text',
+        x: 152,
+        y: baseY + 24,
+        width: 216,
+        height: 32,
+        angle: 0,
+        strokeColor: '#232323',
+        backgroundColor: 'transparent',
+        fillStyle: 'solid',
+        strokeWidth: 1,
+        strokeStyle: 'solid',
+        roughness: 1,
+        opacity: 100,
+        groupIds: [],
+        frameId: null,
+        roundness: null,
+        seed: nonce + 1,
+        version: 1,
+        versionNonce: nonce + 1,
+        isDeleted: false,
+        boundElements: null,
+        updated: Date.now(),
+        link: null,
+        locked: false,
+        text: block.title || 'Untitled block',
+        fontSize: 16,
+        fontFamily: 1,
+        textAlign: 'left',
+        verticalAlign: 'middle',
+        containerId: rectId,
+        originalText: block.title || 'Untitled block',
+        lineHeight: 1.25,
+      };
+      const elements = [...existing, rect, label];
+      api.updateScene({ elements });
+      const next = updateBlock(knowledge, block.id, { elementId: rectId });
+      setKnowledge(next);
+      void saveCanvas({ elements }, undefined, next);
+    },
+    [knowledge, saveCanvas],
+  );
+
+  const handleFocusBlock = useCallback((block: KnowledgeBlock) => {
+    const api = excalidrawApiRef.current;
+    if (!api || !block.elementId) return;
+    const target = api
+      .getSceneElements()
+      .filter((el) => (el as { id?: string }).id === block.elementId);
+    api.updateScene({ appState: { selectedElementIds: { [block.elementId]: true } } });
+    api.scrollToContent?.(target, { fitToViewport: true, animate: true });
+  }, []);
+
+  /** Draw a connector for a named relationship when both blocks are on canvas. */
+  const handleRelationshipCreated = useCallback(
+    (relationship: KnowledgeRelationship) => {
+      const api = excalidrawApiRef.current;
+      if (!api) return;
+      const source = knowledge.blocks.find((b) => b.id === relationship.sourceBlockId);
+      const target = knowledge.blocks.find((b) => b.id === relationship.targetBlockId);
+      if (!source?.elementId || !target?.elementId) return;
+      const elements = api.getSceneElements() as ReadonlyArray<{
+        id?: string;
+        x?: number;
+        y?: number;
+        width?: number;
+        height?: number;
+      }>;
+      const from = elements.find((el) => el.id === source.elementId);
+      const to = elements.find((el) => el.id === target.elementId);
+      if (!from || !to) return;
+      const startX = (from.x ?? 0) + (from.width ?? 0);
+      const startY = (from.y ?? 0) + (from.height ?? 0) / 2;
+      const endX = to.x ?? 0;
+      const endY = (to.y ?? 0) + (to.height ?? 0) / 2;
+      const nonce = Math.floor(Math.random() * 2 ** 31);
+      const arrowId = `kr-${relationship.id}`;
+      const arrow = {
+        id: arrowId,
+        type: 'arrow',
+        x: startX,
+        y: startY,
+        width: Math.max(1, Math.abs(endX - startX)),
+        height: Math.max(1, Math.abs(endY - startY)),
+        angle: 0,
+        strokeColor: '#2f6f63',
+        backgroundColor: 'transparent',
+        fillStyle: 'solid',
+        strokeWidth: 1,
+        strokeStyle: 'solid',
+        roughness: 1,
+        opacity: 100,
+        groupIds: [],
+        frameId: null,
+        roundness: { type: 2 },
+        seed: nonce,
+        version: 1,
+        versionNonce: nonce,
+        isDeleted: false,
+        boundElements: null,
+        updated: Date.now(),
+        link: null,
+        locked: false,
+        points: [
+          [0, 0],
+          [endX - startX, endY - startY],
+        ],
+        lastCommittedPoint: null,
+        startBinding: { elementId: source.elementId, focus: 0, gap: 4 },
+        endBinding: { elementId: target.elementId, focus: 0, gap: 4 },
+        startArrowhead: relationship.direction === 'mutual' ? 'arrow' : null,
+        endArrowhead: 'arrow',
+      };
+      const nextElements = [...elements, arrow];
+      api.updateScene({ elements: nextElements });
+      const next = {
+        ...knowledge,
+        relationships: knowledge.relationships.map((rel) =>
+          rel.id === relationship.id ? { ...rel, linkedElementId: arrowId } : rel,
+        ),
+      };
+      setKnowledge(next);
+      void saveCanvas({ elements: nextElements }, undefined, next);
+    },
+    [knowledge, saveCanvas],
   );
 
   // 4. Debounced autosave on scene changes
@@ -363,11 +606,40 @@ export function ReadWatchCanvas({
 
       const updatedLinks = [...(doc.links || []), newLink];
       setDoc({ ...doc, links: updatedLinks });
-      void saveCanvas({ elements: newElements }, updatedLinks);
+
+      // The same excerpt also becomes a structured, source-linked block so the
+      // Knowledge Canvas keeps provenance instead of a detached copy. The normal
+      // action never inserts the same annotation twice.
+      const existingBlock = findBlockByAnnotation(knowledge, String(ann.id));
+      const nextKnowledge = existingBlock
+        ? knowledge
+        : {
+            ...knowledge,
+            blocks: [
+              ...knowledge.blocks,
+              createKnowledgeBlock({
+                type: ann.kind === 'text-mark' ? 'quote' : 'evidence',
+                title: quoteText.slice(0, 120),
+                body: quoteText,
+                elementId,
+                source: {
+                  itemId: targetItemId,
+                  annotationId: String(ann.id),
+                  label:
+                    typeof ann.anchor?.pageNumber === 'number'
+                      ? `p. ${ann.anchor.pageNumber}`
+                      : 'Source',
+                  quote: quoteText.slice(0, 200),
+                },
+              }),
+            ],
+          };
+      setKnowledge(nextKnowledge);
+      void saveCanvas({ elements: newElements }, updatedLinks, nextKnowledge);
 
       setIsExcerptModalOpen(false);
     },
-    [doc, propItemId, bookTitle, canvasId, saveCanvas],
+    [doc, propItemId, bookTitle, canvasId, saveCanvas, knowledge],
   );
   // 8. Safe Image Asset Upload
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -581,6 +853,22 @@ export function ReadWatchCanvas({
             <span className="hidden md:inline">Image</span>
           </Button>
 
+          {/* Knowledge panel toggle: structured blocks + named relationships */}
+          <Button
+            type="button"
+            variant={knowledgeOpen ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setKnowledgeOpen((v) => !v)}
+            className="h-7 px-2 text-xs"
+            aria-pressed={knowledgeOpen}
+            title="Knowledge blocks and relationships"
+            data-testid="canvas-knowledge-toggle"
+          >
+            <Blocks size={13} className="mr-1" />
+            <span className="hidden md:inline">Knowledge</span>
+            <span className="ml-1 font-mono text-[10px]">{knowledge.blocks.length}</span>
+          </Button>
+
           {/* Export button */}
           <Button
             type="button"
@@ -626,8 +914,9 @@ export function ReadWatchCanvas({
       )}
 
       {/* Main Canvas Workspace */}
-      <div className="flex-1 w-full h-full relative overflow-hidden bg-background">
-        {Excalidraw ? (
+      <div className="flex-1 w-full min-h-0 relative flex overflow-hidden bg-background">
+        <div className="relative min-w-0 flex-1 h-full overflow-hidden">
+          {Excalidraw ? (
           <Excalidraw
             excalidrawAPI={(api: unknown) => {
               excalidrawApiRef.current = api as ExcalidrawApi;
@@ -656,6 +945,22 @@ export function ReadWatchCanvas({
             <RefreshCw className="h-6 w-6 animate-spin mr-2" />
             <span className="text-xs font-medium">Initializing Excalidraw workspace...</span>
           </div>
+          )}
+        </div>
+
+        {knowledgeOpen && (
+          <aside
+            className="h-full w-[22rem] shrink-0 border-l border-border bg-surface overflow-hidden"
+            aria-label="Knowledge blocks and relationships"
+          >
+            <KnowledgePanel
+              knowledge={knowledge}
+              onChange={handleKnowledgeChange}
+              onPlaceBlock={handlePlaceBlock}
+              onFocusBlock={handleFocusBlock}
+              onRelationshipCreated={handleRelationshipCreated}
+            />
+          </aside>
         )}
 
         {/* Floating Deep Link Inspector Card (P10-T005) */}

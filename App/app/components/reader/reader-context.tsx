@@ -40,10 +40,43 @@ import {
   type ReaderStatus,
 } from '@/lib/reader';
 import { getAnnotation } from '@/lib/annotation';
+import {
+  createAnnotation as createAnnotationApi,
+  deleteAnnotation as deleteAnnotationApi,
+  getAnnotations,
+  updateAnnotation as updateAnnotationApi,
+} from '@/lib/annotation/client';
+import type {
+  Annotation,
+  AnnotationAnchor,
+  TextMarkSubKind,
+} from '@/lib/annotation';
+import {
+  normalizeSelectionRects,
+  pdfTextAnchorFromSelection,
+  reflowableTextAnchorFromSelection,
+} from '@/lib/annotation/selection-anchor';
+import type { CanvasMetadata } from '@/lib/canvas';
 import { useToast } from '@/components/ui/toast';
 
 
 export type SidebarTab = 'contents' | 'search' | 'bookmarks' | null;
+
+/** The three reader layout states. */
+export type ReaderLayoutMode = 'split' | 'full' | 'minimized';
+
+/** Right-hand study surface alongside the reader. */
+export type ReaderStudyPane = 'none' | 'annotations' | 'canvas';
+
+export interface StudySummary {
+  itemId: string;
+  annotationCount: number;
+  annotationsWithNotes: number;
+  annotationCounts: Record<string, number>;
+  bookCanvases: number;
+  locationCanvases: number;
+  canvasCount: number;
+}
 
 export interface ReaderContextValue {
   session: ReaderSession;
@@ -62,6 +95,41 @@ export interface ReaderContextValue {
   setActiveCanvasId: (id: string | null) => void;
   mobileViewTab: 'reader' | 'canvas';
   setMobileViewTab: (tab: 'reader' | 'canvas') => void;
+
+  // Reader layout (split / full / minimized) and the study pane
+  readerLayout: ReaderLayoutMode;
+  setReaderLayout: (mode: ReaderLayoutMode) => void;
+  studyPane: ReaderStudyPane;
+  setStudyPane: (pane: ReaderStudyPane) => void;
+
+  // Book-scoped study state
+  annotations: ReadonlyArray<Annotation>;
+  annotationsLoading: boolean;
+  annotationsError: string | null;
+  refreshAnnotations: () => Promise<void>;
+  activeAnnotationId: string | null;
+  setActiveAnnotationId: (id: string | null) => void;
+  activeAnnotation: Annotation | null;
+  annotationNoteDraft: string;
+  setAnnotationNoteDraft: (value: string) => void;
+  studySummary: StudySummary | null;
+  refreshStudySummary: () => Promise<void>;
+  canvases: ReadonlyArray<CanvasMetadata>;
+  refreshCanvases: () => Promise<void>;
+
+  // Annotation creation
+  drawMode: boolean;
+  setDrawMode: (on: boolean) => void;
+  createTextMark: (
+    subKind: TextMarkSubKind,
+    options?: { color?: string; note?: string },
+  ) => Promise<Annotation | null>;
+  createDrawing: (
+    normalizedPoints: ReadonlyArray<{ x: number; y: number }>,
+    options?: { color?: string; strokeWidth?: number; note?: string },
+  ) => Promise<Annotation | null>;
+  saveAnnotationNote: (annotationId: string, note: string) => Promise<void>;
+  removeAnnotation: (annotationId: string) => Promise<void>;
 
   // Actions
   goTo: (location: DocumentLocation) => Promise<void>;
@@ -111,6 +179,18 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [mobileViewTab, setMobileViewTab] = useState<'reader' | 'canvas'>('reader');
   const [readerStatus, setReaderStatus] = useState<ReaderStatus | null>(null);
+  const [readerLayout, setReaderLayout] = useState<ReaderLayoutMode>('split');
+  const [studyPane, setStudyPane] = useState<ReaderStudyPane>('none');
+  const [annotations, setAnnotations] = useState<ReadonlyArray<Annotation>>([]);
+  const [annotationsLoading, setAnnotationsLoading] = useState(false);
+  const [annotationsError, setAnnotationsError] = useState<string | null>(null);
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  // Note drafts are keyed by annotation id so switching annotations never needs a
+  // synchronising effect (and never leaks one annotation's draft into another).
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [studySummary, setStudySummary] = useState<StudySummary | null>(null);
+  const [canvases, setCanvases] = useState<ReadonlyArray<CanvasMetadata>>([]);
+  const [drawMode, setDrawMode] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toast = useToast();
 
@@ -400,6 +480,266 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
     await loadItemStateAndOpen();
   }, [loadItemStateAndOpen]);
 
+  // ---------------------------------------------------------------------------
+  // Book-scoped study state. Every request is item-scoped, so Book A's study
+  // data can never appear in Book B.
+  // ---------------------------------------------------------------------------
+
+  const refreshAnnotations = useCallback(async () => {
+    if (!itemId || itemId.startsWith('sample')) {
+      setAnnotations([]);
+      return;
+    }
+    setAnnotationsLoading(true);
+    setAnnotationsError(null);
+    try {
+      const list = await getAnnotations(itemId);
+      setAnnotations(list);
+    } catch (err) {
+      setAnnotationsError(err instanceof Error ? err.message : 'Failed to load annotations');
+      setAnnotations([]);
+    } finally {
+      setAnnotationsLoading(false);
+    }
+  }, [itemId]);
+
+  const refreshStudySummary = useCallback(async () => {
+    if (!itemId || itemId.startsWith('sample')) {
+      setStudySummary(null);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/reader/items/${encodeURIComponent(itemId)}/study-summary`,
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setStudySummary((await res.json()) as StudySummary);
+    } catch {
+      setStudySummary(null);
+    }
+  }, [itemId]);
+
+  const refreshCanvases = useCallback(async () => {
+    if (!itemId) {
+      setCanvases([]);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/reader/items/${encodeURIComponent(itemId)}/canvases`,
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setCanvases((await res.json()) as CanvasMetadata[]);
+    } catch {
+      setCanvases([]);
+    }
+  }, [itemId]);
+
+  useEffect(() => {
+    void Promise.resolve().then(async () => {
+      await Promise.all([
+        refreshAnnotations(),
+        refreshStudySummary(),
+        refreshCanvases(),
+      ]);
+    });
+  }, [refreshAnnotations, refreshStudySummary, refreshCanvases]);
+
+  const activeAnnotation =
+    annotations.find((a) => a.id === activeAnnotationId) ?? null;
+
+  const annotationNoteDraft = activeAnnotation
+    ? (noteDrafts[activeAnnotation.id] ??
+      (activeAnnotation.content as { note?: string }).note ??
+      '')
+    : '';
+
+  const setAnnotationNoteDraft = useCallback(
+    (value: string) => {
+      if (!activeAnnotationId) return;
+      setNoteDrafts((prev) => ({ ...prev, [activeAnnotationId]: value }));
+    },
+    [activeAnnotationId],
+  );
+
+  /** Build a canonical anchor from the live selection for the current engine. */
+  const buildSelectionAnchor = useCallback(async (): Promise<AnnotationAnchor | null> => {
+    const selection = await session.getSelection();
+    if (!selection || !selection.text.trim() || !snapshot.source) return null;
+
+    if (snapshot.capabilities.has('surfaceMarkup')) {
+      const container = containerRef.current;
+      const pageEl = container?.querySelector('canvas') as HTMLElement | null;
+      const domSelection = typeof window !== 'undefined' ? window.getSelection() : null;
+      const pageRect = pageEl?.getBoundingClientRect();
+      const clientRects: Array<{ left: number; top: number; width: number; height: number }> = [];
+      if (domSelection && domSelection.rangeCount > 0) {
+        const range = domSelection.getRangeAt(0);
+        for (const rect of Array.from(range.getClientRects())) {
+          clientRects.push({
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+          });
+        }
+      }
+      const normalized =
+        pageRect && clientRects.length
+          ? normalizeSelectionRects(clientRects, pageRect)
+          : [];
+      return pdfTextAnchorFromSelection({
+        pageNumber: snapshot.currentPage || 1,
+        sourceHash: snapshot.source.sourceHash,
+        quote: selection.text,
+        rects: normalized,
+        prefix: selection.context?.prefix,
+        suffix: selection.context?.suffix,
+      });
+    }
+
+    const payload = (selection.location.payload || {}) as {
+      cfi?: string;
+      spineIndex?: number;
+      startOffset?: number;
+      endOffset?: number;
+    };
+    return reflowableTextAnchorFromSelection({
+      sourceHash: snapshot.source.sourceHash,
+      quote: selection.text,
+      startCfi: payload.cfi,
+      spineIndex: payload.spineIndex,
+      startOffset: payload.startOffset,
+      endOffset: payload.endOffset,
+      prefix: selection.context?.prefix,
+      suffix: selection.context?.suffix,
+    });
+  }, [session, snapshot.capabilities, snapshot.currentPage, snapshot.source]);
+
+  const createTextMark = useCallback(
+    async (subKind: TextMarkSubKind, options?: { color?: string; note?: string }) => {
+      try {
+        const anchor = await buildSelectionAnchor();
+        if (!anchor || !snapshot.source) {
+          toast.info('Select text in the document first');
+          return null;
+        }
+        const created = await createAnnotationApi(itemId, {
+          assetId: readerStatus?.candidates[0]?.id ?? 'unknown',
+          kind: 'text-mark',
+          anchor,
+          content: {
+            subKind,
+            ...(options?.color ? { color: options.color } : {}),
+            ...(options?.note ? { note: options.note, noteUpdatedAt: new Date().toISOString() } : {}),
+          },
+          sourceHash: snapshot.source.sourceHash,
+        });
+        setAnnotations((prev) => [...prev, created]);
+        setActiveAnnotationId(created.id);
+        void refreshStudySummary();
+        if (typeof window !== 'undefined') window.getSelection()?.removeAllRanges();
+        return created;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to save annotation');
+        return null;
+      }
+    },
+    [buildSelectionAnchor, itemId, readerStatus, refreshStudySummary, snapshot.source, toast],
+  );
+
+  const createDrawing = useCallback(
+    async (
+      normalizedPoints: ReadonlyArray<{ x: number; y: number }>,
+      options?: { color?: string; strokeWidth?: number; note?: string },
+    ) => {
+      if (!snapshot.source) return null;
+      if (!snapshot.capabilities.has('surfaceMarkup')) {
+        toast.info('Freehand markup is available for fixed-layout documents only');
+        return null;
+      }
+      if (normalizedPoints.length < 2) return null;
+      try {
+        const xs = normalizedPoints.map((p) => p.x);
+        const ys = normalizedPoints.map((p) => p.y);
+        const anchor: AnnotationAnchor = {
+          kind: 'pdf-drawing',
+          pageNumber: snapshot.currentPage || 1,
+          points: normalizedPoints.map((p) => ({ x: p.x, y: p.y })),
+          bounds: {
+            x: Math.min(...xs),
+            y: Math.min(...ys),
+            width: Math.max(...xs) - Math.min(...xs),
+            height: Math.max(...ys) - Math.min(...ys),
+          },
+          sourceHash: snapshot.source.sourceHash,
+        };
+        const created = await createAnnotationApi(itemId, {
+          assetId: readerStatus?.candidates[0]?.id ?? 'unknown',
+          kind: 'drawing',
+          anchor,
+          content: {
+            subKind: 'pen',
+            color: options?.color ?? '#b45309',
+            strokeWidth: options?.strokeWidth ?? 0.004,
+            ...(options?.note ? { note: options.note, noteUpdatedAt: new Date().toISOString() } : {}),
+          },
+          sourceHash: snapshot.source.sourceHash,
+        });
+        setAnnotations((prev) => [...prev, created]);
+        setActiveAnnotationId(created.id);
+        void refreshStudySummary();
+        return created;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to save markup');
+        return null;
+      }
+    },
+    [itemId, readerStatus, refreshStudySummary, snapshot.capabilities, snapshot.currentPage, snapshot.source, toast],
+  );
+
+  const saveAnnotationNote = useCallback(
+    async (annotationId: string, note: string) => {
+      const current = annotations.find((a) => a.id === annotationId);
+      if (!current) return;
+      const trimmed = note.trim();
+      const nextContent = {
+        ...(current.content as unknown as Record<string, unknown>),
+        note: trimmed,
+        noteUpdatedAt: trimmed ? new Date().toISOString() : undefined,
+      };
+      try {
+        const updated = await updateAnnotationApi(itemId, annotationId, {
+          content: nextContent,
+          expectedRevision: current.revision,
+        });
+        setAnnotations((prev) => prev.map((a) => (a.id === annotationId ? updated : a)));
+        void refreshStudySummary();
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to save the annotation note',
+        );
+      }
+    },
+    [annotations, itemId, refreshStudySummary, toast],
+  );
+
+  const removeAnnotation = useCallback(
+    async (annotationId: string) => {
+      const current = annotations.find((a) => a.id === annotationId);
+      if (!current) return;
+      try {
+        await deleteAnnotationApi(itemId, annotationId, current.revision);
+        setAnnotations((prev) => prev.filter((a) => a.id !== annotationId));
+        if (activeAnnotationId === annotationId) setActiveAnnotationId(null);
+        void refreshStudySummary();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to delete the annotation');
+      }
+    },
+    [activeAnnotationId, annotations, itemId, refreshStudySummary, toast],
+  );
+
   const value: ReaderContextValue = {
     session,
     snapshot,
@@ -415,6 +755,29 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
     setActiveCanvasId,
     mobileViewTab,
     setMobileViewTab,
+    readerLayout,
+    setReaderLayout,
+    studyPane,
+    setStudyPane,
+    annotations,
+    annotationsLoading,
+    annotationsError,
+    refreshAnnotations,
+    activeAnnotationId,
+    setActiveAnnotationId,
+    activeAnnotation,
+    annotationNoteDraft,
+    setAnnotationNoteDraft,
+    studySummary,
+    refreshStudySummary,
+    canvases,
+    refreshCanvases,
+    drawMode,
+    setDrawMode,
+    createTextMark,
+    createDrawing,
+    saveAnnotationNote,
+    removeAnnotation,
     containerRef,
     isCurrentLocationBookmarked,
     goTo,

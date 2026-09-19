@@ -14,6 +14,96 @@ export const CANVAS_SCHEMA_VERSION = 1 as const;
 /** Canonical lifecycle status of a canvas document. */
 export type CanvasLifecycle = 'active' | 'archived' | 'soft-deleted';
 
+/**
+ * What a canvas is attached to.
+ *
+ *   book     — whole-book study workspace (multiple per title allowed)
+ *   location — a specific PDF page or reflowable document location
+ *
+ * A missing/unknown legacy value migrates to `book`.
+ */
+export type CanvasScopeKind = 'book' | 'location';
+
+/**
+ * Source anchor for a location-scoped canvas. `location` is the canonical
+ * engine-independent DocumentLocation, so a PDF page canvas resolves to a page
+ * and a reflowable canvas resolves to its CFI/section through the existing
+ * reader location model.
+ */
+export interface CanvasScopeAnchor {
+  /** SHA-256 of the source document when the canvas was scoped. */
+  sourceHash?: string;
+  /** Canonical reader location (page / progression / semantic / CFI). */
+  location?: unknown;
+  /** Human label captured at scope time (e.g. "Page 27"). */
+  locationLabel?: string;
+  /** Asset/candidate identity within the item, when known. */
+  assetId?: string;
+}
+
+export interface CanvasScope {
+  kind: CanvasScopeKind;
+  /** Optional user-facing name for the scope (e.g. "Chapter 3"). */
+  label?: string;
+  /** Present for location scope; absent for whole-book scope. */
+  anchor?: CanvasScopeAnchor;
+}
+
+// ---------------------------------------------------------------------------
+// Structured knowledge semantics (the same document as the freeform scene)
+// ---------------------------------------------------------------------------
+
+/**
+ * Structured knowledge block. Every block has a corresponding Excalidraw
+ * element (`elementId`) so the freeform surface and the structured model stay
+ * one workspace instead of two editors.
+ */
+export interface KnowledgeBlock {
+  id: string;
+  elementId?: string;
+  type: string;
+  title: string;
+  body?: string;
+  /** Provenance: where this block came from. */
+  source?: KnowledgeSourceLink | null;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Deep link from a knowledge block back to its source location/annotation. */
+export interface KnowledgeSourceLink {
+  itemId?: string;
+  annotationId?: string;
+  /** Canonical reader location for the source. */
+  location?: unknown;
+  label?: string;
+  quote?: string;
+  /** Legacy graph id when the block came from an imported legacy graph. */
+  legacyGraphId?: string;
+}
+
+export type KnowledgeRelationshipDirection = 'directed' | 'mutual';
+
+export interface KnowledgeRelationship {
+  id: string;
+  sourceBlockId: string;
+  targetBlockId: string;
+  label: string;
+  direction: KnowledgeRelationshipDirection;
+  /** Excalidraw element id of the visual connector, when one exists. */
+  linkedElementId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CanvasKnowledge {
+  blocks: KnowledgeBlock[];
+  relationships: KnowledgeRelationship[];
+  /** Provenance for imported legacy Read knowledge graphs. */
+  importedGraphIds?: string[];
+}
+
 /** Metadata record stored in SQLite (canvases table). */
 export interface CanvasMetadata {
   schemaVersion: 1;
@@ -21,6 +111,11 @@ export interface CanvasMetadata {
   itemId: string | null; // null for unattached / standalone canvases
   title: string;
   documentRelativePath: string; // relative to userDataRoot
+  scopeKind: CanvasScopeKind;
+  scopeLabel: string | null;
+  scopeAnchorJson: string | null;
+  /** Parsed scope anchor (null when no location anchor is present). */
+  scopeAnchor: CanvasScopeAnchor | null;
   revision: number;
   lifecycle: CanvasLifecycle;
   createdAt: string; // ISO 8601 UTC
@@ -78,6 +173,8 @@ export interface ReadWatchCanvasDocument {
   canvasId: string;
   itemId: string | null;
   title: string;
+  scope: CanvasScope;
+  knowledge: CanvasKnowledge;
   revision: number;
   lifecycle: CanvasLifecycle;
   createdAt: string;

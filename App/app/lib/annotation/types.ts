@@ -130,6 +130,14 @@ export interface TextMarkContent {
   readonly subKind: TextMarkSubKind;
   /** Hex color string for the mark. Default per subKind if absent. */
   readonly color?: string;
+  /**
+   * Optional user note attached to this mark. The note belongs to the mark
+   * itself: deleting the note never deletes the mark, and no separate notes
+   * document or table is involved.
+   */
+  readonly note?: string;
+  /** Last time the attached note was edited (ISO 8601 UTC). */
+  readonly noteUpdatedAt?: string;
 }
 
 export interface CommentContent {
@@ -158,6 +166,10 @@ export interface DrawingContent {
   readonly fill?: string;
   /** Text content for text-box drawing. */
   readonly text?: string;
+  /** Optional user note attached to this markup. */
+  readonly note?: string;
+  /** Last time the attached note was edited (ISO 8601 UTC). */
+  readonly noteUpdatedAt?: string;
 }
 
 export type AnnotationContent =

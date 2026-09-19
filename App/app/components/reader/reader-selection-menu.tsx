@@ -27,6 +27,9 @@ import {
   Plus,
   Loader2,
   Info,
+  Highlighter,
+  Underline,
+  Strikethrough,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -48,7 +51,15 @@ function generateCanvasElementId(): string {
 }
 
 export function ReaderSelectionMenu() {
-  const { snapshot, itemId } = useReader();
+  const {
+    snapshot,
+    itemId,
+    createTextMark,
+    setActiveAnnotationId,
+    setStudyPane,
+    readerLayout,
+    setReaderLayout,
+  } = useReader();
   const toast = useToast();
 
   const [selectedText, setSelectedText] = useState('');
@@ -72,6 +83,21 @@ export function ReaderSelectionMenu() {
   const [newCanvasTitle, setNewCanvasTitle] = useState('');
 
   const menuRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Create the requested text mark from the live selection, then focus it in the
+   * book's annotation pane so a note can be added immediately.
+   */
+  const markAndFocus = async (subKind: 'highlight' | 'underline' | 'strike') => {
+    const created = await createTextMark(subKind);
+    if (!created) return;
+    setActiveAnnotationId(created.id);
+    if (readerLayout === 'full') setReaderLayout('split');
+    setStudyPane('annotations');
+    setSelectedText('');
+    setMenuCoords(null);
+    if (typeof window !== 'undefined') window.getSelection()?.removeAllRanges();
+  };
 
   // Listen to selection changes
   const updateSelection = useCallback(() => {
@@ -387,6 +413,40 @@ export function ReaderSelectionMenu() {
         >
           <Copy size={12} className="text-muted-foreground" />
           <span>Copy</span>
+        </button>
+
+        <div className="w-px h-3 bg-border/80 mx-0.5" />
+
+        {/* Source marking: highlight / underline / strike, then an optional note */}
+        <button
+          type="button"
+          onClick={() => void markAndFocus('highlight')}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          title="Highlight selection"
+          data-testid="selection-highlight"
+        >
+          <Highlighter size={12} className="text-amber-600" />
+          <span>Highlight</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => void markAndFocus('underline')}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          title="Underline selection"
+          data-testid="selection-underline"
+        >
+          <Underline size={12} className="text-primary" />
+          <span>Underline</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => void markAndFocus('strike')}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          title="Strike through selection"
+          data-testid="selection-strike"
+        >
+          <Strikethrough size={12} className="text-orange-700" />
+          <span>Strike</span>
         </button>
 
         <div className="w-px h-3 bg-border/80 mx-0.5" />

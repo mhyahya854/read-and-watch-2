@@ -25,6 +25,14 @@ import {
   FileText,
   StickyNote,
   FileDown,
+  Highlighter,
+  Underline,
+  Strikethrough,
+  PenLine,
+  NotebookPen,
+  Columns2,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,7 +55,6 @@ export function ReaderToolbar() {
     setActiveSidebar,
     setIsSettingsOpen,
     isCanvasOpen,
-    setIsCanvasOpen,
     mobileViewTab,
     setMobileViewTab,
     isCurrentLocationBookmarked,
@@ -57,6 +64,15 @@ export function ReaderToolbar() {
     zoomOut,
     rotate,
     toggleBookmark,
+    readerLayout,
+    setReaderLayout,
+    studyPane,
+    setStudyPane,
+    annotations,
+    createTextMark,
+    drawMode,
+    setDrawMode,
+    canvases,
   } = useReader();
 
   const canZoom = snapshot.capabilities.has('zoom');
@@ -70,6 +86,24 @@ export function ReaderToolbar() {
 
   const author = snapshot.metadata?.author;
   const formatBadge = snapshot.metadata?.format || readerStatus?.candidates[0]?.format;
+  const canMark = snapshot.capabilities.has('textAnnotations');
+  const canDraw = snapshot.capabilities.has('surfaceMarkup');
+
+  /** Canvases scoped to the exact location the reader is currently showing. */
+  const currentLocationCanvasCount = snapshot.currentLocation
+    ? canvases.filter((canvas) => {
+        if (canvas.scopeKind !== 'location' || !canvas.scopeAnchor?.location) return false;
+        return (
+          JSON.stringify(canvas.scopeAnchor.location) ===
+          JSON.stringify(snapshot.currentLocation)
+        );
+      }).length
+    : 0;
+
+  const openStudyPane = (pane: 'annotations' | 'canvas') => {
+    if (readerLayout === 'full') setReaderLayout('split');
+    setStudyPane(studyPane === pane ? 'none' : pane);
+  };
 
   const handleExportJson = async () => {
     try {
@@ -183,6 +217,64 @@ export function ReaderToolbar() {
           <ChevronRight size={15} />
         </Button>
       </div>
+
+      {/* 2b. Annotation tools: kept at hand, never behind a second menu */}
+      <fieldset
+        className="hidden lg:flex items-center gap-0.5 bg-surface-muted/40 p-0.5 rounded border border-border/80"
+      >
+        <legend className="sr-only">Annotation tools</legend>
+        {canMark && (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => void createTextMark('highlight')}
+              title="Highlight selection"
+              aria-label="Highlight selection"
+            >
+              <Highlighter size={14} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => void createTextMark('underline')}
+              title="Underline selection"
+              aria-label="Underline selection"
+            >
+              <Underline size={14} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => void createTextMark('strike')}
+              title="Strike through selection"
+              aria-label="Strike through selection"
+            >
+              <Strikethrough size={14} />
+            </Button>
+          </>
+        )}
+        {canDraw && (
+          <Button
+            type="button"
+            variant={drawMode ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setDrawMode(!drawMode)}
+            aria-pressed={drawMode}
+            title="Freehand markup on this page"
+            aria-label="Freehand markup"
+          >
+            <PenLine size={14} />
+          </Button>
+        )}
+      </fieldset>
 
       {/* 3. Right: Sidebar Toggles, Capability-Driven Controls, and Settings */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
@@ -309,16 +401,95 @@ export function ReaderToolbar() {
         {/* Beside-Reader Canvas Notes Toggle (Phase 10 — P10-T006) */}
         <Button
           type="button"
-          variant={isCanvasOpen ? 'default' : 'ghost'}
+          variant={studyPane === 'annotations' ? 'default' : 'ghost'}
           size="sm"
-          onClick={() => setIsCanvasOpen(!isCanvasOpen)}
+          onClick={() => openStudyPane('annotations')}
           className="h-8 px-2 sm:px-2.5 text-xs"
-          title="Toggle Canvas Notes Workspace"
-          aria-label="Canvas Notes"
+          title="This book's annotations"
+          aria-label="Annotations"
+          aria-pressed={studyPane === 'annotations'}
+        >
+          <NotebookPen size={14} />
+          <span className="hidden md:inline ml-1.5">Notes</span>
+          {annotations.length > 0 && (
+            <span className="ml-1 font-mono text-[10px]">{annotations.length}</span>
+          )}
+        </Button>
+
+        {/* Knowledge Canvas toggle, with the current-location canvas count */}
+        <Button
+          type="button"
+          variant={isCanvasOpen || studyPane === 'canvas' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => {
+            if (readerLayout === 'full') setReaderLayout('split');
+            if (studyPane === 'canvas' && !isCanvasOpen) {
+              setStudyPane('none');
+              return;
+            }
+            setStudyPane('canvas');
+          }}
+          className="h-8 px-2 sm:px-2.5 text-xs"
+          title="Knowledge Canvas for this book"
+          aria-label="Knowledge Canvas"
+          aria-pressed={studyPane === 'canvas'}
+          data-testid="knowledge-canvas-toggle"
         >
           <PenTool size={14} />
           <span className="hidden md:inline ml-1.5">Canvas</span>
+          {currentLocationCanvasCount > 0 && (
+            <span
+              className="ml-1 rounded-full bg-primary/15 px-1.5 font-mono text-[10px] text-primary"
+              data-testid="page-canvas-count"
+              title={`${currentLocationCanvasCount} canvas(es) linked to this location`}
+            >
+              {currentLocationCanvasCount}
+            </span>
+          )}
         </Button>
+
+        {/* Reader layout states: split / full / minimized */}
+        <div className="hidden md:flex items-center gap-0.5 bg-surface-muted/40 p-0.5 rounded border border-border/80">
+          <Button
+            type="button"
+            variant={readerLayout === 'split' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setReaderLayout('split')}
+            aria-pressed={readerLayout === 'split'}
+            title="Split reader and study workspace"
+            aria-label="Split view"
+          >
+            <Columns2 size={14} />
+          </Button>
+          <Button
+            type="button"
+            variant={readerLayout === 'full' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setReaderLayout('full')}
+            aria-pressed={readerLayout === 'full'}
+            title="Full reader"
+            aria-label="Full reader"
+          >
+            <Maximize2 size={14} />
+          </Button>
+          <Button
+            type="button"
+            variant={readerLayout === 'minimized' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => {
+              setReaderLayout('minimized');
+              if (studyPane === 'none' && !isCanvasOpen) setStudyPane('annotations');
+            }}
+            aria-pressed={readerLayout === 'minimized'}
+            title="Minimize reader, expand the study workspace"
+            aria-label="Minimize reader"
+          >
+            <Minimize2 size={14} />
+          </Button>
+        </div>
 
         {/* Mobile Tab Switcher when Canvas is open on narrow screens */}
         {isCanvasOpen && (

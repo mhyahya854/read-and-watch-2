@@ -35,6 +35,11 @@ import { createReaderStore } from '../server/reader-store.mjs';
 import { createAnnotationStore } from '../server/annotation-store.mjs';
 import { createCanvasStore } from '../server/canvas-store.mjs';
 import { createKnowledgeStore } from '../server/knowledge-store.mjs';
+import { buildStudySummary } from '../server/study-summary.mjs';
+import {
+  convertLegacyGraphToKnowledgeCanvas,
+  findImportedCanvas,
+} from '../server/canvas-knowledge.mjs';
 import { createSearchStore } from '../server/search-store.mjs';
 import { createPortabilityStore } from '../server/portability-store.mjs';
 import { createSettingsStore } from '../server/settings-store.mjs';
@@ -531,6 +536,120 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         return sendJson(res, 200, readerStore.saveSettings(body));
       }
 
+      // ---------------------------------------------------------------
+      // Book-scoped study routes. These mirror the Vite middleware exactly so
+      // the packaged desktop app and the dev server behave identically.
+      // GET/POST /api/reader/items/:id/annotations
+      // ---------------------------------------------------------------
+      const itemAnnotationsList = sub.match(/^items\/([^/]+)\/annotations$/);
+      if (itemAnnotationsList) {
+        const itemId = decodeURIComponent(itemAnnotationsList[1]);
+        if (method === 'GET') {
+          const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
+          return sendJson(res, 200, annotationStore.getAnnotations(itemId, { includeDeleted }));
+        }
+        if (method === 'POST') {
+          const body = await readJsonBody(req);
+          body.itemId = itemId;
+          return sendJson(res, 201, annotationStore.createAnnotation(body));
+        }
+      }
+
+      const itemAnnotationsBatch = sub.match(/^items\/([^/]+)\/annotations\/batch$/);
+      if (itemAnnotationsBatch && method === 'POST') {
+        const body = await readJsonBody(req);
+        return sendJson(res, 201, annotationStore.batchCreateAnnotations(body.items ?? body));
+      }
+
+      const itemAnnotationsHashCheck = sub.match(/^items\/([^/]+)\/annotations\/hash-check$/);
+      if (itemAnnotationsHashCheck && method === 'GET') {
+        const itemId = decodeURIComponent(itemAnnotationsHashCheck[1]);
+        const sourceHash = url.searchParams.get('sourceHash') || '';
+        return sendJson(res, 200, annotationStore.checkSourceHashMismatches(itemId, sourceHash));
+      }
+
+      const itemAnnotationsRecover = sub.match(/^items\/([^/]+)\/annotations\/recover$/);
+      if (itemAnnotationsRecover && method === 'POST') {
+        const itemId = decodeURIComponent(itemAnnotationsRecover[1]);
+        return sendJson(res, 200, annotationStore.recoverFromExternalFile(itemId));
+      }
+
+      const itemAnnotationRestore = sub.match(
+        /^items\/([^/]+)\/annotations\/([^/]+)\/restore$/,
+      );
+      if (itemAnnotationRestore && method === 'PATCH') {
+        const annotationId = decodeURIComponent(itemAnnotationRestore[2]);
+        const body = await readJsonBody(req);
+        return sendJson(
+          res,
+          200,
+          annotationStore.restoreAnnotation(
+            annotationId,
+            typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined,
+          ),
+        );
+      }
+
+      const itemAnnotation = sub.match(/^items\/([^/]+)\/annotations\/([^/]+)$/);
+      if (itemAnnotation) {
+        const annotationId = decodeURIComponent(itemAnnotation[2]);
+        if (method === 'GET') {
+          const ann = annotationStore.getAnnotation(annotationId);
+          if (!ann) return sendJson(res, 404, { error: 'Annotation not found' });
+          return sendJson(res, 200, ann);
+        }
+        if (method === 'PUT') {
+          const body = await readJsonBody(req);
+          return sendJson(
+            res,
+            200,
+            annotationStore.updateAnnotation(
+              annotationId,
+              body,
+              typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+            ),
+          );
+        }
+        if (method === 'DELETE') {
+          const body = await readJsonBody(req);
+          return sendJson(
+            res,
+            200,
+            annotationStore.deleteAnnotation(
+              annotationId,
+              typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+            ),
+          );
+        }
+      }
+
+      // GET/POST /api/reader/items/:id/canvases — item-scoped canvas routes
+      const itemCanvases = sub.match(/^items\/([^/]+)\/canvases$/);
+      if (itemCanvases) {
+        const itemId = decodeURIComponent(itemCanvases[1]);
+        if (method === 'GET') {
+          return sendJson(res, 200, canvasStore.listCanvases({ itemId }));
+        }
+        if (method === 'POST') {
+          const body = await readJsonBody(req);
+          body.itemId = itemId;
+          return sendJson(res, 201, canvasStore.createCanvas(body));
+        }
+      }
+
+      // GET /api/reader/items/:id/canvas-links
+      const itemCanvasLinks = sub.match(/^items\/([^/]+)\/canvas-links$/);
+      if (itemCanvasLinks && method === 'GET') {
+        return sendJson(res, 200, canvasStore.getLinksForItem(decodeURIComponent(itemCanvasLinks[1])));
+      }
+
+      // GET /api/reader/items/:id/study-summary
+      const studySummary = sub.match(/^items\/([^/]+)\/study-summary$/);
+      if (studySummary && method === 'GET') {
+        const itemId = decodeURIComponent(studySummary[1]);
+        return sendJson(res, 200, buildStudySummary({ itemId, annotationStore, canvasStore }));
+      }
+
       return sendJson(res, 404, { error: 'Reader route not found' });
     }
 
@@ -572,10 +691,25 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         if (method === 'GET') {
           const itemId = url.searchParams.get('itemId') || undefined;
           const excludeWatchOwned = url.searchParams.get('scope') === 'global';
+          const scopeKind = url.searchParams.get('scopeKind');
+          const locationParam = url.searchParams.get('location');
+          if (itemId && locationParam) {
+            let location = null;
+            try {
+              location = JSON.parse(locationParam);
+            } catch {
+              return sendJson(res, 400, { error: 'location must be valid JSON' });
+            }
+            return sendJson(res, 200, canvasStore.listCanvasesForLocation(itemId, location));
+          }
           return sendJson(
             res,
             200,
-            canvasStore.listCanvases({ itemId, excludeWatchOwned })
+            canvasStore.listCanvases({
+              itemId,
+              excludeWatchOwned,
+              scopeKind: scopeKind === 'book' || scopeKind === 'location' ? scopeKind : null,
+            })
           );
         }
         if (method === 'POST') {
@@ -691,6 +825,57 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         if (method === 'DELETE') {
           return sendJson(res, 200, knowledgeStore.deleteDiagram(id, { itemId }));
         }
+      }
+
+      // Legacy item-owned knowledge graphs (Read study workspace)
+      if (sub === 'legacy-graphs' && method === 'GET') {
+        const itemId = url.searchParams.get('itemId');
+        if (!itemId) return sendJson(res, 400, { error: 'itemId is required' });
+        const graphs = knowledgeStore.listGraphs({ associatedItemId: itemId });
+        return sendJson(
+          res,
+          200,
+          graphs.map((graph) => {
+            const imported = findImportedCanvas(canvasStore, itemId, graph.id);
+            return {
+              id: graph.id,
+              title: graph.title,
+              nodeCount: graph.nodeCount,
+              edgeCount: graph.edgeCount,
+              updatedAt: graph.updatedAt,
+              importedCanvasId: imported ? imported.id : null,
+            };
+          }),
+        );
+      }
+
+      const legacyImportMatch = sub.match(/^legacy-graphs\/([^/]+)\/import$/);
+      if (legacyImportMatch && method === 'POST') {
+        const graphId = decodeURIComponent(legacyImportMatch[1]);
+        const body = (await readJsonBody(req)) || {};
+        const itemId = body.itemId ? String(body.itemId) : null;
+        if (!itemId) return sendJson(res, 400, { error: 'itemId is required' });
+        const graph = knowledgeStore.getGraph(graphId, { itemId });
+        const existing = findImportedCanvas(canvasStore, itemId, graphId);
+        if (existing) {
+          return sendJson(res, 409, {
+            error: 'This legacy graph has already been imported',
+            canvasId: existing.id,
+          });
+        }
+        const converted = convertLegacyGraphToKnowledgeCanvas(graph, { itemId });
+        const created = canvasStore.createCanvas({
+          itemId,
+          title: converted.title,
+          scope: converted.scope,
+          knowledge: converted.knowledge,
+        });
+        return sendJson(res, 201, {
+          canvasId: created.canvasId,
+          legacyGraphId: graphId,
+          blockCount: converted.knowledge.blocks.length,
+          relationshipCount: converted.knowledge.relationships.length,
+        });
       }
       return sendJson(res, 404, { error: 'Knowledge route not found' });
     }

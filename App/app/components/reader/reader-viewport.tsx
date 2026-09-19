@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useReader } from './reader-context';
 import { createPageLocation, createProgressionLocation } from '@/lib/document';
 import { ReaderSelectionMenu } from './reader-selection-menu';
+import { ReaderAnnotationLayer } from './reader-annotation-layer';
 
 export function ReaderViewport() {
   const {
@@ -120,6 +121,9 @@ export function ReaderViewport() {
         />
       </div>
 
+      {/* 3b. Normalized annotation overlay (marks + freehand markup) */}
+      <ReaderAnnotationLayer />
+
       {/* 4. Floating Navigation Affordances */}
       {snapshot.isOpen && !snapshot.isLoading && (
         <>
@@ -156,4 +160,3 @@ export function ReaderViewport() {
     </main>
   );
 }
-

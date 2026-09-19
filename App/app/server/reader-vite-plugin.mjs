@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createReaderStore } from './reader-store.mjs';
 import { createAnnotationStore } from './annotation-store.mjs';
 import { createCanvasStore } from './canvas-store.mjs';
+import { buildStudySummary } from './study-summary.mjs';
 
 const MAX_BODY_BYTES = 16 * 1024 * 1024; // 16 MB — supports canvas payloads, exports, and image assets
 const FORMAT_MIME_TYPES = {
@@ -50,6 +51,8 @@ export function readerPlugin({
   readerExecutable = null,
   userDataRoot,
   searchStore = null,
+  annotationStore: providedAnnotationStore = null,
+  canvasStore: providedCanvasStore = null,
 } = {}) {
   const store = createReaderStore({
     libraryRoot,
@@ -60,17 +63,21 @@ export function readerPlugin({
     searchStore,
   });
 
-  const annotationStore = createAnnotationStore({
-    databasePath: libraryDatabasePath,
-    userDataRoot,
-    searchStore,
-  });
+  const annotationStore =
+    providedAnnotationStore ||
+    createAnnotationStore({
+      databasePath: libraryDatabasePath,
+      userDataRoot,
+      searchStore,
+    });
 
-  const canvasStore = createCanvasStore({
-    databasePath: libraryDatabasePath,
-    userDataRoot,
-    searchStore,
-  });
+  const canvasStore =
+    providedCanvasStore ||
+    createCanvasStore({
+      databasePath: libraryDatabasePath,
+      userDataRoot,
+      searchStore,
+    });
 
   return {
     name: 'local-unified-reader',
@@ -449,10 +456,30 @@ export function readerPlugin({
             const itemId = url.searchParams.get('itemId') || undefined;
             const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
             const excludeWatchOwned = url.searchParams.get('scope') === 'global';
+            const scopeKind = url.searchParams.get('scopeKind');
+            const locationParam = url.searchParams.get('location');
+            if (itemId && locationParam) {
+              let location = null;
+              try {
+                location = JSON.parse(locationParam);
+              } catch {
+                return sendJson(response, 400, { error: 'location must be valid JSON' });
+              }
+              return sendJson(
+                response,
+                200,
+                canvasStore.listCanvasesForLocation(itemId, location),
+              );
+            }
             return sendJson(
               response,
               200,
-              canvasStore.listCanvases({ itemId, includeDeleted, excludeWatchOwned })
+              canvasStore.listCanvases({
+                itemId,
+                includeDeleted,
+                excludeWatchOwned,
+                scopeKind: scopeKind === 'book' || scopeKind === 'location' ? scopeKind : null,
+              })
             );
           }
 
@@ -491,6 +518,16 @@ export function readerPlugin({
           if (parts.length === 3 && parts[0] === 'items' && parts[2] === 'canvas-links' && request.method === 'GET') {
             const itemId = decodeURIComponent(parts[1]);
             return sendJson(response, 200, canvasStore.getLinksForItem(itemId));
+          }
+
+          // GET /api/reader/items/:id/study-summary — the book's own study state
+          if (parts.length === 3 && parts[0] === 'items' && parts[2] === 'study-summary' && request.method === 'GET') {
+            const itemId = decodeURIComponent(parts[1]);
+            return sendJson(
+              response,
+              200,
+              buildStudySummary({ itemId, annotationStore, canvasStore }),
+            );
           }
 
           // GET /api/reader/annotations/:id/canvas-links — get links for an annotation

@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS canvases (
   id                      TEXT PRIMARY KEY,
   item_id                 TEXT,
   title                   TEXT NOT NULL DEFAULT '',
+  scope_kind              TEXT NOT NULL DEFAULT 'book',
+  scope_label             TEXT,
+  scope_anchor_json       TEXT,
   document_relative_path  TEXT NOT NULL UNIQUE,
   revision                INTEGER NOT NULL DEFAULT 1,
   lifecycle               TEXT NOT NULL DEFAULT 'active',
@@ -137,6 +140,28 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     }
   })();
 
+  // Idempotent scope migration: canvases created before Read study scopes
+  // existed become whole-book canvases. No location is fabricated for them.
+  try {
+    const canvasColumns = db
+      .prepare("PRAGMA table_info('canvases')")
+      .all()
+      .map((col) => col.name);
+    if (!canvasColumns.includes('scope_kind')) {
+      db.exec("ALTER TABLE canvases ADD COLUMN scope_kind TEXT NOT NULL DEFAULT 'book';");
+    }
+    if (!canvasColumns.includes('scope_label')) {
+      db.exec('ALTER TABLE canvases ADD COLUMN scope_label TEXT;');
+    }
+    if (!canvasColumns.includes('scope_anchor_json')) {
+      db.exec('ALTER TABLE canvases ADD COLUMN scope_anchor_json TEXT;');
+    }
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_canvases_scope
+        ON canvases(item_id, scope_kind, deleted_at_utc);
+    `);
+  } catch {}
+
   // Directory resolution
   function canvasDir(canvasId) {
     if (typeof canvasId !== 'string' || !canvasId.trim() || !/^[a-zA-Z0-9_-]+$/.test(canvasId)) {
@@ -168,12 +193,24 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
 
   // Row mapping
   function rowToMetadata(row) {
+    let scopeAnchor = null;
+    if (row.scope_anchor_json) {
+      try {
+        scopeAnchor = JSON.parse(row.scope_anchor_json);
+      } catch {
+        scopeAnchor = null;
+      }
+    }
     return {
       schemaVersion: 1,
       id: row.id,
       itemId: row.item_id,
       title: row.title,
       documentRelativePath: row.document_relative_path,
+      scopeKind: row.scope_kind === 'location' && scopeAnchor ? 'location' : 'book',
+      scopeLabel: row.scope_label ?? null,
+      scopeAnchorJson: row.scope_anchor_json ?? null,
+      scopeAnchor,
       revision: row.revision,
       lifecycle: row.lifecycle,
       createdAt: row.created_at_utc,
@@ -273,6 +310,7 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     itemId = null,
     standaloneOnly = false,
     excludeWatchOwned = false,
+    scopeKind = null,
     includeDeleted = false,
   } = {}) {
     let sql = 'SELECT * FROM canvases WHERE 1=1';
@@ -291,6 +329,10 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
         WHERE owner.id = canvases.item_id AND owner.collection = 'watch'
       ))`;
     }
+    if (scopeKind === 'book' || scopeKind === 'location') {
+      sql += ' AND scope_kind = ?';
+      params.push(scopeKind);
+    }
     if (!includeDeleted) {
       sql += ' AND deleted_at_utc IS NULL';
     }
@@ -298,6 +340,20 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
 
     const rows = db.prepare(sql).all(...params);
     return rows.map(rowToMetadata);
+  }
+
+  /**
+   * Canvases scoped to one exact source location for an item, matched on the
+   * canonical reader location rather than on a page number or scroll percentage.
+   */
+  function listCanvasesForLocation(itemId, location) {
+    if (!itemId || !location || typeof location !== 'object') return [];
+    const anchorKey = JSON.stringify(location);
+    return listCanvases({ itemId, scopeKind: 'location' }).filter((meta) => {
+      const anchor = meta.scopeAnchor;
+      if (!anchor || !anchor.location) return false;
+      return JSON.stringify(anchor.location) === anchorKey;
+    });
   }
 
   /** Get canvas metadata by ID. */
@@ -338,6 +394,8 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
         canvasId: meta.id,
         itemId: meta.itemId,
         title: meta.title,
+        scope: scopeFromMeta(meta),
+        knowledge: emptyKnowledge(),
         revision: meta.revision,
         lifecycle: meta.lifecycle,
         createdAt: meta.createdAt,
@@ -351,6 +409,15 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     } else {
       doc.title = meta.title;
       doc.itemId = meta.itemId;
+      // The metadata row is authoritative for scope identity; the JSON document
+      // is authoritative for the structured knowledge payload.
+      doc.scope = scopeFromMeta(meta, doc.scope);
+      if (!doc.knowledge || typeof doc.knowledge !== 'object') {
+        doc.knowledge = emptyKnowledge();
+      } else {
+        if (!Array.isArray(doc.knowledge.blocks)) doc.knowledge.blocks = [];
+        if (!Array.isArray(doc.knowledge.relationships)) doc.knowledge.relationships = [];
+      }
       doc.revision = meta.revision;
       doc.lifecycle = meta.lifecycle;
       doc.deletedAt = meta.deletedAt;
@@ -361,20 +428,106 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     return doc;
   }
 
+  function emptyKnowledge() {
+    return { blocks: [], relationships: [] };
+  }
+
+  /**
+   * Canvas scope as a document object. The SQLite row is the scope authority for
+   * filtering; the document copy travels with the file-first mirror/backup.
+   */
+  function scopeFromMeta(meta, fallback = null) {
+    if (meta.scopeKind === 'location' && meta.scopeAnchor) {
+      return {
+        kind: 'location',
+        ...(meta.scopeLabel ? { label: meta.scopeLabel } : {}),
+        anchor: meta.scopeAnchor,
+      };
+    }
+    if (fallback && fallback.kind === 'location' && fallback.anchor) {
+      return { kind: 'location', ...(meta.scopeLabel ? { label: meta.scopeLabel } : {}), anchor: fallback.anchor };
+    }
+    return { kind: 'book', ...(meta.scopeLabel ? { label: meta.scopeLabel } : {}) };
+  }
+
+  /** Validate + normalize an incoming scope payload for storage. */
+  function normalizeScopeInput(scope) {
+    if (!scope || typeof scope !== 'object') return { kind: 'book', label: null, anchorJson: null };
+    const label = typeof scope.label === 'string' && scope.label.trim() ? scope.label.trim().slice(0, 200) : null;
+    if (scope.kind !== 'location') return { kind: 'book', label, anchorJson: null };
+    const anchor = scope.anchor;
+    if (!anchor || typeof anchor !== 'object') return { kind: 'book', label, anchorJson: null };
+    const clean = {
+      ...(typeof anchor.sourceHash === 'string' ? { sourceHash: anchor.sourceHash } : {}),
+      ...(anchor.location !== undefined && anchor.location !== null ? { location: anchor.location } : {}),
+      ...(typeof anchor.locationLabel === 'string' ? { locationLabel: anchor.locationLabel.slice(0, 200) } : {}),
+      ...(typeof anchor.assetId === 'string' ? { assetId: anchor.assetId } : {}),
+    };
+    if (!clean.location && !clean.sourceHash) return { kind: 'book', label, anchorJson: null };
+    return { kind: 'location', label, anchorJson: JSON.stringify(clean) };
+  }
+
+  /** Sanitize incoming structured knowledge (blocks + relationships). */
+  function normalizeKnowledgeInput(knowledge) {
+    if (!knowledge || typeof knowledge !== 'object') return undefined;
+    const blocks = Array.isArray(knowledge.blocks) ? knowledge.blocks.slice(0, 1000) : [];
+    const blockIds = new Set(blocks.map((b) => b && b.id).filter((id) => typeof id === 'string'));
+    const relationships = Array.isArray(knowledge.relationships)
+      ? knowledge.relationships
+          .slice(0, 4000)
+          .filter(
+            (rel) =>
+              rel &&
+              typeof rel.id === 'string' &&
+              typeof rel.sourceBlockId === 'string' &&
+              typeof rel.targetBlockId === 'string' &&
+              blockIds.has(rel.sourceBlockId) &&
+              blockIds.has(rel.targetBlockId),
+          )
+      : [];
+    const importedGraphIds = Array.isArray(knowledge.importedGraphIds)
+      ? knowledge.importedGraphIds.filter((id) => typeof id === 'string').slice(0, 200)
+      : [];
+    return {
+      blocks,
+      relationships,
+      ...(importedGraphIds.length ? { importedGraphIds } : {}),
+    };
+  }
+
   /** Create a new canvas attached to an item or standalone. */
-  function createCanvas({ id, itemId = null, title = 'Untitled Canvas', scene = null }) {
+  function createCanvas({
+    id,
+    itemId = null,
+    title = 'Untitled Canvas',
+    scene = null,
+    scope = null,
+    knowledge = null,
+  }) {
     const canvasId = id || randomUUID();
     const cleanTitle = (title || 'Untitled Canvas').trim().slice(0, 500);
     const relPath = `canvases/${canvasId}/canvas.json`;
     const now = nowUtc();
+    const normalizedScope = normalizeScopeInput(scope);
+    const normalizedKnowledge = normalizeKnowledgeInput(knowledge) ?? emptyKnowledge();
 
     db.exec('BEGIN IMMEDIATE');
     try {
       db.prepare(`
         INSERT INTO canvases
-          (id, item_id, title, document_relative_path, revision, lifecycle, created_at_utc, updated_at_utc, deleted_at_utc)
-        VALUES (?, ?, ?, ?, 1, 'active', ?, ?, NULL)
-      `).run(canvasId, itemId, cleanTitle, relPath, now, now);
+          (id, item_id, title, scope_kind, scope_label, scope_anchor_json, document_relative_path, revision, lifecycle, created_at_utc, updated_at_utc, deleted_at_utc)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'active', ?, ?, NULL)
+      `).run(
+        canvasId,
+        itemId,
+        cleanTitle,
+        normalizedScope.kind,
+        normalizedScope.label,
+        normalizedScope.anchorJson,
+        relPath,
+        now,
+        now,
+      );
       db.exec('COMMIT');
     } catch (err) {
       db.exec('ROLLBACK');
@@ -386,6 +539,14 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
       canvasId,
       itemId,
       title: cleanTitle,
+      scope: normalizedScope.kind === 'location'
+        ? {
+            kind: 'location',
+            ...(normalizedScope.label ? { label: normalizedScope.label } : {}),
+            anchor: JSON.parse(normalizedScope.anchorJson),
+          }
+        : { kind: 'book', ...(normalizedScope.label ? { label: normalizedScope.label } : {}) },
+      knowledge: normalizedKnowledge,
       revision: 1,
       lifecycle: 'active',
       createdAt: now,
@@ -422,12 +583,19 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
 
       const newTitle = payload.title !== undefined ? payload.title.slice(0, 500) : row.title;
       const newRevision = row.revision + 1;
+      const scopeChanged = payload.scope !== undefined;
+      const nextScope = scopeChanged ? normalizeScopeInput(payload.scope) : null;
 
       db.prepare(`
         UPDATE canvases
         SET title = ?, revision = ?, updated_at_utc = ?
+            ${scopeChanged ? ', scope_kind = ?, scope_label = ?, scope_anchor_json = ?' : ''}
         WHERE id = ?
-      `).run(newTitle, newRevision, now, canvasId);
+      `).run(
+        ...(scopeChanged
+          ? [newTitle, newRevision, now, nextScope.kind, nextScope.label, nextScope.anchorJson, canvasId]
+          : [newTitle, newRevision, now, canvasId]),
+      );
 
       // Synchronize canvas_links if provided
       if (Array.isArray(payload.links)) {
@@ -468,6 +636,13 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
       canvasId: updatedMeta.id,
       itemId: updatedMeta.itemId,
       title: updatedMeta.title,
+      scope: scopeFromMeta(updatedMeta),
+      knowledge:
+        normalizeKnowledgeInput(payload.knowledge) ??
+        (() => {
+          const prior = readDocumentFile(canvasId);
+          return prior && prior.knowledge ? prior.knowledge : emptyKnowledge();
+        })(),
       revision: updatedMeta.revision,
       lifecycle: updatedMeta.lifecycle,
       createdAt: updatedMeta.createdAt,
@@ -787,6 +962,8 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
       itemId: sourceDoc.itemId,
       title: sourceDoc.title,
       scene: sourceDoc.scene,
+      scope: sourceDoc.scope ?? null,
+      knowledge: sourceDoc.knowledge ?? null,
     });
 
     // Restore links
@@ -829,17 +1006,21 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
 
     const now = nowUtc();
     const relPath = `canvases/${canvasId}/canvas.json`;
+    const recoveredScope = normalizeScopeInput(doc.scope ?? null);
 
     db.exec('BEGIN IMMEDIATE');
     try {
       db.prepare(`
         INSERT INTO canvases
-          (id, item_id, title, document_relative_path, revision, lifecycle, created_at_utc, updated_at_utc, deleted_at_utc)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, item_id, title, scope_kind, scope_label, scope_anchor_json, document_relative_path, revision, lifecycle, created_at_utc, updated_at_utc, deleted_at_utc)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         canvasId,
         doc.itemId,
         doc.title || 'Recovered Canvas',
+        recoveredScope.kind,
+        recoveredScope.label,
+        recoveredScope.anchorJson,
         relPath,
         doc.revision || 1,
         doc.lifecycle || 'active',
@@ -959,6 +1140,7 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
 
   return {
     listCanvases,
+    listCanvasesForLocation,
     getCanvasMetadata,
     assertCanvasOwnership,
     getCanvas,

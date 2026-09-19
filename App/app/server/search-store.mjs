@@ -330,8 +330,12 @@ export function createSearchStore({
           let secondaryLabel = '';
 
           if (ann.kind === 'text-mark') {
-            textContent = anchor.quote || '';
-            title = textContent.slice(0, 80) || `${subkind} mark`;
+            textContent = [anchor.quote, content.note].filter(Boolean).join(' — ');
+            title = content.note
+              ? content.note.slice(0, 80)
+              : anchor.quote
+                ? anchor.quote.slice(0, 80)
+                : `${subkind} mark`;
             secondaryLabel = anchor.pageNumber ? `Page ${anchor.pageNumber}` : 'Reflowable';
           } else if (ann.kind === 'comment') {
             textContent = [content.body, anchor.quote].filter(Boolean).join(' — ');
@@ -342,7 +346,7 @@ export function createSearchStore({
             title = content.passage ? content.passage.slice(0, 80) : 'Excerpt';
             secondaryLabel = anchor.pageNumber ? `Page ${anchor.pageNumber}` : 'Reflowable';
           } else if (ann.kind === 'drawing') {
-            textContent = content.text || '';
+            textContent = [content.text, content.note].filter(Boolean).join(' — ');
             title = content.text ? content.text.slice(0, 80) : `Drawing: ${content.subKind || 'shape'}`;
             secondaryLabel = anchor.pageNumber ? `Page ${anchor.pageNumber}` : 'Drawing';
           }
@@ -480,7 +484,19 @@ export function createSearchStore({
                 const linkLabels = (doc.links || [])
                   .map((l) => l.label)
                   .filter(Boolean);
-                sceneText = [...textElements, ...linkLabels].join(' ');
+                const knowledge = doc.knowledge || {};
+                const blockText = (knowledge.blocks || [])
+                  .map((b) => [b.title, b.body].filter(Boolean).join(' '))
+                  .filter(Boolean);
+                const relationshipLabels = (knowledge.relationships || [])
+                  .map((rel) => rel.label)
+                  .filter(Boolean);
+                sceneText = [
+                  ...textElements,
+                  ...linkLabels,
+                  ...blockText,
+                  ...relationshipLabels,
+                ].join(' ');
               } catch {}
             }
           }
@@ -493,7 +509,12 @@ export function createSearchStore({
           };
 
           const title = canvas.title || 'Untitled Canvas';
-          const secondaryLabel = canvas.item_id ? `Attached: ${bookTitle || 'Book'}` : 'Standalone Canvas';
+          const secondaryLabel =
+            canvas.scope_kind === 'location'
+              ? `Page/Location canvas${bookTitle ? `: ${bookTitle}` : ''}`
+              : canvas.item_id
+                ? `Book canvas: ${bookTitle || 'Book'}`
+                : 'Standalone Canvas';
 
           insertRecord.run(
             canvas.id,
@@ -978,8 +999,12 @@ export function createSearchStore({
       let secondaryLabel = '';
 
       if (ann.kind === 'text-mark') {
-        textContent = anchor.quote || '';
-        title = textContent.slice(0, 80) || `${subkind} mark`;
+        textContent = [anchor.quote, content.note].filter(Boolean).join(' — ');
+        title = content.note
+          ? content.note.slice(0, 80)
+          : anchor.quote
+            ? anchor.quote.slice(0, 80)
+            : `${subkind} mark`;
         secondaryLabel = anchor.pageNumber ? `Page ${anchor.pageNumber}` : 'Reflowable';
       } else if (ann.kind === 'comment') {
         textContent = [content.body, anchor.quote].filter(Boolean).join(' — ');
@@ -990,7 +1015,7 @@ export function createSearchStore({
         title = content.passage ? content.passage.slice(0, 80) : 'Excerpt';
         secondaryLabel = anchor.pageNumber ? `Page ${anchor.pageNumber}` : 'Reflowable';
       } else if (ann.kind === 'drawing') {
-        textContent = content.text || '';
+        textContent = [content.text, content.note].filter(Boolean).join(' — ');
         title = content.text ? content.text.slice(0, 80) : `Drawing: ${content.subKind || 'shape'}`;
         secondaryLabel = anchor.pageNumber ? `Page ${anchor.pageNumber}` : 'Drawing';
       }
@@ -1153,7 +1178,14 @@ export function createSearchStore({
               .filter((el) => el.type === 'text' && el.text)
               .map((el) => el.text);
             const linkLabels = (doc.links || []).map((l) => l.label).filter(Boolean);
-            sceneText = [...textElements, ...linkLabels].join(' ');
+            const knowledge = doc.knowledge || {};
+            const blockText = (knowledge.blocks || [])
+              .map((b) => [b.title, b.body].filter(Boolean).join(' '))
+              .filter(Boolean);
+            const relationshipLabels = (knowledge.relationships || [])
+              .map((rel) => rel.label)
+              .filter(Boolean);
+            sceneText = [...textElements, ...linkLabels, ...blockText, ...relationshipLabels].join(' ');
           } catch {}
         }
       }
@@ -1168,7 +1200,13 @@ export function createSearchStore({
       };
 
       const title = canvas.title || 'Untitled Canvas';
-      const secondaryLabel = canvas.item_id ? `Attached: ${bookTitle || 'Book'}` : 'Standalone Canvas';
+      const scopeLabel =
+        canvas.scope_kind === 'location'
+          ? `Page/Location canvas${bookTitle ? `: ${bookTitle}` : ''}`
+          : canvas.item_id
+            ? `Book canvas: ${bookTitle || 'Book'}`
+            : 'Standalone Canvas';
+      const secondaryLabel = scopeLabel;
 
       db.prepare(
         `INSERT INTO search_index_records (

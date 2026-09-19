@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { UserDataEditor } from '@/components/user-data-editor';
 import { WatchWorkspace } from '@/components/watch/watch-workspace';
+import { ReadStudyPanel } from '@/components/read/read-study-panel';
 import type { CatalogMedia, LibraryItem } from '@/lib/catalog';
 import { libraryAssetUrl } from '@/lib/catalog';
 import {
@@ -43,7 +44,8 @@ export type DetailTab =
   | 'relationships'
   | 'highlights'
   | 'canvas'
-  | 'workspace';
+  | 'workspace'
+  | 'study';
 
 function present(value: string | number | null | undefined) {
   return value === null || value === undefined || String(value).trim() === ''
@@ -114,6 +116,8 @@ export function ItemDetail({
       ? 'overview'
       : item.collection === 'watch' && (selectedTab === 'highlights' || selectedTab === 'canvas')
         ? 'workspace'
+        : item.collection === 'read' && (selectedTab === 'highlights' || selectedTab === 'canvas')
+          ? 'study'
         : selectedTab;
 
   const people = item.collection === 'read' ? item.authors : item.creators;
@@ -135,8 +139,7 @@ export function ItemDetail({
           ['metadata', 'Metadata'],
           ['media', `Media (${item.media.length})`],
           ['relationships', `Links (${item.relationshipIds.length})`],
-          ['highlights', 'Highlights'],
-          ['canvas', 'Canvas'],
+          ['study', 'Study'],
         ];
 
   const relatedItems = item.relationshipIds
@@ -553,6 +556,10 @@ export function ItemDetail({
                 Your library and notes continue to work independently.
               </p>
             </div>
+          )}
+
+          {tab === 'study' && item.collection === 'read' && (
+            <ReadStudyPanel itemId={item.id} />
           )}
 
           {tab === 'canvas' && (
