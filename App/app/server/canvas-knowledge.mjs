@@ -26,21 +26,41 @@ export function convertLegacyGraphToKnowledgeCanvas(graph, { itemId, now } = {})
 
   const blocks = nodes.map((node) => {
     const deepLink = node?.deepLink ?? null;
-    const annotationId =
-      deepLink && deepLink.type === 'annotation' && typeof deepLink.target === 'string'
-        ? deepLink.target
-        : undefined;
+    const linkType = deepLink && typeof deepLink.type === 'string' ? deepLink.type : null;
+    const linkTarget =
+      deepLink && typeof deepLink.target === 'string' && deepLink.target ? deepLink.target : null;
+    let parsedAnchor = null;
+    if (deepLink && typeof deepLink.anchorJson === 'string' && deepLink.anchorJson) {
+      try {
+        parsedAnchor = JSON.parse(deepLink.anchorJson);
+      } catch {
+        parsedAnchor = null;
+      }
+    }
+
+    // Every supported legacy deep-link type is preserved rather than discarded:
+    // annotation keeps the annotation id, item keeps the referenced item,
+    // location keeps the canonical location (with the item it belongs to), and
+    // external keeps its URL.
+    const source = {
+      itemId,
+      ...(linkType === 'annotation' && linkTarget ? { annotationId: linkTarget } : {}),
+      ...(linkType === 'item' && linkTarget ? { itemId: linkTarget } : {}),
+      ...(linkType === 'location' && linkTarget ? { itemId: linkTarget } : {}),
+      ...(parsedAnchor ? { location: parsedAnchor } : {}),
+      ...(linkType === 'external' && linkTarget ? { externalUrl: linkTarget } : {}),
+      ...(typeof deepLink?.label === 'string' && deepLink.label
+        ? { label: deepLink.label }
+        : {}),
+      legacyGraphId: graph.id,
+    };
+
     return {
       id: node.id,
       type: typeof node.nodeType === 'string' && node.nodeType ? node.nodeType : 'concept',
       title: typeof node.label === 'string' ? node.label : 'Untitled block',
       ...(node.notes ? { body: node.notes } : {}),
-      source: {
-        itemId,
-        ...(annotationId ? { annotationId } : {}),
-        ...(typeof deepLink?.label === 'string' ? { label: deepLink.label } : {}),
-        legacyGraphId: graph.id,
-      },
+      source,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -91,4 +111,3 @@ export function findImportedCanvas(canvasStore, itemId, graphId) {
 export function newKnowledgeId(prefix) {
   return `${prefix}-${randomUUID()}`;
 }
-

@@ -126,6 +126,19 @@ export class CdpClient {
             const { requestId, request } = msg.params;
             if (request?.url?.includes('/api/') && request.method !== 'GET') {
               this.pendingRequests.set(requestId, `${request.method} ${request.url}`);
+              if (request.method === 'PUT' && request.url.includes('/canvases/') && request.postData) {
+                try {
+                  const body = JSON.parse(request.postData);
+                  console.log(
+                    `[net-body ${stamp()}] expectedRevision=${body.expectedRevision} ` +
+                      `blocks=${body.knowledge?.blocks?.length ?? 'n/a'} ` +
+                      `relationships=${body.knowledge?.relationships?.length ?? 'n/a'} ` +
+                      `elements=${body.scene?.elements?.length ?? 'n/a'}`,
+                  );
+                } catch {
+                  // Non-JSON canvas payloads are not interesting here.
+                }
+              }
             }
           }
           if (msg.method === 'Network.responseReceived') {

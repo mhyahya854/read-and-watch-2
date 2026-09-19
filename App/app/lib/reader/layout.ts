@@ -28,8 +28,18 @@ export function sidePaneVisible(
   layout: ReaderLayoutMode,
   hasSideContent: boolean,
 ): boolean {
-  if (layout === 'full') return false;
   return hasSideContent;
+}
+
+/**
+ * The study pane is hidden (not unmounted) in full-reader mode: an in-progress
+ * annotation note draft must survive a full -> split round trip.
+ */
+export function sidePaneClass(layout: ReaderLayoutMode): string {
+  if (layout === 'full') return 'hidden';
+  return layout === 'minimized'
+    ? 'flex flex-1 min-w-0'
+    : 'flex flex-1 min-w-[320px] border-l border-border';
 }
 
 export function readerPaneClass(
@@ -40,12 +50,6 @@ export function readerPaneClass(
   if (layout === 'minimized') return 'hidden';
   if (layout === 'full' || !hasSideContent) return 'flex flex-1';
   return 'flex flex-[1.4] min-w-[320px] border-r border-border';
-}
-
-export function sidePaneClass(layout: ReaderLayoutMode): string {
-  return layout === 'minimized'
-    ? 'flex flex-1 min-w-0'
-    : 'flex flex-1 min-w-[320px] border-l border-border';
 }
 
 /** Entering full mode keeps the study selection; leaving it restores the pane. */

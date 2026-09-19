@@ -225,19 +225,55 @@ test('Reflowable text anchor: accepts valid CFI range and quote', () => {
   }
 });
 
-test('Reflowable text anchor: rejects missing startCfi', () => {
-  assert.throws(
-    () => validateAnnotation(makeBase({
+test('Reflowable text anchor: a CFI is optional, but a claimed CFI must exist', () => {
+  // Section-level anchors are legitimate: the engine may have no CFI at all, and
+  // forging one would be fabricated evidence.
+  const sectionAnchor = validateAnnotation(
+    makeBase({
       anchor: {
         kind: 'reflowable-text',
-        startCfi: '',
-        endCfi: '/6/4!/4/2/1:10',
+        spineIndex: 0,
+        quote: 'text',
+        sourceHash: 'h',
+        fidelity: 'section',
+      },
+    }),
+  );
+  assert.equal(sectionAnchor.anchor.kind, 'reflowable-text');
+  assert.equal(sectionAnchor.anchor.fidelity, 'section');
+  assert.equal(sectionAnchor.anchor.startCfi, undefined);
+
+  // A genuine CFI is preserved and marked as CFI-fidelity by default.
+  const cfiAnchor = validateAnnotation(
+    makeBase({
+      anchor: {
+        kind: 'reflowable-text',
+        startCfi: '/6/4!/4/2/1:10',
+        endCfi: '/6/4!/4/2/1:24',
         spineIndex: 0,
         quote: 'text',
         sourceHash: 'h',
       },
-    })),
-    /non-empty string/i,
+    }),
+  );
+  assert.equal(cfiAnchor.anchor.fidelity, 'cfi');
+  assert.equal(cfiAnchor.anchor.startCfi, '/6/4!/4/2/1:10');
+
+  // Claiming CFI fidelity without a CFI is rejected.
+  assert.throws(
+    () =>
+      validateAnnotation(
+        makeBase({
+          anchor: {
+            kind: 'reflowable-text',
+            spineIndex: 0,
+            quote: 'text',
+            sourceHash: 'h',
+            fidelity: 'cfi',
+          },
+        }),
+      ),
+    /requires a real startCfi/i,
   );
 });
 

@@ -190,9 +190,9 @@ export function ReadStudyPanel({ itemId }: { itemId: string }) {
                   </span>
                 )}
                 <Link
-                  href={`/reader/${encodeURIComponent(itemId)}`}
+                  href={`/reader/${encodeURIComponent(itemId)}?canvasId=${encodeURIComponent(canvas.id)}`}
                   className="shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open in the reader study workspace"
+                  title="Open this canvas in the reader study workspace"
                 >
                   <ExternalLink size={12} />
                 </Link>

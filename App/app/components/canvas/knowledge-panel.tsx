@@ -54,10 +54,24 @@ export interface KnowledgePanelProps {
   readOnly?: boolean;
 }
 
+/**
+ * Source navigation with a documented fallback chain:
+ *   1. exact annotation (reader focuses it)
+ *   2. the stored canonical reader location (works even if the annotation was
+ *      deleted or is temporarily unavailable)
+ *   3. the item itself
+ * A source-linked block is never left stranded.
+ */
 function sourceHref(source: KnowledgeBlock['source']): string | null {
   if (!source) return null;
+  if (source.externalUrl) return source.externalUrl;
   if (source.annotationId && source.itemId) {
     return `/reader/${encodeURIComponent(source.itemId)}?annotationId=${encodeURIComponent(source.annotationId)}`;
+  }
+  if (source.itemId && source.location) {
+    return `/reader/${encodeURIComponent(source.itemId)}?location=${encodeURIComponent(
+      JSON.stringify(source.location),
+    )}`;
   }
   if (source.itemId) return `/reader/${encodeURIComponent(source.itemId)}`;
   return null;
@@ -69,6 +83,7 @@ function sourceLabel(block: KnowledgeBlock): string | null {
   if (source.label) return source.label;
   if (source.quote) return `“${source.quote.slice(0, 32)}${source.quote.length > 32 ? '…' : ''}”`;
   if (source.annotationId) return 'Annotation';
+  if (source.location) return 'Location';
   if (source.legacyGraphId) return 'Imported';
   return 'Source';
 }
@@ -385,7 +400,7 @@ export function KnowledgePanel({
                       key={preset}
                       type="button"
                       onClick={() => setLinkLabel(preset)}
-                      className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+                      className="rounded-md border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-surface-muted hover:text-foreground"
                     >
                       {preset}
                     </button>
@@ -526,7 +541,7 @@ export function KnowledgePanel({
             <div key={`list-${block.id}`} className="flex items-start justify-between gap-2">
               <span className="truncate text-foreground">
                 {block.title || 'Untitled block'}
-                {block.body ? ` — ${block.body}` : ''}
+                {block.body ? ` - ${block.body}` : ''}
               </span>
               <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
                 {block.type}
@@ -539,7 +554,7 @@ export function KnowledgePanel({
             return (
               <div key={`list-${rel.id}`} className="text-muted-foreground">
                 {source?.title || '?'} {rel.direction === 'mutual' ? '↔' : '→'}{' '}
-                {target?.title || '?'} — {rel.label || 'related'}
+                {target?.title || '?'} - {rel.label || 'related'}
               </div>
             );
           })}

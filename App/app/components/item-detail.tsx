@@ -546,32 +546,8 @@ export function ItemDetail({
             </div>
           )}
 
-          {tab === 'highlights' && (
-            <div className="rounded-md border border-border bg-surface-muted/40 p-6 text-center">
-              <h3 className="font-editorial text-base font-semibold text-foreground">
-                No highlights yet
-              </h3>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground max-w-sm mx-auto">
-                Highlights will appear here when annotation support is available.
-                Your library and notes continue to work independently.
-              </p>
-            </div>
-          )}
-
           {tab === 'study' && item.collection === 'read' && (
             <ReadStudyPanel itemId={item.id} />
-          )}
-
-          {tab === 'canvas' && (
-            <div className="rounded-md border border-border bg-surface-muted/40 p-6 text-center">
-              <h3 className="font-editorial text-base font-semibold text-foreground">
-                Canvas Notes are not available yet
-              </h3>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground max-w-sm mx-auto">
-                This entry point is ready, but drawing and linked-canvas tools
-                are scheduled for a future release.
-              </p>
-            </div>
           )}
         </div>
         )}

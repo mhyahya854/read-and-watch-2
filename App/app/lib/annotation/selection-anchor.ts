@@ -13,59 +13,30 @@ import type {
   PdfTextAnchor,
   ReflowableTextAnchor,
 } from './types.ts';
+import {
+  mergeNormalizedRects,
+  normalizeClientRects,
+  type ClientRectLike,
+  type PageRectLike,
+} from '../document/selection-geometry.ts';
 
-export interface ClientRectLike {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
+export type { ClientRectLike, PageRectLike };
 
-export type PageRectLike = ClientRectLike;
-
-function clamp01(value: number): number {
-  if (Number.isNaN(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}
-
-/**
- * Normalize client-space rectangles into page-relative 0..1 rectangles.
- * Zero-area rects (typical for collapsed selection boundaries) are dropped.
- */
+/** Normalize client-space rectangles into canonical page-relative rects. */
 export function normalizeSelectionRects(
   rects: ReadonlyArray<ClientRectLike>,
   page: PageRectLike,
 ): NormalizedRect[] {
-  if (page.width <= 0 || page.height <= 0) return [];
-  const normalized = rects
-    .filter((r) => r.width > 0.5 && r.height > 0.5)
-    .map((r) => ({
-      x: clamp01((r.left - page.left) / page.width),
-      y: clamp01((r.top - page.top) / page.height),
-      width: clamp01(r.width / page.width),
-      height: clamp01(r.height / page.height),
-    }))
-    .filter((r) => r.width > 0 && r.height > 0);
-
-  // Merge rectangles that share a line (same y band) so a single mark is one
-  // anchor rather than one per glyph run.
-  const merged: Array<{ x: number; y: number; width: number; height: number }> = [];
-  for (const rect of normalized) {
-    const existing = merged.find(
-      (m) => Math.abs(m.y - rect.y) < 0.004 && Math.abs(m.height - rect.height) < 0.01,
-    );
-    if (existing) {
-      const right = Math.max(existing.x + existing.width, rect.x + rect.width);
-      const left = Math.min(existing.x, rect.x);
-      existing.x = left;
-      existing.width = clamp01(right - left);
-    } else {
-      merged.push({ ...rect });
-    }
-  }
-  return merged as NormalizedRect[];
+  return normalizeClientRects(rects, page) as NormalizedRect[];
 }
 
+/**
+ * Build a PDF text anchor from REAL selection geometry.
+ *
+ * Returns null when no usable selection rectangles exist. A mark is never
+ * invented: a full-width stripe standing in for a selection the engine could not
+ * resolve would be fabricated evidence.
+ */
 export function pdfTextAnchorFromSelection(input: {
   pageNumber: number;
   sourceHash: string;
@@ -73,13 +44,12 @@ export function pdfTextAnchorFromSelection(input: {
   rects: ReadonlyArray<NormalizedRect>;
   prefix?: string;
   suffix?: string;
-}): PdfTextAnchor {
+}): PdfTextAnchor | null {
+  if (!input.rects || input.rects.length === 0) return null;
   return {
     kind: 'pdf-text',
     pageNumber: Math.max(1, Math.trunc(input.pageNumber)),
-    rects: input.rects.length
-      ? input.rects
-      : [{ x: 0, y: 0, width: 1, height: 0.02 }],
+    rects: mergeNormalizedRects(input.rects) as NormalizedRect[],
     quote: input.quote,
     ...(input.prefix ? { prefix: input.prefix } : {}),
     ...(input.suffix ? { suffix: input.suffix } : {}),
@@ -88,9 +58,12 @@ export function pdfTextAnchorFromSelection(input: {
 }
 
 /**
- * Reflowable anchor. A CFI is used when the engine supplies one; otherwise the
- * anchor is section-level (spine/section + offsets) with the quote and context
- * used for re-resolution. No page number is invented for reflowable documents.
+ * Reflowable anchor.
+ *
+ * A CFI is stored ONLY when the engine actually supplied one. Otherwise the
+ * anchor is section-level: spine/section identity, offsets when genuinely
+ * available, the canonical reader location, and the quote/context for
+ * re-resolution. No CFI is forged and no page number is invented.
  */
 export function reflowableTextAnchorFromSelection(input: {
   sourceHash: string;
@@ -100,19 +73,30 @@ export function reflowableTextAnchorFromSelection(input: {
   spineIndex?: number;
   startOffset?: number;
   endOffset?: number;
+  sectionId?: string;
+  location?: unknown;
   prefix?: string;
   suffix?: string;
 }): ReflowableTextAnchor {
   const spineIndex = Number.isInteger(input.spineIndex) ? (input.spineIndex as number) : 0;
-  const fallbackCfi = `epubcfi(/6/${(spineIndex + 1) * 2}!)`;
+  const hasCfi = typeof input.startCfi === 'string' && input.startCfi.trim().length > 0;
   return {
     kind: 'reflowable-text',
-    startCfi: input.startCfi || `${fallbackCfi}[${input.startOffset ?? 0}]`,
-    endCfi:
-      input.endCfi ||
-      `${input.startCfi || fallbackCfi}[${input.endOffset ?? input.startOffset ?? 0}]`,
+    ...(hasCfi ? { startCfi: input.startCfi } : {}),
+    ...(hasCfi && typeof input.endCfi === 'string' && input.endCfi.trim()
+      ? { endCfi: input.endCfi }
+      : {}),
     spineIndex,
+    ...(typeof input.sectionId === 'string' && input.sectionId
+      ? { sectionId: input.sectionId }
+      : {}),
+    ...(typeof input.startOffset === 'number' ? { startOffset: input.startOffset } : {}),
+    ...(typeof input.endOffset === 'number' ? { endOffset: input.endOffset } : {}),
+    ...(input.location !== undefined && input.location !== null
+      ? { location: input.location }
+      : {}),
     quote: input.quote,
+    fidelity: hasCfi ? 'cfi' : 'section',
     ...(input.prefix ? { prefix: input.prefix } : {}),
     ...(input.suffix ? { suffix: input.suffix } : {}),
     sourceHash: input.sourceHash,
@@ -122,6 +106,61 @@ export function reflowableTextAnchorFromSelection(input: {
 /** True when the anchor carries geometry that can be drawn on a page. */
 export function anchorHasGeometry(anchor: AnnotationAnchor): boolean {
   return anchor.kind === 'pdf-text' && anchor.rects.length > 0;
+}
+
+/**
+ * Convert the document layer's versioned TextAnchor into the annotation store's
+ * anchor. This is the single conversion path used by the reader, so the adapter
+ * (which owns the real DOM geometry and the page rotation) decides the geometry.
+ */
+export function annotationAnchorFromTextAnchor(
+  textAnchor: {
+    kind: 'pdf-geometry' | 'reflowable-range';
+    quote: string;
+    sourceHash: string;
+    context?: { prefix?: string; suffix?: string };
+    payload: object;
+  },
+  options: { location?: unknown } = {},
+): AnnotationAnchor | null {
+  if (textAnchor.kind === 'pdf-geometry') {
+    const payload = textAnchor.payload as unknown as {
+      pageNumber?: number;
+      rects?: NormalizedRect[];
+    };
+    if (!Array.isArray(payload.rects) || payload.rects.length === 0) return null;
+    if (typeof payload.pageNumber !== 'number' || payload.pageNumber < 1) return null;
+    return pdfTextAnchorFromSelection({
+      pageNumber: payload.pageNumber,
+      sourceHash: textAnchor.sourceHash,
+      quote: textAnchor.quote,
+      rects: payload.rects,
+      prefix: textAnchor.context?.prefix,
+      suffix: textAnchor.context?.suffix,
+    });
+  }
+
+  const payload = textAnchor.payload as unknown as {
+    startCfi?: string;
+    endCfi?: string;
+    spineIndex?: number;
+    sectionId?: string;
+    startOffset?: number;
+    endOffset?: number;
+  };
+  return reflowableTextAnchorFromSelection({
+    sourceHash: textAnchor.sourceHash,
+    quote: textAnchor.quote,
+    startCfi: payload.startCfi,
+    endCfi: payload.endCfi,
+    spineIndex: payload.spineIndex,
+    sectionId: payload.sectionId,
+    startOffset: payload.startOffset,
+    endOffset: payload.endOffset,
+    location: options.location,
+    prefix: textAnchor.context?.prefix,
+    suffix: textAnchor.context?.suffix,
+  });
 }
 
 /** Human-readable source label for an anchor (no fabricated page numbers). */

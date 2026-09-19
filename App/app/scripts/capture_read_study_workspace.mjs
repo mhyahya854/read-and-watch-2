@@ -133,6 +133,50 @@ async function selectReaderText(cdp, spanCount = 2) {
   `);
 }
 
+/** Numeric proof that the annotation overlay sits exactly on the rendered page. */
+async function expectOverlayAligned(cdp, label) {
+  const boxes = await cdp.evaluate(`
+    (() => {
+      const layer = document.querySelector('[data-testid="reader-annotation-layer"]');
+      const container = document.querySelector('[aria-label="Publication Content Viewport"]');
+      const page = container?.querySelector('canvas') ?? null;
+      if (!layer || !page) return null;
+      const l = layer.getBoundingClientRect();
+      const p = page.getBoundingClientRect();
+      return {
+        ld: { x: l.left, y: l.top, w: l.width, h: l.height },
+        pd: { x: p.left, y: p.top, w: p.width, h: p.height },
+      };
+    })()
+  `);
+  if (!boxes) throw new Error(`overlay alignment (${label}): layer or page missing`);
+  for (const key of ['x', 'y', 'w', 'h']) {
+    const delta = Math.abs(boxes.ld[key] - boxes.pd[key]);
+    if (delta > 2) {
+      throw new Error(
+        `overlay alignment (${label}): ${key} differs by ${delta.toFixed(2)}px ` +
+          `(layer ${JSON.stringify(boxes.ld)} vs page ${JSON.stringify(boxes.pd)})`,
+      );
+    }
+  }
+}
+
+/** Fetch one canvas document through the real API. */
+async function fetchCanvasDoc(canvasId, itemId) {
+  const res = await fetch(
+    `${BASE_URL}/api/reader/canvases/${encodeURIComponent(canvasId)}?itemId=${encodeURIComponent(itemId)}`,
+  );
+  if (!res.ok) throw new Error(`canvas fetch failed (HTTP ${res.status})`);
+  return res.json();
+}
+
+async function listCanvasIds(itemId) {
+  const res = await fetch(`${BASE_URL}/api/reader/items/${encodeURIComponent(itemId)}/canvases`);
+  if (!res.ok) throw new Error(`canvas list failed (HTTP ${res.status})`);
+  const list = await res.json();
+  return list.map((c) => c.canvasId ?? c.id);
+}
+
 async function drawStroke(cdp) {
   const box = await cdp.evaluate(`
     (() => {
@@ -239,7 +283,16 @@ async function main() {
     await cdp.clickByLabel('Full reader');
     await shot('03-reader-full-mode.png', 'Full reader hides the study pane', async () => {
       await expectPresent('full reader pane', '[data-reader-pane="full"]');
-      await expectCount('no side pane', '[data-side-pane]', 0);
+      // The study pane stays MOUNTED (so a note draft survives) but hidden.
+      const sideHidden = await cdp.evaluate(`
+        (() => {
+          const pane = document.querySelector('[data-side-pane]');
+          return Boolean(pane) && pane.offsetParent === null;
+        })()
+      `);
+      if (!sideHidden) {
+        throw new Error('full reader must hide (not unmount) the study pane');
+      }
     });
 
     await cdp.clickByLabel('Minimize reader');
@@ -267,7 +320,7 @@ async function main() {
     // -------------------------------------------------------------------
     // Annotations
     // -------------------------------------------------------------------
-    const selected = await selectReaderText(cdp, 2);
+    const selected = await selectReaderText(cdp, 4);
     if (!selected) {
       const diag = await cdp.evaluate(`
         (() => {
@@ -288,6 +341,14 @@ async function main() {
     await shot('06-highlighted-text.png', 'Highlight created from the selection', async () => {
       await expectPresent('highlight mark painted', '[data-testid="reader-annotation-layer"] button[data-annotation-id]');
       await expectText('highlight listed', 'Highlight');
+      // A multi-line selection must render every line, not just the first rect.
+      const fragments = await cdp.evaluate(
+        `document.querySelectorAll('[data-testid="reader-annotation-layer"] [data-annotation-fragment]').length`,
+      );
+      if (fragments < 3) {
+        throw new Error(`multi-line highlight rendered ${fragments} fragment(s); expected >= 3`);
+      }
+      await expectOverlayAligned(cdp, 'highlight on page');
     });
 
     const selectedUnderline = await selectReaderText(cdp, 3);
@@ -366,9 +427,28 @@ async function main() {
     await cdp.navigate(readerA);
     await cdp.clickByText('Canvas', { exact: false });
     await cdp.clickSelector('[data-testid="study-tab-canvas"]');
+    const zoomBefore = await cdp.evaluate(`
+      (() => {
+        const label = Array.from(document.querySelectorAll('span'))
+          .map((s) => (s.textContent || '').trim())
+          .find((t) => /^\\d+%$/.test(t));
+        return label ?? null;
+      })()
+    `);
     await cdp.clickByLabel('Zoom In');
     await cdp.clickByLabel('Zoom In');
     await sleep(1200);
+    const zoomAfter = await cdp.evaluate(`
+      (() => {
+        const label = Array.from(document.querySelectorAll('span'))
+          .map((s) => (s.textContent || '').trim())
+          .find((t) => /^\\d+%$/.test(t));
+        return label ?? null;
+      })()
+    `);
+    if (zoomBefore && zoomAfter && zoomBefore === zoomAfter) {
+      throw new Error(`zoom control did not change the reader zoom (${zoomBefore} -> ${zoomAfter})`);
+    }
     const afterReload = await cdp.evaluate(`
       (() => {
         const path = document.querySelector('[data-testid="reader-annotation-layer"] path');
@@ -384,6 +464,53 @@ async function main() {
     await shot('14-drawing-after-reload-zoom.png', 'Drawing stays attached to the page after reload and zoom', async () => {
       await expectPresent('drawing still painted', '[data-testid="reader-annotation-layer"] path');
     });
+    if (beforeReload && afterReload && beforeReload.layer === afterReload.layer) {
+      throw new Error(
+        `zoom did not change the rendered page size (before ${beforeReload.layer}, after ${afterReload.layer}), ` +
+          'so the drawing alignment claim is untested',
+      );
+    }
+    await expectOverlayAligned(cdp, 'after zoom');
+
+    // Rotating the page must keep the stored geometry attached to the same source
+    // region: canonical coordinates never change, while the RENDERED path is the
+    // rotated form and returns exactly to the original after a full 360 degrees.
+    const rotationProbe = await cdp.evaluate(`
+      (() => {
+        const path = document.querySelector('[data-testid="reader-annotation-layer"] path');
+        return path ? path.getAttribute('d') : null;
+      })()
+    `);
+    await cdp.clickByLabel('Rotate Clockwise');
+    await sleep(1200);
+    await cdp.clickByLabel('Rotate Clockwise');
+    await sleep(1200);
+    await expectOverlayAligned(cdp, 'after rotation');
+    const rotated180 = await cdp.evaluate(`
+      (() => {
+        const path = document.querySelector('[data-testid="reader-annotation-layer"] path');
+        return path ? path.getAttribute('d') : null;
+      })()
+    `);
+    if (rotationProbe && rotated180 && rotationProbe === rotated180) {
+      throw new Error('rotating the page did not transform the rendered mark');
+    }
+    await cdp.clickByLabel('Rotate Clockwise');
+    await sleep(1200);
+    await cdp.clickByLabel('Rotate Clockwise');
+    await sleep(1200);
+    const backToZero = await cdp.evaluate(`
+      (() => {
+        const path = document.querySelector('[data-testid="reader-annotation-layer"] path');
+        return path ? path.getAttribute('d') : null;
+      })()
+    `);
+    if (rotationProbe && backToZero && rotationProbe !== backToZero) {
+      throw new Error(
+        `a full 360 degree rotation did not restore the original geometry ` +
+          `(${rotationProbe} vs ${backToZero})`,
+      );
+    }
 
     // -------------------------------------------------------------------
     // Knowledge Canvas: scope, blocks, relationships, promotion
@@ -477,6 +604,73 @@ async function main() {
       await expectText('second block', 'Cell membrane');
     });
 
+    // Place the first block on the canvas, then rename it: the visual label must
+    // follow the structured title.
+    await cdp.clickByText('Place on canvas');
+    await sleep(1800);
+    const renamedTitle = 'Osmosis (revised)';
+    await cdp.evaluate(`
+      (() => {
+        const edit = Array.from(document.querySelectorAll('button'))
+          .find((b) => (b.getAttribute('aria-label') || '').startsWith('Edit block'));
+        if (edit) edit.click();
+        return Boolean(edit);
+      })()
+    `);
+    await sleep(400);
+    await cdp.evaluate(`
+      (() => {
+        const inputs = Array.from(document.querySelectorAll('input[aria-label="Block title"]'));
+        const input = inputs[0];
+        if (!input) return false;
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(input, ${JSON.stringify(renamedTitle)});
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      })()
+    `);
+    await sleep(1800);
+    const canvasIds = await listCanvasIds(BOOK_A.id);
+    const renamedDoc = await (async () => {
+      for (const id of canvasIds) {
+        const doc = await fetchCanvasDoc(id, BOOK_A.id);
+        if (doc.knowledge?.blocks?.some((b) => b.title === renamedTitle)) return doc;
+      }
+      return null;
+    })();
+    if (!renamedDoc) {
+      const titles = [];
+      for (const id of canvasIds) {
+        const doc = await fetchCanvasDoc(id, BOOK_A.id);
+        titles.push(...(doc.knowledge?.blocks ?? []).map((b) => b.title));
+      }
+      const panelText = await cdp.evaluate(
+        `Array.from(document.querySelectorAll('[data-testid^="block-"]')).map((el) => el.textContent).join(' | ')`,
+      );
+      throw new Error(
+        `block rename was not persisted to the canvas document. Titles: ${JSON.stringify(titles)}. Panel: ${panelText}`,
+      );
+    }
+    const renamedBlock = renamedDoc.knowledge.blocks.find((b) => b.title === renamedTitle);
+    // App-owned visual elements carry durable customData metadata; the label is
+    // matched by that metadata rather than by an assumed id string.
+    const renamedLabel = renamedDoc.scene.elements.find(
+      (el) =>
+        el.customData?.rw?.kind === 'block-label' &&
+        el.customData?.rw?.blockId === renamedBlock.id,
+    );
+    if (renamedLabel?.text !== renamedTitle) {
+      const sceneDump = renamedDoc.scene.elements
+        .map((el) => `${el.id}|${el.type}|${el.customData ? JSON.stringify(el.customData) : 'no-meta'}|${el.text ?? ''}`)
+        .join(' ;; ');
+      throw new Error(
+        `visual label did not follow the block rename: "${renamedLabel?.text}". Scene: ${sceneDump}`,
+      );
+    }
+    await shot('20b-block-rename-visual-sync.png', 'Renaming a block renames its visual label', async () => {
+      await expectText('renamed block in the panel', renamedTitle);
+    });
+
     // Custom named relationship with an arbitrary Unicode label.
     await cdp.clickSelector('[data-testid="knowledge-tab-relationships"]');
     await sleep(400);
@@ -518,6 +712,14 @@ async function main() {
     }
     await cdp.clickByText('Connect');
     await sleep(1400);
+    // The second endpoint is still unplaced, so the connector cannot exist yet.
+    // Placing it must make the connector appear automatically (delayed creation).
+    await cdp.clickSelector('[data-testid="knowledge-tab-blocks"]');
+    await sleep(300);
+    await cdp.clickByText('Place on canvas');
+    await sleep(1800);
+    await cdp.clickSelector('[data-testid="knowledge-tab-relationships"]');
+    await sleep(400);
     const relationshipDump = await cdp.evaluate(`
       (() => {
         const rels = Array.from(document.querySelectorAll('[data-testid^="relationship-"]'))
@@ -544,6 +746,29 @@ async function main() {
       if (state.label !== '母亲') {
         throw new Error(`custom relationship label missing: ${JSON.stringify(state)}`);
       }
+      // The connector must be a NAMED line in the scene, not just panel metadata.
+      const docs = [];
+      for (const id of await listCanvasIds(BOOK_A.id)) docs.push(await fetchCanvasDoc(id, BOOK_A.id));
+      const withRelationship = docs.find((doc) =>
+        doc.knowledge?.relationships?.some((rel) => rel.label === '母亲'),
+      );
+      if (!withRelationship) throw new Error('relationship was not persisted');
+      const relationship = withRelationship.knowledge.relationships.find(
+        (rel) => rel.label === '母亲',
+      );
+      const arrow = withRelationship.scene.elements.find(
+        (el) => el.id === relationship.linkedElementId,
+      );
+      const arrowLabel = withRelationship.scene.elements.find(
+        (el) => el.containerId === relationship.linkedElementId,
+      );
+      if (!arrow) throw new Error('connector element is missing for the relationship');
+      if (arrowLabel?.text !== '母亲') {
+        throw new Error(`connector label is not the relationship label: "${arrowLabel?.text}"`);
+      }
+      if (arrow.startArrowhead !== null) {
+        throw new Error('a directed relationship must not have a start arrowhead');
+      }
     });
 
     await cdp.clickByText('Mutual');
@@ -560,13 +785,47 @@ async function main() {
           (b) => (b.textContent || '').trim() === 'Mutual' && b.className.includes('border-primary'))
       `);
       if (!mutualActive) throw new Error('mutual direction control is not active');
+      // The VISUAL arrowheads must change, not only the metadata.
+      let mutualArrow = null;
+      let lastRelationshipDirection = null;
+      for (const id of await listCanvasIds(BOOK_A.id)) {
+        const doc = await fetchCanvasDoc(id, BOOK_A.id);
+        const rel = doc.knowledge?.relationships?.find((r) => r.label === '母亲');
+        if (rel) {
+          lastRelationshipDirection = rel.direction;
+          mutualArrow = doc.scene.elements.find((el) => el.id === rel.linkedElementId);
+        }
+      }
+      if (!mutualArrow) throw new Error('connector missing after switching to mutual');
+      if (mutualArrow.startArrowhead !== 'arrow') {
+        throw new Error(
+          `mutual relationship did not gain a start arrowhead: ${JSON.stringify({
+            id: mutualArrow.id,
+            startArrowhead: mutualArrow.startArrowhead,
+            endArrowhead: mutualArrow.endArrowhead,
+            direction: lastRelationshipDirection,
+          })}`,
+        );
+      }
     });
 
-    // Place a block visually so freeform and structured content share the surface.
+    // Structured blocks and their connections are real freeform canvas elements.
     await cdp.clickSelector('[data-testid="knowledge-tab-blocks"]');
     await sleep(300);
-    await cdp.clickByText('Place on canvas');
-    await sleep(1800);
+    const appOwned = await (async () => {
+      for (const id of await listCanvasIds(BOOK_A.id)) {
+        const doc = await fetchCanvasDoc(id, BOOK_A.id);
+        const owned = (doc.scene?.elements ?? []).filter((el) => el.customData?.rw);
+        if (owned.length > 0) return owned;
+      }
+      return [];
+    })();
+    const ownedKinds = appOwned.map((el) => el.customData.rw.kind);
+    for (const kind of ['block', 'block-label', 'connector', 'connector-label']) {
+      if (!ownedKinds.includes(kind)) {
+        throw new Error(`missing app-owned ${kind} element in the scene (${ownedKinds.join(',')})`);
+      }
+    }
     await shot('23-freeform-and-structured.png', 'Structured block placed as a freeform canvas element', async () => {
       await expectText('block marked as placed', 'On canvas');
     });
@@ -641,6 +900,81 @@ async function main() {
       if (bookBAnnotations !== 0) {
         throw new Error(`Book A annotations leaked into Book B (${bookBAnnotations})`);
       }
+    });
+
+    // API-level isolation: Book A must not reach Book B's annotation or canvas.
+    const bookBAnnotationIds = (
+      await (await fetch(`${BASE_URL}/api/reader/items/${BOOK_B.id}/annotations`)).json()
+    ).map((a) => a.id);
+    for (const id of bookBAnnotationIds) {
+      const cross = await fetch(
+        `${BASE_URL}/api/reader/items/${BOOK_A.id}/annotations/${encodeURIComponent(id)}`,
+      );
+      if (cross.status !== 404) {
+        throw new Error(`Book A could read Book B annotation ${id} (HTTP ${cross.status})`);
+      }
+    }
+    const bookACanvasIds = await listCanvasIds(BOOK_A.id);
+    if (bookACanvasIds.length === 0) throw new Error('Book A canvas setup was lost');
+    const crossCanvas = await fetch(
+      `${BASE_URL}/api/reader/canvases/${bookACanvasIds[0]}/export?itemId=${BOOK_B.id}`,
+    );
+    if (crossCanvas.status !== 404) {
+      throw new Error(`Book B could export Book A canvas (HTTP ${crossCanvas.status})`);
+    }
+    const crossAnnotationCreate = await fetch(
+      `${BASE_URL}/api/reader/items/${BOOK_B.id}/annotations`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'cross-book-probe',
+          itemId: BOOK_A.id,
+          assetId: 'asset-1',
+          kind: 'text-mark',
+          anchor: {
+            kind: 'pdf-text',
+            pageNumber: 1,
+            rects: [{ x: 0.1, y: 0.1, width: 0.2, height: 0.02 }],
+            quote: 'probe',
+            sourceHash: 'probe',
+          },
+          content: { subKind: 'highlight' },
+          sourceHash: 'probe',
+        }),
+      },
+    );
+    if (crossAnnotationCreate.status !== 400) {
+      throw new Error(
+        `a mismatched annotation owner was accepted (HTTP ${crossAnnotationCreate.status})`,
+      );
+    }
+
+    // No real selection in a reflowable book must never create a synthetic mark.
+    await cdp.navigate(readerB);
+    await cdp.clickByText('Notes', { exact: false });
+    await sleep(800);
+    const beforeCount = await cdp.evaluate(
+      `document.querySelectorAll('[data-testid="reader-study-pane"] button[data-annotation-id]').length`,
+    );
+    await cdp.clickByLabel('Highlight selection');
+    await sleep(1200);
+    const afterCount = await cdp.evaluate(
+      `document.querySelectorAll('[data-testid="reader-study-pane"] button[data-annotation-id]').length`,
+    );
+    if (afterCount !== beforeCount) {
+      throw new Error(
+        `a highlight was created without a real selection (${beforeCount} -> ${afterCount})`,
+      );
+    }
+    const persisted = await (
+      await fetch(`${BASE_URL}/api/reader/items/${BOOK_B.id}/annotations`)
+    ).json();
+    if (persisted.length !== 0) {
+      throw new Error('a synthetic annotation was persisted for the reflowable book');
+    }
+    await shot('26b-no-synthetic-selection.png', 'No selection in a reflowable book creates nothing', async () => {
+      await expectPresent('study pane still mounted', '[data-testid="reader-study-pane"]');
     });
 
     await cdp.navigate(`${BASE_URL}/?collection=read&selected=${BOOK_A.id}&tab=study`);

@@ -319,8 +319,9 @@ export function readerPlugin({
             parts[2] === 'annotations' &&
             request.method === 'GET'
           ) {
+            const itemId = decodeURIComponent(parts[1]);
             const annotationId = decodeURIComponent(parts[3]);
-            const ann = annotationStore.getAnnotation(annotationId);
+            const ann = annotationStore.getAnnotation(annotationId, { itemId });
             if (!ann) return sendJson(response, 404, { error: 'Annotation not found' });
             return sendJson(response, 200, ann);
           }
@@ -337,6 +338,11 @@ export function readerPlugin({
           ) {
             const itemId = decodeURIComponent(parts[1]);
             const body = await readJson(request);
+            if (body.itemId && body.itemId !== itemId) {
+              return sendJson(response, 400, {
+                error: 'Annotation itemId does not match the requested item',
+              });
+            }
             body.itemId = itemId;
             const created = annotationStore.createAnnotation(body);
             return sendJson(response, 201, created);
@@ -354,7 +360,12 @@ export function readerPlugin({
             request.method === 'POST'
           ) {
             const body = await readJson(request);
-            return sendJson(response, 201, annotationStore.batchCreateAnnotations(body.items ?? body));
+            const itemId = decodeURIComponent(parts[1]);
+            return sendJson(
+              response,
+              201,
+              annotationStore.batchCreateAnnotations(body.items ?? body, { itemId }),
+            );
           }
 
           // -------------------------------------------------------------------
@@ -367,12 +378,14 @@ export function readerPlugin({
             parts[2] === 'annotations' &&
             request.method === 'PUT'
           ) {
+            const itemId = decodeURIComponent(parts[1]);
             const annotationId = decodeURIComponent(parts[3]);
             const body = await readJson(request);
             const updated = annotationStore.updateAnnotation(
               annotationId,
               body,
               typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+              { itemId },
             );
             return sendJson(response, 200, updated);
           }
@@ -387,11 +400,13 @@ export function readerPlugin({
             parts[2] === 'annotations' &&
             request.method === 'DELETE'
           ) {
+            const itemId = decodeURIComponent(parts[1]);
             const annotationId = decodeURIComponent(parts[3]);
             const body = await readJson(request);
             const result = annotationStore.deleteAnnotation(
               annotationId,
               typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+              { itemId },
             );
             return sendJson(response, 200, result);
           }
@@ -407,11 +422,13 @@ export function readerPlugin({
             parts[4] === 'restore' &&
             request.method === 'PATCH'
           ) {
+            const itemId = decodeURIComponent(parts[1]);
             const annotationId = decodeURIComponent(parts[3]);
             const body = await readJson(request);
             const restored = annotationStore.restoreAnnotation(
               annotationId,
               typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined,
+              { itemId },
             );
             return sendJson(response, 200, restored);
           }
@@ -586,12 +603,14 @@ export function readerPlugin({
           // GET /api/reader/canvases/:id/links — get links
           if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'links' && request.method === 'GET') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             return sendJson(response, 200, canvasStore.getCanvasLinks(canvasId));
           }
 
           // POST /api/reader/canvases/:id/links — add link
           if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'links' && request.method === 'POST') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             const body = await readJson(request);
             const createdLink = canvasStore.addCanvasLink(canvasId, body);
             return sendJson(response, 201, createdLink);
@@ -599,6 +618,8 @@ export function readerPlugin({
 
           // DELETE /api/reader/canvases/:id/links/:linkId — remove link
           if (parts.length === 4 && parts[0] === 'canvases' && parts[2] === 'links' && request.method === 'DELETE') {
+            const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             const linkId = decodeURIComponent(parts[3]);
             return sendJson(response, 200, canvasStore.removeCanvasLink(linkId));
           }
@@ -606,6 +627,7 @@ export function readerPlugin({
           // POST /api/reader/canvases/:id/assets — upload image asset
           if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'assets' && request.method === 'POST') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             const body = await readJson(request);
             const buffer = Buffer.from(body.dataBase64, 'base64');
             const asset = canvasStore.saveCanvasAsset(canvasId, {
@@ -619,6 +641,7 @@ export function readerPlugin({
           // GET /api/reader/canvases/:id/assets/:assetId — serve asset
           if (parts.length === 4 && parts[0] === 'canvases' && parts[2] === 'assets' && request.method === 'GET') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             const assetId = decodeURIComponent(parts[3]);
             const { meta, buffer } = canvasStore.getCanvasAsset(canvasId, assetId);
             response.statusCode = 200;
@@ -633,12 +656,14 @@ export function readerPlugin({
           // GET /api/reader/canvases/:id/export — export canvas
           if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'export' && request.method === 'GET') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             return sendJson(response, 200, canvasStore.exportCanvas(canvasId));
           }
 
           // POST /api/reader/canvases/:id/recover — recover canvas from external file
           if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'recover' && request.method === 'POST') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             return sendJson(response, 200, canvasStore.recoverCanvasFromExternal(canvasId));
           }
 

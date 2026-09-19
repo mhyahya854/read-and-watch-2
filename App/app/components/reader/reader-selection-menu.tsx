@@ -36,7 +36,8 @@ import { useToast } from '@/components/ui/toast';
 import { useReader } from './reader-context';
 import { studyExtensions, type DictionaryLookupResult, type TranslationResult } from '@/lib/study/extension-hooks';
 import { UserDataService } from '@/lib/user-data';
-import type { CanvasMetadata, ReadWatchCanvasDocument } from '@/lib/canvas';
+import type { CanvasMetadata } from '@/lib/canvas';
+import { addAnnotationToKnowledgeCanvas } from '@/lib/canvas';
 
 interface SelectionCoords {
   top: number;
@@ -45,16 +46,13 @@ interface SelectionCoords {
   height: number;
 }
 
-function generateCanvasElementId(): string {
-  const rand = Math.random().toString(36).slice(2, 6);
-  return `elem-${Date.now()}-${rand}`;
-}
-
 export function ReaderSelectionMenu() {
   const {
     snapshot,
     itemId,
     createTextMark,
+    createExcerpt,
+    refreshCanvases,
     setActiveAnnotationId,
     setStudyPane,
     readerLayout,
@@ -284,99 +282,61 @@ export function ReaderSelectionMenu() {
   const handleSendToCanvas = async (canvasId: string) => {
     setIsAddingToCanvas(true);
     try {
-      // 1. Fetch current canvas
-      const getRes = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}`);
-      if (!getRes.ok) {
-        throw new Error('Failed to load target canvas');
-      }
-      const canvasDoc = (await getRes.json()) as ReadWatchCanvasDocument;
+      // Unified Knowledge Canvas path: the selection first becomes a real source
+      // annotation (evidence with provenance), then a structured, source-linked
+      // canvas block with a real visual element. No detached raw text card.
+      const annotation = await createExcerpt();
+      if (!annotation) return;
 
-      const bookTitle = snapshot.source?.title || 'Book';
-      const pageNum = snapshot.currentPage > 0 ? ` p. ${snapshot.currentPage}` : '';
-      const excerptText = `"${selectedText}"\n\n- ${bookTitle}${pageNum}`;
-
-      // 2. Create text card element
-      const elementId = generateCanvasElementId();
-      const existingElements: Array<Record<string, unknown>> = Array.isArray(canvasDoc.scene?.elements)
-        ? (canvasDoc.scene.elements as Array<Record<string, unknown>>)
-        : [];
-
-      // Calculate safe coordinates below existing elements
-      const maxY = existingElements.reduce(
-        (max, el) => Math.max(max, (Number(el.y) || 0) + (Number(el.height) || 0)),
-        100,
-      );
-
-      const newElement: Record<string, unknown> = {
-        id: elementId,
-        type: 'text',
-        x: 100,
-        y: maxY + 40,
-        width: Math.min(480, Math.max(200, selectedText.length * 8)),
-        height: 120,
-        text: excerptText,
-        fontSize: 16,
-        fontFamily: 1,
-        textAlign: 'left',
-        verticalAlign: 'top',
-        strokeColor: '#1e293b',
-        backgroundColor: '#f8fafc',
-        fillStyle: 'solid',
-        strokeWidth: 1,
-        roughness: 0,
-        opacity: 100,
-      };
-
-      const updatedElements = [...existingElements, newElement];
-
-      // 3. Save updated canvas scene
-      const updateRes = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scene: {
-            ...canvasDoc.scene,
-            elements: updatedElements,
-          },
-          expectedRevision: canvasDoc.revision,
-        }),
+      const result = await addAnnotationToKnowledgeCanvas(canvasId, annotation, {
+        itemId,
       });
-
-      if (!updateRes.ok) {
-        throw new Error('Failed to update canvas with new excerpt');
+      if (result.status === 'failed') {
+        toast.error(result.message || 'Adding to the Knowledge Canvas failed');
+        return;
       }
-
-      toast.success('Excerpt added to canvas');
+      await refreshCanvases();
+      setStudyPane('canvas');
+      toast.success(
+        result.status === 'already-present'
+          ? 'Already on this Knowledge Canvas'
+          : 'Added to the Knowledge Canvas',
+      );
       setActiveModal(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to add excerpt to canvas');
+      toast.error(err instanceof Error ? err.message : 'Failed to add to the Knowledge Canvas');
     } finally {
       setIsAddingToCanvas(false);
     }
   };
 
-  // Create new canvas and send
+  // Create a new book-level Knowledge Canvas (item-scoped) and add to it.
   const handleCreateCanvasAndSend = async () => {
-    const title = newCanvasTitle.trim() || `Study Notes: ${snapshot.source?.title || 'Reading'}`;
+    const title =
+      newCanvasTitle.trim() ||
+      `${snapshot.source?.title || 'Book'} - Knowledge Canvas`;
     setIsAddingToCanvas(true);
     try {
-      const createRes = await fetch('/api/reader/canvases', {
+      const createRes = await fetch(
+        `/api/reader/items/${encodeURIComponent(itemId)}/canvases`,
+        {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
-          itemId,
+          scope: { kind: 'book', label: 'Whole book' },
         }),
-      });
+        },
+      );
 
       if (!createRes.ok) {
         throw new Error('Failed to create new canvas');
       }
 
-      const created = (await createRes.json()) as CanvasMetadata;
-      await handleSendToCanvas(created.id);
+      const created = (await createRes.json()) as { canvasId: string };
+      await handleSendToCanvas(created.canvasId);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create canvas');
+      toast.error(err instanceof Error ? err.message : 'Failed to create the Knowledge Canvas');
       setIsAddingToCanvas(false);
     }
   };
@@ -403,12 +363,12 @@ export function ReaderSelectionMenu() {
           transform: 'translateX(-50%)',
           zIndex: 50,
         }}
-        className="flex items-center gap-0.5 p-1 bg-surface/95 backdrop-blur-md border border-border/90 rounded-full shadow-lg text-foreground text-xs select-none animate-in fade-in-0 zoom-in-95 duration-100"
+        className="flex items-center gap-0.5 p-1 bg-surface border border-border rounded-lg shadow-md text-foreground text-xs select-none animate-in fade-in-0 zoom-in-95 duration-100"
       >
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-surface-muted transition-colors font-medium text-[11px]"
           title="Copy selected text"
         >
           <Copy size={12} className="text-muted-foreground" />
@@ -421,7 +381,7 @@ export function ReaderSelectionMenu() {
         <button
           type="button"
           onClick={() => void markAndFocus('highlight')}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-surface-muted transition-colors font-medium text-[11px]"
           title="Highlight selection"
           data-testid="selection-highlight"
         >
@@ -431,7 +391,7 @@ export function ReaderSelectionMenu() {
         <button
           type="button"
           onClick={() => void markAndFocus('underline')}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-surface-muted transition-colors font-medium text-[11px]"
           title="Underline selection"
           data-testid="selection-underline"
         >
@@ -441,7 +401,7 @@ export function ReaderSelectionMenu() {
         <button
           type="button"
           onClick={() => void markAndFocus('strike')}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-surface-muted transition-colors font-medium text-[11px]"
           title="Strike through selection"
           data-testid="selection-strike"
         >
@@ -454,7 +414,7 @@ export function ReaderSelectionMenu() {
         <button
           type="button"
           onClick={handleDefine}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-surface-muted transition-colors font-medium text-[11px]"
           title="Define word or phrase"
         >
           <BookA size={12} className="text-muted-foreground" />
@@ -464,7 +424,7 @@ export function ReaderSelectionMenu() {
         <button
           type="button"
           onClick={handleTranslate}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-surface-muted transition-colors font-medium text-[11px]"
           title="Translate selection"
         >
           <Languages size={12} className="text-muted-foreground" />
@@ -476,7 +436,7 @@ export function ReaderSelectionMenu() {
         <button
           type="button"
           onClick={handleOpenNotes}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-surface-muted transition-colors font-medium text-[11px]"
           title="Send excerpt to item notes"
         >
           <StickyNote size={12} className="text-muted-foreground" />
@@ -486,7 +446,7 @@ export function ReaderSelectionMenu() {
         <button
           type="button"
           onClick={handleOpenCanvas}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-surface-muted transition-colors font-medium text-[11px]"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-surface-muted transition-colors font-medium text-[11px]"
           title="Send excerpt to canvas"
         >
           <LayoutGrid size={12} className="text-muted-foreground" />

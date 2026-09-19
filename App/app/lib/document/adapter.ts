@@ -116,4 +116,10 @@ export interface DocumentAdapter {
 
   /** Return the set of product capabilities supported by this adapter instance */
   getCapabilities(): DocumentCapabilities;
+
+  /**
+   * Re-render the current page after a view-only change (zoom, rotation,
+   * typography). Optional: engines that re-render internally omit it.
+   */
+  refresh?(signal?: AbortSignal): Promise<void>;
 }

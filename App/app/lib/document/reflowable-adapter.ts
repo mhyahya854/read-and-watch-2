@@ -595,17 +595,14 @@ export class FoliateReflowableAdapter implements DocumentAdapter {
         const sel = win?.getSelection();
         if (sel && !sel.isCollapsed && sel.toString().trim()) {
           const text = sel.toString().trim();
-          const cfi = this._currentCfi ?? `/6/2!/4/1:0`;
+          // Only a genuinely engine-provided CFI is propagated. When the engine
+          // has none, the canonical semantic location carries the position.
           return {
             text,
             location: createSemanticLocation(this._source!.sourceHash, {
-              cfi,
+              ...(this._currentCfi ? { cfi: this._currentCfi } : {}),
               progression: this._currentFraction,
             }),
-            context: {
-              prefix: 'Context before: ',
-              suffix: ' Context after.',
-            },
           };
         }
       }
@@ -615,15 +612,10 @@ export class FoliateReflowableAdapter implements DocumentAdapter {
       return this._currentSelection;
     }
 
-    // Default simulated selection when none highlighted
-    return {
-      text: 'Software abstractions should reflect natural domain boundaries.',
-      location: await this.getCurrentLocation(),
-      context: {
-        prefix: 'As noted earlier, ',
-        suffix: ' This remains authoritative.',
-      },
-    };
+    // No real user selection (and no explicit test seam). Returning null is the
+    // honest answer: a synthetic "selection" here would create a persisted
+    // annotation for text the user never selected.
+    return null;
   }
 
   setSelection(selection: DocumentSelection | null): void {
@@ -637,16 +629,30 @@ export class FoliateReflowableAdapter implements DocumentAdapter {
       throw DocumentError.unsupportedCapability('textAnchors', this._source!.format);
     }
 
-    const payload = selection.location.payload as { spineIndex?: number; cfi?: string };
-    const cfi = payload.cfi ?? `/6/2!/4/1:0`;
+    const payload = selection.location.payload as {
+      spineIndex?: number;
+      cfi?: string;
+      sectionId?: string;
+      startOffset?: number;
+      endOffset?: number;
+    };
+    const hasCfi = typeof payload.cfi === 'string' && payload.cfi.trim().length > 0;
 
     return createReflowableRangeAnchor(
       this._source!.sourceHash,
       selection.text,
       {
-        startCfi: cfi,
-        endCfi: `${cfi}:45`,
+        // A CFI is only stored when the engine actually reported one. Otherwise
+        // the anchor stays section-level (spine/offsets) with no forged CFI.
+        ...(hasCfi ? { startCfi: payload.cfi, endCfi: payload.cfi } : {}),
         spineIndex: payload.spineIndex ?? 0,
+        ...(typeof payload.sectionId === 'string' && payload.sectionId
+          ? { sectionId: payload.sectionId }
+          : {}),
+        ...(typeof payload.startOffset === 'number'
+          ? { startOffset: payload.startOffset }
+          : {}),
+        ...(typeof payload.endOffset === 'number' ? { endOffset: payload.endOffset } : {}),
       },
       selection.context
     );

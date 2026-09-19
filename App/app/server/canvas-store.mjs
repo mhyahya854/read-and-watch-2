@@ -23,6 +23,8 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, extname, isAbsolute, relative, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { canonicalLocationKey } from '../lib/document/location-key.mjs';
+import { isValidLocation } from '../lib/document/location-key.mjs';
 import { randomUUID, createHash } from 'node:crypto';
 
 // ---------------------------------------------------------------------------
@@ -348,11 +350,12 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
    */
   function listCanvasesForLocation(itemId, location) {
     if (!itemId || !location || typeof location !== 'object') return [];
-    const anchorKey = JSON.stringify(location);
+    const anchorKey = canonicalLocationKey(location);
+    if (!anchorKey) return [];
     return listCanvases({ itemId, scopeKind: 'location' }).filter((meta) => {
       const anchor = meta.scopeAnchor;
       if (!anchor || !anchor.location) return false;
-      return JSON.stringify(anchor.location) === anchorKey;
+      return canonicalLocationKey(anchor.location) === anchorKey;
     });
   }
 
@@ -373,6 +376,30 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     if (!itemId) return;
     const meta = getCanvasMetadata(canvasId);
     if ((meta.itemId ?? null) !== itemId) fail('Canvas not found for this item', 404);
+  }
+
+  /**
+   * Owner validation for new canvases. The item must exist. A page/location
+   * Knowledge Canvas is a Read study concept, so it must belong to a Read item;
+   * the shared book/host canvas path keeps working for Watch titles.
+   */
+  function assertCanvasOwner(itemId, scopeKind) {
+    // Standalone/legacy canvases legitimately have no owner.
+    if (!itemId) return;
+    let row = null;
+    try {
+      row = db.prepare('SELECT id, collection FROM items WHERE id = ?').get(itemId);
+    } catch {
+      try {
+        row = db.prepare('SELECT id FROM items WHERE id = ?').get(itemId);
+      } catch {
+        return; // reduced schema without an items table
+      }
+    }
+    if (!row) fail('Unknown library item for this canvas', 400);
+    if (scopeKind === 'location' && row.collection && row.collection !== 'read') {
+      fail('Page/location Knowledge Canvases belong to Read titles', 400);
+    }
   }
 
   /** Get complete canvas document (metadata + scene + links + assets). */
@@ -463,7 +490,8 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
       ...(typeof anchor.locationLabel === 'string' ? { locationLabel: anchor.locationLabel.slice(0, 200) } : {}),
       ...(typeof anchor.assetId === 'string' ? { assetId: anchor.assetId } : {}),
     };
-    if (!clean.location && !clean.sourceHash) return { kind: 'book', label, anchorJson: null };
+    // A location scope must resolve to a real source position.
+    if (!isValidLocation(clean.location)) return { kind: 'book', label, anchorJson: null };
     return { kind: 'location', label, anchorJson: JSON.stringify(clean) };
   }
 
@@ -510,6 +538,7 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     const now = nowUtc();
     const normalizedScope = normalizeScopeInput(scope);
     const normalizedKnowledge = normalizeKnowledgeInput(knowledge) ?? emptyKnowledge();
+    assertCanvasOwner(itemId, normalizedScope.kind);
 
     db.exec('BEGIN IMMEDIATE');
     try {

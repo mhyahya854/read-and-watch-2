@@ -28,6 +28,11 @@ import {
   STANDARD_PDF_CAPABILITIES,
   createCapabilities,
 } from './capabilities.ts';
+import {
+  normalizeClientRects,
+  toCanonicalRect,
+  type NormalizedRectLike,
+} from './selection-geometry.ts';
 import { DocumentError } from './errors.ts';
 import {
   type DocumentLocation,
@@ -316,6 +321,8 @@ export class PdfAdapter implements DocumentAdapter {
   private _activeRenderTask: { cancel: () => void } | null = null;
   private _activeTextLayer: PdfJsTextLayerInstance | null = null;
   private _mockSelection: DocumentSelection | null = null;
+  /** Test-only selection geometry seam; production reads the real DOM selection. */
+  private _mockSelectionRects: NormalizedRectLike[] | null = null;
 
   constructor(options: PdfAdapterOptions = {}) {
     this._options = options;
@@ -775,21 +782,19 @@ export class PdfAdapter implements DocumentAdapter {
       };
     }
 
-    // Default simulated selection when running in headless/test environments
-    return {
-      text: 'Principles of System Architecture',
-      location: createPageLocation(this._source!.sourceHash, this._currentPage, {
-        totalPages: this._pageCount,
-      }),
-      context: {
-        prefix: 'Chapter 1: ',
-        suffix: ' Design principles verified.',
-      },
-    };
+    // No real selection exists (headless / no DOM). Returning null is the honest
+    // answer: a fabricated selection here would create a persisted annotation
+    // for text the user never selected. Tests inject `setMockSelection`.
+    return null;
   }
 
   setMockSelection(selection: DocumentSelection | null): void {
     this._mockSelection = selection;
+  }
+
+  /** Test-only: inject the rendered selection rectangles the DOM would provide. */
+  setMockSelectionRects(rects: NormalizedRectLike[] | null): void {
+    this._mockSelectionRects = rects;
   }
 
   async createTextAnchor(selection: DocumentSelection): Promise<TextAnchor> {
@@ -803,21 +808,53 @@ export class PdfAdapter implements DocumentAdapter {
         ? (selection.location.payload as PageLocationPayload).pageNumber
         : this._currentPage;
 
-    // Standard normalized bounding rect (defaults to full width if coordinates not present)
-    const boundingRect: NormalizedRect = {
-      x: 0,
-      y: 0,
-      width: 1.0,
-      height: 0.05,
-    };
+    // Real selection geometry, normalized to CANONICAL (unrotated) page space.
+    // If the engine cannot resolve the selection rectangles we fail loudly rather
+    // than storing a fabricated full-width stripe.
+    const renderedRects = this._selectionRectsRendered();
+    if (renderedRects.length === 0) {
+      throw DocumentError.anchorInvalid(
+        'Selection geometry could not be resolved for this PDF page',
+      );
+    }
+    const rects = renderedRects.map((rect) => toCanonicalRect(rect, this._currentRotation));
 
     return createPdfGeometryAnchor(
       this._source!.sourceHash,
       selection.text,
       pageNumber,
-      [boundingRect],
+      rects as NormalizedRect[],
       selection.context,
     );
+  }
+
+  /**
+   * Selection rectangles in the CURRENT rendered space, relative to the page
+   * container. Returns an empty array when nothing usable is selected.
+   */
+  private _selectionRectsRendered(): NormalizedRectLike[] {
+    // Explicit test seam: only tests inject rectangles, production never does.
+    if (this._mockSelectionRects) return this._mockSelectionRects;
+    const pageElement = this._options.container ?? null;
+    if (typeof window === 'undefined' || !pageElement) return [];
+    const domSelection = window.getSelection();
+    if (!domSelection || domSelection.isCollapsed || domSelection.rangeCount === 0) return [];
+    const pageRect = pageElement.getBoundingClientRect();
+    if (pageRect.width <= 0 || pageRect.height <= 0) return [];
+
+    const clientRects: Array<{ left: number; top: number; width: number; height: number }> = [];
+    for (let i = 0; i < domSelection.rangeCount; i += 1) {
+      const range = domSelection.getRangeAt(i);
+      for (const rect of Array.from(range.getClientRects())) {
+        clientRects.push({
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    }
+    return normalizeClientRects(clientRects, pageRect);
   }
 
   async resolveTextAnchor(anchor: TextAnchor): Promise<ResolvedAnchor> {
@@ -896,6 +933,23 @@ export class PdfAdapter implements DocumentAdapter {
   setRotation(rotation: number): void {
     const normalized = ((rotation % 360) + 360) % 360;
     this._currentRotation = normalized - (normalized % 90);
+  }
+
+  /**
+   * Re-render the current page at the current zoom/rotation.
+   *
+   * Zoom and rotation are view-only changes: without this the toolbar updates
+   * its label while the rendered page silently stays at the old scale.
+   */
+  async refresh(signal?: AbortSignal): Promise<void> {
+    if (this._state !== 'open' || !this._options.container || typeof window === 'undefined') {
+      return;
+    }
+    await this.renderPage(this._currentPage, this._options.container, {
+      signal,
+      zoom: this._currentZoom,
+      rotation: this._currentRotation,
+    });
   }
 
   async nextPage(signal?: AbortSignal): Promise<void> {

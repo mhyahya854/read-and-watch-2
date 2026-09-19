@@ -12,18 +12,32 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useReader } from './reader-context';
+import {
+  fromCanonicalPoint,
+  fromCanonicalRect,
+  type NormalizedRectLike,
+} from '@/lib/document/selection-geometry';
 
-const MARK_STYLES: Record<string, { background: string; borderBottom?: string }> = {
-  highlight: { background: 'rgba(214, 179, 76, 0.32)' },
-  underline: {
-    background: 'transparent',
-    borderBottom: '2px solid rgba(47, 111, 99, 0.85)',
-  },
-  strike: {
-    background: 'transparent',
-    borderBottom: '2px solid rgba(180, 83, 9, 0.85)',
-  },
+const DEFAULT_MARK_COLORS: Record<string, string> = {
+  highlight: '#d6b34c',
+  underline: '#2f6f63',
+  strike: '#b45309',
 };
+
+/** Per-annotation colour, honouring the colour the user actually saved. */
+function markPresentation(subKind: string, savedColor?: string) {
+  const color = savedColor || DEFAULT_MARK_COLORS[subKind] || DEFAULT_MARK_COLORS.highlight;
+  if (subKind === 'underline') {
+    return { background: 'transparent', borderBottom: `2px solid ${color}` };
+  }
+  if (subKind === 'strike') {
+    return { background: 'transparent', borderBottom: `2px solid ${color}` };
+  }
+  return {
+    background: `color-mix(in oklab, ${color} 42%, transparent)`,
+    borderBottom: undefined as string | undefined,
+  };
+}
 
 interface StrokePoint {
   x: number;
@@ -43,8 +57,10 @@ export function ReaderAnnotationLayer() {
   } = useReader();
 
   const [pageRect, setPageRect] = useState<DOMRect | null>(null);
+  const [parentOffset, setParentOffset] = useState<{ left: number; top: number } | null>(null);
   const strokeRef = useRef<StrokePoint[] | null>(null);
   const [liveStroke, setLiveStroke] = useState<ReadonlyArray<StrokePoint>>([]);
+  const layerRef = useRef<HTMLDivElement | null>(null);
 
   const canPaintGeometry = snapshot.capabilities.has('surfaceMarkup');
 
@@ -52,19 +68,49 @@ export function ReaderAnnotationLayer() {
   const measure = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-    const page = container.querySelector('canvas, .reflowable-content, iframe');
-    setPageRect(page ? page.getBoundingClientRect() : null);
+    // The adapter renders the page INTO the container, so the container is the
+    // page element (its canvas/text layer fill it).
+    const page = container.querySelector('canvas, .reflowable-content, iframe') ?? container;
+    setPageRect(page.getBoundingClientRect());
+
+    // The overlay is absolutely positioned, so its left/top must be expressed in
+    // the offsetParent's coordinate space, not viewport space. Measuring the
+    // offsetParent (rather than assuming one) keeps the overlay aligned in split,
+    // full, minimized and sidebar states.
+    const parent = layerRef.current?.offsetParent as HTMLElement | null;
+    const parentRect = parent?.getBoundingClientRect();
+    setParentOffset(parentRect ? { left: parentRect.left, top: parentRect.top } : { left: 0, top: 0 });
   }, [containerRef]);
 
   useEffect(() => {
     measure();
-    const interval = window.setInterval(measure, 400);
     window.addEventListener('resize', measure);
+    const container = containerRef.current;
+    const observer =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measure()) : null;
+    if (container && observer) observer.observe(container);
+    const mutation =
+      container && typeof MutationObserver !== 'undefined'
+        ? new MutationObserver(() => measure())
+        : null;
+    if (container && mutation) mutation.observe(container, { childList: true, subtree: true });
+    // Capture-phase scroll keeps the overlay glued to the page while scrolling,
+    // without a permanent polling loop.
+    const onScroll = () => measure();
+    window.addEventListener('scroll', onScroll, true);
     return () => {
-      window.clearInterval(interval);
       window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', onScroll, true);
+      observer?.disconnect();
+      mutation?.disconnect();
     };
-  }, [measure, snapshot.currentPage, snapshot.zoom, snapshot.currentLocation, snapshot.isOpen]);
+  }, [measure, containerRef, snapshot.currentPage, snapshot.zoom, snapshot.currentLocation, snapshot.isOpen]);
+
+  // Re-measure when the reader re-renders the page (page/zoom/rotation changes).
+  useEffect(() => {
+    const timer = window.setTimeout(measure, 120);
+    return () => window.clearTimeout(timer);
+  }, [measure, snapshot.currentPage, snapshot.zoom, snapshot.rotation]);
 
   const pageNumber = snapshot.currentPage || 1;
 
@@ -78,6 +124,8 @@ export function ReaderAnnotationLayer() {
   const pageDrawings = annotations.filter(
     (a) => a.anchor.kind === 'pdf-drawing' && a.anchor.pageNumber === pageNumber,
   );
+
+  const rotation = snapshot.rotation ?? 0;
 
   const normalizeEvent = useCallback(
     (event: React.PointerEvent): StrokePoint | null => {
@@ -116,46 +164,64 @@ export function ReaderAnnotationLayer() {
 
   if (!pageRect || !snapshot.isOpen || !canPaintGeometry) return null;
 
+  const layerStyle = parentOffset
+    ? {
+        left: pageRect.left - parentOffset.left,
+        top: pageRect.top - parentOffset.top,
+      }
+    : { left: pageRect.left, top: pageRect.top };
+
   return (
     <div
+      ref={layerRef}
       className="pointer-events-none absolute z-10"
       style={{
-        left: pageRect.left,
-        top: pageRect.top,
+        ...layerStyle,
         width: pageRect.width,
         height: pageRect.height,
       }}
       data-testid="reader-annotation-layer"
     >
       {geometryMarks.map((annotation) => {
-        const rect = (
-          annotation.anchor as unknown as {
-            rects: Array<{ x: number; y: number; width: number; height: number }>;
-          }
-        ).rects[0];
+        const canonicalRects = (
+          annotation.anchor as unknown as { rects: NormalizedRectLike[] }
+        ).rects;
         const subKind = (annotation.content as { subKind?: string }).subKind ?? 'highlight';
-        const style = MARK_STYLES[subKind] ?? MARK_STYLES.highlight;
+        const savedColor = (annotation.content as { color?: string }).color;
+        const style = markPresentation(subKind, savedColor);
         const isActive = annotation.id === activeAnnotationId;
         return (
-          <button
-            key={annotation.id}
-            type="button"
-            onClick={() => setActiveAnnotationId(annotation.id)}
-            aria-label={`${subKind} annotation`}
-            data-annotation-id={annotation.id}
-            className={`pointer-events-auto absolute rounded-[2px] outline-none ${
-              isActive ? 'ring-2 ring-primary/70' : ''
-            }`}
-            style={{
-              left: `${rect.x * 100}%`,
-              top: `${rect.y * 100}%`,
-              width: `${rect.width * 100}%`,
-              height: `${rect.height * 100}%`,
-              background: style.background,
-              borderBottom: style.borderBottom,
-              mixBlendMode: 'multiply',
-            }}
-          />
+          <span key={annotation.id} className="contents">
+            {canonicalRects.map((canonicalRect, index) => {
+              const rect = fromCanonicalRect(canonicalRect, rotation);
+              return (
+                <button
+                  // One accessible element per annotation: the first fragment
+                  // carries the label, the rest are presentation pieces.
+                  key={`${annotation.id}-${index}`}
+                  type="button"
+                  aria-hidden={index === 0 ? undefined : true}
+                  tabIndex={index === 0 ? 0 : -1}
+                  onClick={() => setActiveAnnotationId(annotation.id)}
+                  aria-label={index === 0 ? `${subKind} annotation` : undefined}
+                  data-annotation-id={annotation.id}
+                  data-annotation-fragment={index}
+                  className={`pointer-events-auto absolute rounded-[2px] outline-none ${
+                    isActive ? 'ring-2 ring-primary/70' : ''
+                  }`}
+                  style={{
+                    left: `${rect.x * 100}%`,
+                    top: `${rect.y * 100}%`,
+                    width: `${rect.width * 100}%`,
+                    height: `${rect.height * 100}%`,
+                    background: style.background,
+                    borderBottom: style.borderBottom,
+                    mixBlendMode: 'multiply',
+                  }}
+                />
+              );
+            })}
+          </span>
         );
       })}
 
@@ -170,6 +236,7 @@ export function ReaderAnnotationLayer() {
           };
           const content = annotation.content as { color?: string; strokeWidth?: number };
           const d = anchor.points
+            .map((p) => fromCanonicalPoint(p, rotation))
             .map(
               (p, i) =>
                 `${i === 0 ? 'M' : 'L'} ${(p.x * 100).toFixed(3)} ${(p.y * 100).toFixed(3)}`,

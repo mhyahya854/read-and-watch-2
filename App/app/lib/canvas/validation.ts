@@ -19,6 +19,7 @@ import {
   type ReadWatchCanvasDocument,
   type ExcalidrawSceneData,
 } from './types.ts';
+import { isValidLocation } from '../document/location-key.mjs';
 
 const VALID_LIFECYCLES: ReadonlySet<CanvasLifecycle> = new Set(['active', 'archived', 'soft-deleted']);
 const ALLOWED_IMAGE_MIMES: ReadonlySet<string> = new Set([
@@ -240,6 +241,11 @@ export function validateCanvasScope(raw: unknown): CanvasScope {
   if (kind === 'location' && !anchor) {
     return { kind: 'book', ...(label ? { label } : {}) };
   }
+  // A location scope must carry a canonical reader location, not an arbitrary
+  // object that could never navigate back to the source.
+  if (kind === 'location' && anchor && !isValidLocation(anchor.location)) {
+    return { kind: 'book', ...(label ? { label } : {}) };
+  }
 
   return {
     kind,
@@ -255,6 +261,9 @@ function validateKnowledgeSourceLink(raw: unknown): KnowledgeSourceLink | null {
     ...(typeof r.itemId === 'string' ? { itemId: r.itemId.slice(0, 128) } : {}),
     ...(typeof r.annotationId === 'string' ? { annotationId: r.annotationId.slice(0, 128) } : {}),
     ...(r.location !== undefined && r.location !== null ? { location: r.location } : {}),
+    ...(typeof r.externalUrl === 'string' && r.externalUrl
+      ? { externalUrl: r.externalUrl.slice(0, 2000) }
+      : {}),
     ...(typeof r.label === 'string' ? { label: r.label.slice(0, 200) } : {}),
     ...(typeof r.quote === 'string' ? { quote: r.quote.slice(0, 4000) } : {}),
     ...(typeof r.legacyGraphId === 'string' ? { legacyGraphId: r.legacyGraphId.slice(0, 128) } : {}),

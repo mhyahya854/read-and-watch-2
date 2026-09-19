@@ -515,6 +515,7 @@ export class ReaderSession {
       anyAdapter.setZoom(this.zoomLevel);
     }
     this.notify();
+    void this.refreshView();
   }
 
   zoomIn(): void {
@@ -535,6 +536,25 @@ export class ReaderSession {
       anyAdapter.setRotation(this.rotationAngle);
     }
     this.notify();
+    void this.refreshView();
+  }
+
+  /**
+   * Ask the engine to re-render after a view-only change. The toolbar otherwise
+   * reports a new zoom/rotation while the page keeps rendering at the old one.
+   */
+  private async refreshView(): Promise<void> {
+    const adapter = this.adapter as unknown as {
+      refresh?: (signal?: AbortSignal) => Promise<void>;
+    } | null;
+    if (!adapter || typeof adapter.refresh !== 'function') return;
+    try {
+      await adapter.refresh();
+      this.notify();
+    } catch {
+      // A failed re-render leaves the previous page on screen; the failure is
+      // surfaced through the next navigation/reload rather than crashing the UI.
+    }
   }
 
   rotate(): void {

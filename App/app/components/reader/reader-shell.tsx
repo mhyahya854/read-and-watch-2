@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 import { useReader } from './reader-context';
 import { ReaderToolbar } from './reader-toolbar';
 import { ReaderSidebar } from './reader-sidebar';
@@ -20,7 +21,6 @@ import {
   readerPaneClass,
   readerPaneVisible,
   sidePaneClass,
-  sidePaneVisible,
 } from '@/lib/reader/layout';
 
 export function ReaderShell() {
@@ -137,8 +137,9 @@ export function ReaderShell() {
   };
 
   const bookTitle = snapshot.metadata?.title || readerStatus?.candidates[0]?.name || 'Book';
-  const showSide =
-    readerLayout !== 'full' && (isCanvasOpen || studyPane !== 'none');
+  // The study pane stays mounted in every layout state (hidden in full-reader
+  // mode) so an in-progress note draft survives layout transitions.
+  const showSide = isCanvasOpen || studyPane !== 'none';
 
   return (
     <div
@@ -169,7 +170,7 @@ export function ReaderShell() {
 
         {/* Side surface: the book's Knowledge Canvas when one is open, otherwise
             its annotation/study pane. Hidden in full-reader mode. */}
-        {sidePaneVisible(readerLayout, showSide) && (
+        {showSide && (
           <div
             data-side-pane={
               activeCanvasId ? 'canvas' : isCanvasOpen ? 'canvas-list' : 'study'
@@ -180,6 +181,10 @@ export function ReaderShell() {
           >
             {activeCanvasId ? (
               <ReadWatchCanvas
+                // Remount per canvas: the editor holds per-canvas document state
+                // (revision ref, scene, structured knowledge) that must never be
+                // carried into a different canvas.
+                key={activeCanvasId}
                 canvasId={activeCanvasId}
                 bookTitle={bookTitle}
                 itemId={itemId}
@@ -207,7 +212,7 @@ export function ReaderShell() {
                     title="Close Canvas"
                     aria-label="Close canvas workspace"
                   >
-                    ✕
+                    <X size={13} />
                   </button>
                 </div>
                 <div className="flex-1 overflow-hidden">

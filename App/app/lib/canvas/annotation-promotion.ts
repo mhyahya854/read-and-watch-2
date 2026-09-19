@@ -9,6 +9,11 @@
 import type { Annotation } from '@/lib/annotation';
 import type { CanvasKnowledge, ReadWatchCanvasDocument } from './types.ts';
 import { createKnowledgeBlock, findBlockByAnnotation } from './knowledge.ts';
+import {
+  createBlockElements,
+  reconcileKnowledgeScene,
+  type SceneElementLike,
+} from './scene-sync.ts';
 
 export interface PromotionResult {
   status: 'added' | 'already-present' | 'failed';
@@ -37,7 +42,35 @@ export function annotationBlockType(annotation: Annotation): string {
   return 'evidence';
 }
 
-/** Build the knowledge payload for one promoted annotation. */
+/**
+ * Canonical reader location for an annotation, when one is known: a reflowable
+ * anchor stores it directly; a PDF anchor derives it from the page number.
+ */
+export function annotationLocation(annotation: Annotation): unknown {
+  const anchor = annotation.anchor as {
+    kind?: string;
+    pageNumber?: number;
+    location?: unknown;
+  };
+  if (anchor.location) return anchor.location;
+  if ((anchor.kind === 'pdf-text' || anchor.kind === 'pdf-drawing') && anchor.pageNumber) {
+    return {
+      schemaVersion: 1,
+      kind: 'page',
+      sourceHash: annotation.sourceHash,
+      payload: { pageNumber: anchor.pageNumber },
+    };
+  }
+  return null;
+}
+
+/**
+ * Build the knowledge payload for one promoted annotation.
+ *
+ * Provenance kept: itemId, annotationId, the canonical reader location (so the
+ * block can still return to source if the annotation is later deleted), a human
+ * label and the quote.
+ */
 export function knowledgeWithPromotedAnnotation(
   knowledge: CanvasKnowledge,
   annotation: Annotation,
@@ -57,6 +90,7 @@ export function knowledgeWithPromotedAnnotation(
       annotationId: annotation.id,
       label: annotationSourceLabel(annotation),
       quote: quote.slice(0, 200),
+      ...(annotationLocation(annotation) ? { location: annotationLocation(annotation) } : {}),
     },
   });
   return {
@@ -103,14 +137,38 @@ export async function addAnnotationToKnowledgeCanvas(
         ? doc.knowledge
         : { blocks: [], relationships: [] };
 
-    const { knowledge, blockId, alreadyPresent } = knowledgeWithPromotedAnnotation(
+    const promoted = knowledgeWithPromotedAnnotation(
       currentKnowledge,
       annotation,
       { itemId: options.itemId },
     );
+    let knowledge = promoted.knowledge;
+    const { blockId, alreadyPresent } = promoted;
     if (alreadyPresent) {
       return { status: 'already-present', canvasId, blockId: blockId ?? undefined };
     }
+
+    // Place the promoted block visually: a structured knowledge block must have
+    // a corresponding visual element, and its connectors must exist too.
+    const sceneElements = (doc.scene?.elements ?? []) as ReadonlyArray<SceneElementLike>;
+    const block = knowledge.blocks.find((b) => b.id === blockId);
+    let nextElements = [...sceneElements];
+    if (block && !block.elementId) {
+      const placed = createBlockElements(block, {
+        x: 140,
+        y: 120 + (knowledge.blocks.length % 6) * 130,
+      });
+      nextElements = [...nextElements, ...placed];
+      knowledge = {
+        ...knowledge,
+        blocks: knowledge.blocks.map((b) =>
+          b.id === block.id ? { ...b, elementId: placed[0].id } : b,
+        ),
+      };
+    }
+    const reconciled = reconcileKnowledgeScene({ elements: nextElements, knowledge });
+    knowledge = reconciled.knowledge;
+    nextElements = reconciled.elements;
 
     const putRes = await doFetch(canvasUrl(canvasId, options.itemId), {
       method: 'PUT',
@@ -118,7 +176,7 @@ export async function addAnnotationToKnowledgeCanvas(
       body: JSON.stringify({
         title: doc.title,
         expectedRevision: doc.revision,
-        scene: doc.scene,
+        scene: { ...doc.scene, elements: nextElements },
         links: doc.links,
         knowledge,
       }),

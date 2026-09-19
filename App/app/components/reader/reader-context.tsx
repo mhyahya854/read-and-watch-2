@@ -52,10 +52,9 @@ import type {
   TextMarkSubKind,
 } from '@/lib/annotation';
 import {
-  normalizeSelectionRects,
-  pdfTextAnchorFromSelection,
-  reflowableTextAnchorFromSelection,
+  annotationAnchorFromTextAnchor,
 } from '@/lib/annotation/selection-anchor';
+import { toCanonicalPoint } from '@/lib/document/selection-geometry';
 import type { CanvasMetadata } from '@/lib/canvas';
 import { useToast } from '@/components/ui/toast';
 
@@ -120,6 +119,13 @@ export interface ReaderContextValue {
   // Annotation creation
   drawMode: boolean;
   setDrawMode: (on: boolean) => void;
+  /** Colour and width applied to new annotation marks / ink. */
+  markColor: string;
+  setMarkColor: (color: string) => void;
+  drawStrokeWidth: number;
+  setDrawStrokeWidth: (width: number) => void;
+  /** Recolour an existing mark; persisted through the annotation store. */
+  setAnnotationColor: (annotationId: string, color: string) => Promise<void>;
   createTextMark: (
     subKind: TextMarkSubKind,
     options?: { color?: string; note?: string },
@@ -128,7 +134,14 @@ export interface ReaderContextValue {
     normalizedPoints: ReadonlyArray<{ x: number; y: number }>,
     options?: { color?: string; strokeWidth?: number; note?: string },
   ) => Promise<Annotation | null>;
-  saveAnnotationNote: (annotationId: string, note: string) => Promise<void>;
+  /** Create an excerpt annotation for the current selection (source evidence). */
+  createExcerpt: (options?: { note?: string }) => Promise<Annotation | null>;
+  /**
+   * Persists an annotation note. Resolves with the updated annotation only after
+   * the server accepted the write; rejects otherwise so the UI cannot report a
+   * note change that did not happen.
+   */
+  saveAnnotationNote: (annotationId: string, note: string) => Promise<Annotation>;
   removeAnnotation: (annotationId: string) => Promise<void>;
 
   // Actions
@@ -191,6 +204,8 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
   const [studySummary, setStudySummary] = useState<StudySummary | null>(null);
   const [canvases, setCanvases] = useState<ReadonlyArray<CanvasMetadata>>([]);
   const [drawMode, setDrawMode] = useState(false);
+  const [markColor, setMarkColor] = useState('#d6b34c');
+  const [drawStrokeWidth, setDrawStrokeWidth] = useState(0.004);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toast = useToast();
 
@@ -243,6 +258,12 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
       const urlParams = new URLSearchParams(window.location.search);
       const targetLocParam = urlParams.get('location');
       const targetAnnId = urlParams.get('annotationId');
+      const targetCanvasId = urlParams.get('canvasId');
+
+      // Deep link straight into one Knowledge Canvas of this book.
+      if (targetCanvasId) {
+        setActiveCanvasId(targetCanvasId);
+      }
 
       if (targetLocParam) {
         try {
@@ -564,64 +585,26 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
 
   /** Build a canonical anchor from the live selection for the current engine. */
   const buildSelectionAnchor = useCallback(async (): Promise<AnnotationAnchor | null> => {
-    const selection = await session.getSelection();
-    if (!selection || !selection.text.trim() || !snapshot.source) return null;
-
-    if (snapshot.capabilities.has('surfaceMarkup')) {
-      const container = containerRef.current;
-      const pageEl = container?.querySelector('canvas') as HTMLElement | null;
-      const domSelection = typeof window !== 'undefined' ? window.getSelection() : null;
-      const pageRect = pageEl?.getBoundingClientRect();
-      const clientRects: Array<{ left: number; top: number; width: number; height: number }> = [];
-      if (domSelection && domSelection.rangeCount > 0) {
-        const range = domSelection.getRangeAt(0);
-        for (const rect of Array.from(range.getClientRects())) {
-          clientRects.push({
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-          });
-        }
-      }
-      const normalized =
-        pageRect && clientRects.length
-          ? normalizeSelectionRects(clientRects, pageRect)
-          : [];
-      return pdfTextAnchorFromSelection({
-        pageNumber: snapshot.currentPage || 1,
-        sourceHash: snapshot.source.sourceHash,
-        quote: selection.text,
-        rects: normalized,
-        prefix: selection.context?.prefix,
-        suffix: selection.context?.suffix,
-      });
-    }
-
-    const payload = (selection.location.payload || {}) as {
-      cfi?: string;
-      spineIndex?: number;
-      startOffset?: number;
-      endOffset?: number;
-    };
-    return reflowableTextAnchorFromSelection({
-      sourceHash: snapshot.source.sourceHash,
-      quote: selection.text,
-      startCfi: payload.cfi,
-      spineIndex: payload.spineIndex,
-      startOffset: payload.startOffset,
-      endOffset: payload.endOffset,
-      prefix: selection.context?.prefix,
-      suffix: selection.context?.suffix,
+    // The adapter owns the real geometry (it knows the rendered page and the
+    // current page rotation), so the reader converts its anchor rather than
+    // re-deriving rectangles from the DOM a second time.
+    const textAnchor = await session.createAnchorFromSelection();
+    if (!textAnchor) return null;
+    return annotationAnchorFromTextAnchor(textAnchor, {
+      location: snapshot.currentLocation ?? undefined,
     });
-  }, [session, snapshot.capabilities, snapshot.currentPage, snapshot.source]);
+  }, [session, snapshot.currentLocation]);
 
   const createTextMark = useCallback(
     async (subKind: TextMarkSubKind, options?: { color?: string; note?: string }) => {
       try {
         const anchor = await buildSelectionAnchor();
         if (!anchor || !snapshot.source) {
-          toast.info('Select text in the document first');
+          toast.info(
+            snapshot.capabilities.has('surfaceMarkup')
+              ? 'Select text in the document first (this page could not be anchored)'
+              : 'Select text in the document first',
+          );
           return null;
         }
         const created = await createAnnotationApi(itemId, {
@@ -630,7 +613,7 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
           anchor,
           content: {
             subKind,
-            ...(options?.color ? { color: options.color } : {}),
+            color: options?.color ?? markColor,
             ...(options?.note ? { note: options.note, noteUpdatedAt: new Date().toISOString() } : {}),
           },
           sourceHash: snapshot.source.sourceHash,
@@ -645,7 +628,16 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
         return null;
       }
     },
-    [buildSelectionAnchor, itemId, readerStatus, refreshStudySummary, snapshot.source, toast],
+    [
+      buildSelectionAnchor,
+      itemId,
+      readerStatus,
+      refreshStudySummary,
+      snapshot.capabilities,
+      snapshot.source,
+      toast,
+      markColor,
+    ],
   );
 
   const createDrawing = useCallback(
@@ -660,17 +652,22 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
       }
       if (normalizedPoints.length < 2) return null;
       try {
-        const xs = normalizedPoints.map((p) => p.x);
-        const ys = normalizedPoints.map((p) => p.y);
+        const canonicalPoints = normalizedPoints.map((p) =>
+          toCanonicalPoint({ x: p.x, y: p.y }, snapshot.rotation),
+        );
+        const canonicalXs = canonicalPoints.map((p) => p.x);
+        const canonicalYs = canonicalPoints.map((p) => p.y);
         const anchor: AnnotationAnchor = {
           kind: 'pdf-drawing',
           pageNumber: snapshot.currentPage || 1,
-          points: normalizedPoints.map((p) => ({ x: p.x, y: p.y })),
+          // Stored in canonical (unrotated) page space and clamped, so a stroke
+          // cannot persist outside the page or drift when the page is rotated.
+          points: canonicalPoints,
           bounds: {
-            x: Math.min(...xs),
-            y: Math.min(...ys),
-            width: Math.max(...xs) - Math.min(...xs),
-            height: Math.max(...ys) - Math.min(...ys),
+            x: Math.min(...canonicalXs),
+            y: Math.min(...canonicalYs),
+            width: Math.max(...canonicalXs) - Math.min(...canonicalXs),
+            height: Math.max(...canonicalYs) - Math.min(...canonicalYs),
           },
           sourceHash: snapshot.source.sourceHash,
         };
@@ -680,8 +677,8 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
           anchor,
           content: {
             subKind: 'pen',
-            color: options?.color ?? '#b45309',
-            strokeWidth: options?.strokeWidth ?? 0.004,
+            color: options?.color ?? markColor,
+            strokeWidth: options?.strokeWidth ?? drawStrokeWidth,
             ...(options?.note ? { note: options.note, noteUpdatedAt: new Date().toISOString() } : {}),
           },
           sourceHash: snapshot.source.sourceHash,
@@ -695,18 +692,95 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
         return null;
       }
     },
-    [itemId, readerStatus, refreshStudySummary, snapshot.capabilities, snapshot.currentPage, snapshot.source, toast],
+    [
+      itemId,
+      readerStatus,
+      refreshStudySummary,
+      snapshot.capabilities,
+      snapshot.currentPage,
+      snapshot.rotation,
+      snapshot.source,
+      toast,
+      markColor,
+      drawStrokeWidth,
+    ],
   );
 
   const saveAnnotationNote = useCallback(
     async (annotationId: string, note: string) => {
       const current = annotations.find((a) => a.id === annotationId);
-      if (!current) return;
+      if (!current) throw new Error('Annotation is no longer available');
       const trimmed = note.trim();
       const nextContent = {
         ...(current.content as unknown as Record<string, unknown>),
         note: trimmed,
         noteUpdatedAt: trimmed ? new Date().toISOString() : undefined,
+      };
+      // Failure is propagated to the caller: a note is never reported as saved
+      // unless the server actually accepted it.
+      const updated = await updateAnnotationApi(itemId, annotationId, {
+        content: nextContent,
+        expectedRevision: current.revision,
+      });
+      setAnnotations((prev) => prev.map((a) => (a.id === annotationId ? updated : a)));
+      void refreshStudySummary();
+      return updated;
+    },
+    [annotations, itemId, refreshStudySummary],
+  );
+
+  /**
+   * Excerpt annotation for the current selection. The selection menu uses this so
+   * "Knowledge Canvas" creates real source evidence first and then promotes it,
+   * instead of dropping a detached text card.
+   */
+  const createExcerpt = useCallback(
+    async (options?: { note?: string }) => {
+      try {
+        const anchor = await buildSelectionAnchor();
+        const selection = await session.getSelection();
+        if (!anchor || !selection || !snapshot.source) {
+          toast.info('Select text in the document first');
+          return null;
+        }
+        const created = await createAnnotationApi(itemId, {
+          assetId: readerStatus?.candidates[0]?.id ?? 'unknown',
+          kind: 'excerpt',
+          anchor,
+          content: {
+            passage: selection.text,
+            ...(options?.note ? { note: options.note } : {}),
+          },
+          sourceHash: snapshot.source.sourceHash,
+        });
+        setAnnotations((prev) => [...prev, created]);
+        setActiveAnnotationId(created.id);
+        void refreshStudySummary();
+        return created;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to save the excerpt');
+        return null;
+      }
+    },
+    [
+      buildSelectionAnchor,
+      itemId,
+      readerStatus,
+      refreshStudySummary,
+      session,
+      snapshot.source,
+      toast,
+    ],
+  );
+
+  /** Persisted recolour of an existing mark, so a stored colour is never dead. */
+  const setAnnotationColor = useCallback(
+    async (annotationId: string, color: string) => {
+      const current = annotations.find((a) => a.id === annotationId);
+      if (!current) return;
+      const nextContent = {
+        ...(current.content as unknown as Record<string, unknown>),
+        color,
       };
       try {
         const updated = await updateAnnotationApi(itemId, annotationId, {
@@ -714,14 +788,11 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
           expectedRevision: current.revision,
         });
         setAnnotations((prev) => prev.map((a) => (a.id === annotationId ? updated : a)));
-        void refreshStudySummary();
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to save the annotation note',
-        );
+        toast.error(err instanceof Error ? err.message : 'Could not change the colour');
       }
     },
-    [annotations, itemId, refreshStudySummary, toast],
+    [annotations, itemId, toast],
   );
 
   const removeAnnotation = useCallback(
@@ -774,8 +845,14 @@ export function ReaderProvider({ itemId, source, children }: ReaderProviderProps
     refreshCanvases,
     drawMode,
     setDrawMode,
+    markColor,
+    setMarkColor,
+    drawStrokeWidth,
+    setDrawStrokeWidth,
+    setAnnotationColor,
     createTextMark,
     createDrawing,
+    createExcerpt,
     saveAnnotationNote,
     removeAnnotation,
     containerRef,

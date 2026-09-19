@@ -77,6 +77,8 @@ export interface KnowledgeSourceLink {
   annotationId?: string;
   /** Canonical reader location for the source. */
   location?: unknown;
+  /** External reference URL preserved from a legacy graph deep link. */
+  externalUrl?: string;
   label?: string;
   quote?: string;
   /** Legacy graph id when the block came from an imported legacy graph. */

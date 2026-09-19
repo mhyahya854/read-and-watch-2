@@ -68,16 +68,58 @@ Read reuses the Phase 09 annotation store. No second annotation database exists.
 `content_json` (`content.note`, `content.noteUpdatedAt`) — no new table, no
 separate notes document. Deleting only the note leaves the mark itself intact.
 
+## Annotation ownership (book isolation)
+
+Every annotation route is item-scoped and the owner is enforced in the store, not
+only in the route:
+
+- `getAnnotation` / `updateAnnotation` / `deleteAnnotation` / `restoreAnnotation`
+  accept the route's `itemId` and return **404 for any record owned by another
+  book**, exactly as if the id did not exist.
+- Single create rejects a payload whose `itemId` contradicts the route item.
+- Batch create binds every annotation to the route item and refuses a payload
+  that names a different book.
+- Recovery reads `user-data/items/<itemId>/annotations.json` and refuses (and
+  reports) any record claiming a different owner, instead of injecting it.
+- Creation validates that the owning item actually exists.
+
+The Vite middleware and the Electron desktop service implement the same
+semantics; both call the same store entry points, and a parity test exercises the
+desktop service over HTTP against a synthetic data root.
+
 ## Inline painting, honestly
 
-- PDF text marks and freehand markup are painted from **normalized** coordinates
-  against the rendered page rectangle, so they stay attached to the correct page
-  region through reload, zoom, rotation and resize.
+- PDF text marks and freehand markup are stored in **canonical, unrotated,
+  page-relative** coordinates (0..1) and painted by transforming them into the
+  current render space. They therefore stay attached to the same page region
+  through reload, zoom, rotation and resize, and a full 360° rotation returns the
+  rendered geometry exactly to its original form.
+- The overlay is positioned in its own offset-parent's coordinate space (not raw
+  viewport coordinates), so it stays aligned in split, full, minimized, sidebar-
+  open and sidebar-closed states. The browser harness asserts this numerically.
+- A mark is only created when the engine can actually resolve the selection
+  geometry. There is no full-width "stripe" fallback: if the rectangles cannot be
+  resolved the action reports that the selection could not be anchored and
+  creates nothing.
+- Mark colour is per annotation and is used by the renderer; the study pane
+  offers a small colour row for new marks and for recolouring the selected one.
 - Reflowable documents have no stable page geometry. Their marks are created,
   stored, listed and jump-to-source navigable, but they are **not** painted as
   page overlays, because that would require fabricating geometry that reflow
   invalidates. Freehand drawing on reflowable text is deliberately not offered;
   the page/location Knowledge Canvas is the supported drawing surface there.
+- The reader never fabricates a selection: with nothing selected, a mark action
+  reports "select text first" and creates nothing. Zoom and rotation re-render
+  the page through `DocumentAdapter.refresh()`.
+
+## Reflowable anchors: real CFIs only
+
+`ReflowableTextAnchor.startCfi`/`endCfi` are present **only** when the engine
+genuinely reported a CFI. Otherwise the anchor is section-level and carries
+`fidelity: 'section'` plus the spine index, offsets when available, the quote and
+context, and the canonical reader location. A CFI is never manufactured, and
+`fidelity: 'cfi'` without a CFI is rejected by validation. Existing anchors with
+real CFIs keep working unchanged, and historical anchors are never rewritten.
 
 ## Reader layout states
 
@@ -96,9 +138,25 @@ page/CFI, zoom, annotations, or the open canvas.
 
 `Book B` can never read, mutate, rename, delete, or list `Book A`'s canvases,
 annotations, or study summary: the reader, knowledge, and canvas routes are all
-item-scoped, and canvas access additionally verifies the owning `item_id`
-(`assertCanvasOwnership`). The study pane, the reader toolbar counts, and the
+item-scoped, annotation ownership is enforced in the annotation store, and canvas
+access additionally verifies the owning `item_id` (`assertCanvasOwnership`) on
+every item-sensitive subroute (open, update, rename, delete, restore, links,
+assets, export, recovery). The study pane, the reader toolbar counts, and the
 library Study panel only ever read the current item.
+
+## Location identity and labelling
+
+- Canvas location scope stores a **canonical** `DocumentLocation`; a location
+  scope without a valid one is not accepted for new canvases (junk input is
+  downgraded to book scope only by the documented legacy-validation path).
+- Two locations are compared with one canonical key
+  (`lib/document/location-key.mjs`), so key order or harmless metadata can never
+  hide a page/location canvas from the reader. Client and server use the same
+  module.
+- Labels are honest: fixed-layout documents use `Page N`; reflowable documents
+  use the current location/section description instead of an invented page
+  number. A page/location canvas cannot be created while the reader has no
+  current location.
 
 ## Legacy compatibility (no destructive migration)
 
@@ -129,8 +187,40 @@ library Study panel only ever read the current item.
 - Annotation JSON/Markdown export already included `content.note`; notes now
   exist for marks and drawings too.
 
+## Unified semantic <-> visual Canvas invariants
+
+`lib/canvas/scene-sync.ts` is the single reconciliation helper and owns these
+invariants. Only elements carrying Read & Watch `customData.rw` metadata
+participate; ordinary user drawings are never touched or reinterpreted.
+
+1. A placed block has a real rectangle and a bound title label.
+2. Renaming a block renames its visual label; editing type/notes is metadata only.
+3. A relationship whose two blocks are both placed has a real **named**
+   connector: the label lives on the arrow, and arrowheads follow the direction
+   (mutual adds a start arrowhead).
+4. A relationship created before its blocks are placed gains its connector
+   automatically once both endpoints exist. The same healing runs once when a
+   canvas is loaded, so older documents are repaired too.
+5. Deleting a block removes its visual block, its label, every relationship
+   touching it, and their connectors. Deleting a relationship removes only its
+   connector.
+6. Deleting an app-owned visual element detaches the semantic record
+   (`elementId` is dropped) instead of leaving a ghost reference, and the
+   semantic block survives so the user can re-place it.
+7. The live scene-change handler only runs the full reconciliation when a
+   structural mismatch exists (`needsReconcile`), so it never fights a drag.
+
+## Source navigation
+
+Blocks created from annotations keep `itemId`, `annotationId`, a human label, the
+quote, and the canonical location. Navigation falls back in a documented order:
+exact annotation -> stored location -> the book. A source link therefore still
+works after the annotation is deleted or temporarily unavailable. The reader
+understands one query contract (`?annotationId=`, `?location=`, `?canvasId=`),
+and legacy graph deep links of every supported type (annotation, item, location,
+external) are preserved on import rather than discarded.
+
 ## Source immutability
 
 No Read feature writes to the PDF/EPUB source file. Annotations, drawings, notes
 and Knowledge Canvases live under the Read & Watch user-data root.
-

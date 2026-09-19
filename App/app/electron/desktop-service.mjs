@@ -550,6 +550,11 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         }
         if (method === 'POST') {
           const body = await readJsonBody(req);
+          if (body.itemId && body.itemId !== itemId) {
+            return sendJson(res, 400, {
+              error: 'Annotation itemId does not match the requested item',
+            });
+          }
           body.itemId = itemId;
           return sendJson(res, 201, annotationStore.createAnnotation(body));
         }
@@ -557,8 +562,13 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
 
       const itemAnnotationsBatch = sub.match(/^items\/([^/]+)\/annotations\/batch$/);
       if (itemAnnotationsBatch && method === 'POST') {
+        const itemId = decodeURIComponent(itemAnnotationsBatch[1]);
         const body = await readJsonBody(req);
-        return sendJson(res, 201, annotationStore.batchCreateAnnotations(body.items ?? body));
+        return sendJson(
+          res,
+          201,
+          annotationStore.batchCreateAnnotations(body.items ?? body, { itemId }),
+        );
       }
 
       const itemAnnotationsHashCheck = sub.match(/^items\/([^/]+)\/annotations\/hash-check$/);
@@ -578,6 +588,7 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         /^items\/([^/]+)\/annotations\/([^/]+)\/restore$/,
       );
       if (itemAnnotationRestore && method === 'PATCH') {
+        const itemId = decodeURIComponent(itemAnnotationRestore[1]);
         const annotationId = decodeURIComponent(itemAnnotationRestore[2]);
         const body = await readJsonBody(req);
         return sendJson(
@@ -586,15 +597,17 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
           annotationStore.restoreAnnotation(
             annotationId,
             typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined,
+            { itemId },
           ),
         );
       }
 
       const itemAnnotation = sub.match(/^items\/([^/]+)\/annotations\/([^/]+)$/);
       if (itemAnnotation) {
+        const itemId = decodeURIComponent(itemAnnotation[1]);
         const annotationId = decodeURIComponent(itemAnnotation[2]);
         if (method === 'GET') {
-          const ann = annotationStore.getAnnotation(annotationId);
+          const ann = annotationStore.getAnnotation(annotationId, { itemId });
           if (!ann) return sendJson(res, 404, { error: 'Annotation not found' });
           return sendJson(res, 200, ann);
         }
@@ -607,6 +620,7 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
               annotationId,
               body,
               typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+              { itemId },
             ),
           );
         }
@@ -618,6 +632,7 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
             annotationStore.deleteAnnotation(
               annotationId,
               typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+              { itemId },
             ),
           );
         }

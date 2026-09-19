@@ -44,6 +44,7 @@ import {
   downloadNotes,
 } from '@/lib/portability/client';
 import { useReader } from './reader-context';
+import { locationsEqual } from '@/lib/document/location-key.mjs';
 
 export function ReaderToolbar() {
   const toast = useToast();
@@ -93,10 +94,7 @@ export function ReaderToolbar() {
   const currentLocationCanvasCount = snapshot.currentLocation
     ? canvases.filter((canvas) => {
         if (canvas.scopeKind !== 'location' || !canvas.scopeAnchor?.location) return false;
-        return (
-          JSON.stringify(canvas.scopeAnchor.location) ===
-          JSON.stringify(snapshot.currentLocation)
-        );
+        return locationsEqual(canvas.scopeAnchor.location, snapshot.currentLocation);
       }).length
     : 0;
 
@@ -544,7 +542,7 @@ export function ReaderToolbar() {
                   void handleExportJson();
                 }}
               >
-                <FileJson size={13} className="text-amber-500" />
+                <FileJson size={13} className="text-warning" />
                 <span>Export Annotations (JSON)</span>
               </DropdownMenuItem>
 
@@ -554,7 +552,7 @@ export function ReaderToolbar() {
                   void handleExportMarkdown();
                 }}
               >
-                <FileText size={13} className="text-blue-500" />
+                <FileText size={13} className="text-primary" />
                 <span>Export Annotations (Markdown)</span>
               </DropdownMenuItem>
 
@@ -564,7 +562,7 @@ export function ReaderToolbar() {
                   void handleExportNotes();
                 }}
               >
-                <StickyNote size={13} className="text-purple-500" />
+                <StickyNote size={13} className="text-warning" />
                 <span>Export Notes &amp; Thoughts (JSON)</span>
               </DropdownMenuItem>
 
@@ -575,7 +573,7 @@ export function ReaderToolbar() {
                     handleExportAnnotatedPdf();
                   }}
                 >
-                  <FileDown size={13} className="text-emerald-500" />
+                  <FileDown size={13} className="text-success" />
                   <span>Export Annotated PDF</span>
                 </DropdownMenuItem>
               )}

@@ -80,6 +80,22 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
   // Internal helpers
   // -------------------------------------------------------------------------
 
+  /**
+   * Owner validation: an annotation may only be created for a library item that
+   * actually exists, so a typo or a foreign id cannot create an orphan row and
+   * an orphan recovery folder.
+   */
+  function assertKnownItem(itemId) {
+    if (!itemId) fail('Missing required annotation fields');
+    try {
+      const row = db.prepare('SELECT id FROM items WHERE id = ?').get(itemId);
+      if (!row) fail('Unknown library item for this annotation', 400);
+    } catch (err) {
+      if (err?.status) throw err;
+      // items table unavailable in a reduced schema: skip the existence check.
+    }
+  }
+
   function rowToAnnotation(row) {
     return {
       schemaVersion: 1,
@@ -125,10 +141,21 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
     return rows.map(rowToAnnotation);
   }
 
-  function getAnnotation(id) {
+  /**
+   * Book isolation. When a caller operates inside an item-scoped route the owner
+   * must match exactly; anything else behaves as if the row does not exist.
+   */
+  function assertAnnotationOwnership(row, itemId) {
+    if (!itemId) return;
+    if (row.item_id === itemId) return;
+    fail('Annotation not found for this item', 404);
+  }
+
+  function getAnnotation(id, { itemId = null } = {}) {
     if (typeof id !== 'string' || !id) fail('Invalid annotation id');
     const row = db.prepare('SELECT * FROM annotations WHERE id=?').get(id);
     if (!row) fail('Annotation not found', 404);
+    assertAnnotationOwnership(row, itemId);
     return rowToAnnotation(row);
   }
 
@@ -146,6 +173,7 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
     if (!itemId || !assetId || !kind || !anchor || !content || !sourceHash) {
       fail('Missing required annotation fields');
     }
+    assertKnownItem(itemId);
 
     const id = payload.id || randomUUID();
     const now = nowUtc();
@@ -178,7 +206,7 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
     return created;
   }
 
-  function updateAnnotation(id, patch, expectedRevision) {
+  function updateAnnotation(id, patch, expectedRevision, { itemId = null } = {}) {
     if (typeof id !== 'string' || !id) fail('Invalid annotation id');
     if (typeof expectedRevision !== 'number') fail('expectedRevision required');
 
@@ -187,6 +215,7 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
     try {
       const row = db.prepare('SELECT * FROM annotations WHERE id=?').get(id);
       if (!row) fail('Annotation not found', 404);
+      assertAnnotationOwnership(row, itemId);
       if (row.deleted_at_utc) fail('Cannot update a deleted annotation', 409);
       if (row.revision !== expectedRevision) {
         fail(`Revision conflict: expected ${expectedRevision}, found ${row.revision}`, 409);
@@ -220,15 +249,16 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
     return updated;
   }
 
-  function deleteAnnotation(id, expectedRevision) {
+  function deleteAnnotation(id, expectedRevision, { itemId = null } = {}) {
     if (typeof id !== 'string' || !id) fail('Invalid annotation id');
     if (typeof expectedRevision !== 'number') fail('expectedRevision required');
 
-    let itemId;
+    let ownerItemId;
     db.exec('BEGIN IMMEDIATE');
     try {
       const row = db.prepare('SELECT * FROM annotations WHERE id=?').get(id);
       if (!row) fail('Annotation not found', 404);
+      assertAnnotationOwnership(row, itemId);
       if (row.deleted_at_utc) return { ok: true, alreadyDeleted: true };
       if (row.revision !== expectedRevision) {
         fail(`Revision conflict: expected ${expectedRevision}, found ${row.revision}`, 409);
@@ -240,20 +270,20 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
         WHERE id=?
       `).run(now, now, id);
       db.exec('COMMIT');
-      itemId = row.item_id;
+      ownerItemId = row.item_id;
     } catch (err) {
       db.exec('ROLLBACK');
       throw err;
     }
 
-    exportRecoveryFile(itemId);
+    exportRecoveryFile(ownerItemId);
     if (searchStore) {
       try { searchStore.removeAnnotation(id); } catch {}
     }
     return { ok: true };
   }
 
-  function restoreAnnotation(id, expectedRevision) {
+  function restoreAnnotation(id, expectedRevision, { itemId = null } = {}) {
     if (typeof id !== 'string' || !id) fail('Invalid annotation id');
 
     let restored;
@@ -261,6 +291,7 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
     try {
       const row = db.prepare('SELECT * FROM annotations WHERE id=?').get(id);
       if (!row) fail('Annotation not found', 404);
+      assertAnnotationOwnership(row, itemId);
       if (!row.deleted_at_utc) return rowToAnnotation(row); // nothing to restore
       if (typeof expectedRevision === 'number' && row.revision !== expectedRevision) {
         fail(`Revision conflict: expected ${expectedRevision}, found ${row.revision}`, 409);
@@ -285,8 +316,21 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
     return restored;
   }
 
-  function batchCreateAnnotations(items) {
+  /**
+   * Batch create under an item-scoped route.
+   *
+   * The route's itemId is authoritative: a payload that names a different book is
+   * rejected rather than silently creating a cross-book annotation.
+   */
+  function batchCreateAnnotations(items, { itemId = null } = {}) {
     if (!Array.isArray(items) || items.length === 0) fail('items must be a non-empty array');
+
+    if (itemId) {
+      const foreign = items.find((p) => p.itemId && p.itemId !== itemId);
+      if (foreign) {
+        fail('Annotation itemId does not match the requested item', 400);
+      }
+    }
 
     const created = [];
     const now = nowUtc();
@@ -301,8 +345,11 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
       `);
       for (const p of items) {
         const id = p.id || randomUUID();
+        const ownerItemId = itemId || p.itemId;
+        if (!ownerItemId) fail('Annotation itemId is required', 400);
+        assertKnownItem(ownerItemId);
         stmt.run(
-          id, p.itemId, p.assetId, p.kind,
+          id, ownerItemId, p.assetId, p.kind,
           JSON.stringify(p.anchor), JSON.stringify(p.content),
           p.style ? JSON.stringify(p.style) : null,
           p.sourceHash, now, now,
@@ -316,7 +363,7 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
     }
 
     // Export per unique itemId
-    const itemIds = [...new Set(items.map((p) => p.itemId))];
+    const itemIds = [...new Set(items.map((p) => itemId || p.itemId))];
     for (const iid of itemIds) exportRecoveryFile(iid);
 
     if (searchStore) {
@@ -366,6 +413,7 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
     if (!Array.isArray(data.annotations)) return { ok: false, error: 'Invalid recovery file format' };
 
     let count = 0;
+    const rejected = [];
     db.exec('BEGIN IMMEDIATE');
     try {
       const stmt = db.prepare(`
@@ -375,8 +423,15 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
       `);
       for (const a of data.annotations) {
+        // A recovery file lives under items/<itemId>/ and must not be able to
+        // inject rows claiming another book. A missing owner is rebound to the
+        // file's item; an explicit foreign owner is refused.
+        if (a.itemId && a.itemId !== itemId) {
+          rejected.push(a.id ?? null);
+          continue;
+        }
         stmt.run(
-          a.id, a.itemId, a.assetId, a.kind,
+          a.id, itemId, a.assetId, a.kind,
           JSON.stringify(a.anchor), JSON.stringify(a.content),
           a.style ? JSON.stringify(a.style) : null,
           a.sourceHash, a.revision, a.lifecycle,
@@ -390,6 +445,14 @@ export function createAnnotationStore({ databasePath, userDataRoot, searchStore 
       return { ok: false, error: String(err) };
     }
 
+    if (rejected.length > 0) {
+      return {
+        ok: false,
+        recovered: count,
+        rejected,
+        error: `${rejected.length} recovery record(s) claimed a different item and were refused`,
+      };
+    }
     return { ok: true, recovered: count };
   }
 

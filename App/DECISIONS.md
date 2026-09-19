@@ -1328,3 +1328,87 @@ book-scoped study workspace, so the permanent primary sidebar no longer lists
 compatibility, deep links, migration and recovery, and are still reachable
 directly; they are simply not primary navigation. Read, Watch and Settings remain
 in the sidebar.
+
+## D-072 - Annotation ownership is enforced in the store, not only in routes
+
+Status: Accepted
+
+Every annotation operation that is reached through an item-scoped route proves
+the owner: `getAnnotation`, `updateAnnotation`, `deleteAnnotation` and
+`restoreAnnotation` take the route's item id and behave as "not found" for any
+record owned by another book. Batch create binds each row to the route item and
+refuses a payload that names a different book; single create rejects a
+contradictory payload item and refuses an unknown owner. Recovery may not inject
+records that claim another item; foreign records are refused and reported.
+
+The rule lives in the annotation store, so the Vite middleware and the Electron
+desktop service cannot drift apart, and a parity test drives the desktop service
+over HTTP.
+
+## D-073 - PDF mark geometry is canonical page space, and never fabricated
+
+Status: Accepted
+
+PDF text marks and ink strokes are stored in canonical, unrotated, page-relative
+coordinates and transformed into the rendered space at paint time, so a mark
+follows its source region through zoom, rotation and resize, and a full rotation
+restores the original geometry exactly. The overlay is positioned in its offset
+parent's coordinate space so pane and sidebar layout cannot shift it.
+
+A mark is only created when the engine can resolve real selection rectangles.
+The former full-width "stripe" fallback was removed: a fabricated mark would
+claim evidence the user never selected. When geometry cannot be resolved the
+action reports that the selection could not be anchored and creates nothing.
+Ink coordinates are clamped to the page.
+
+## D-074 - Reflowable anchors carry a fidelity level and never forge a CFI
+
+Status: Accepted
+
+A reflowable anchor stores a CFI only when the engine genuinely reported one, in
+which case `fidelity` is `cfi`. Otherwise it is section-level: spine index,
+offsets when available, quote, context, and the canonical reader location, with
+`fidelity: 'section'`. Validation rejects `fidelity: 'cfi'` without a real CFI.
+Historical anchors are never rewritten, and a missing CFI is never replaced by a
+manufactured one.
+
+## D-075 - The Knowledge Canvas reconciles semantics and visuals through one helper
+
+Status: Accepted
+
+`lib/canvas/scene-sync.ts` is the single reconciliation helper for the unified
+Canvas. Only elements carrying Read & Watch `customData.rw` metadata are app
+owned; ordinary drawings are never reinterpreted. The invariants are: a placed
+block has a rectangle and a bound label; renaming a block renames its label; a
+relationship between two placed blocks has a named connector whose arrowheads
+follow the direction; a relationship created before its blocks were placed gains
+its connector once both exist (and loaded canvases are healed once); deleting a
+block removes its visuals and every touching connector; deleting an app-owned
+visual element detaches the semantic record instead of leaving a ghost id.
+
+The live scene-change handler runs the full reconciliation only when a structural
+mismatch exists, so it never fights a drag, and the editor remounts per canvas so
+one canvas can never inherit another's document state.
+
+## D-076 - Single-writer canvas conflicts adopt the server revision once
+
+Status: Accepted
+
+A Knowledge Canvas is edited by one writer at a time inside the app. When a save
+is rejected with 409 the editor re-reads the canvas, adopts the server revision
+and re-applies the user's current state exactly once; a second conflict is
+surfaced as a real conflict. This preserves optimistic concurrency for genuine
+races while removing the dead-end where every later save failed against a stale
+revision.
+
+## D-077 - Source links degrade in a documented order
+
+Status: Accepted
+
+A canvas block promoted from an annotation keeps the annotation id, the owning
+item, a human label, the quote, and the canonical reader location. Navigation
+prefers the exact annotation, then the stored location, then the book, so a
+source-linked block is never stranded when its annotation is deleted or
+temporarily unavailable. Legacy graph deep links of every supported type
+(annotation, item, location, external) are preserved on import. Reader links use
+one query contract: `?annotationId=`, `?location=`, `?canvasId=`.

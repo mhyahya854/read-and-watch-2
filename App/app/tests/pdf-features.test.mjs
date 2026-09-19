@@ -165,6 +165,17 @@ test('Selection and versioned text anchors support creation, resolution, and mis
     },
   };
 
+  // Without real selection geometry the adapter must refuse, not fabricate a
+  // full-width stripe that pretends to be the user's selection.
+  await assert.rejects(
+    () => adapter.createTextAnchor(selection),
+    (err) => DocumentError.isDocumentError(err) && err.code === 'ANCHOR_INVALID',
+  );
+
+  adapter.setMockSelectionRects([
+    { x: 0.1, y: 0.2, width: 0.4, height: 0.03 },
+    { x: 0.1, y: 0.24, width: 0.35, height: 0.03 },
+  ]);
   const anchor = await adapter.createTextAnchor(selection);
   assert.equal(anchor.schemaVersion, 1);
   assert.equal(anchor.kind, 'pdf-geometry');
@@ -174,7 +185,8 @@ test('Selection and versioned text anchors support creation, resolution, and mis
   assert.equal(anchor.context?.suffix, ' in offline environments.');
   assert.equal(anchor.payload.pageNumber, 1);
   assert.ok(Array.isArray(anchor.payload.rects));
-  assert.ok(anchor.payload.rects.length > 0);
+  assert.equal(anchor.payload.rects.length, 2, 'both selected lines keep their geometry');
+  assert.deepEqual(anchor.payload.rects[0], { x: 0.1, y: 0.2, width: 0.4, height: 0.03 });
 
   // 1. Resolve matching anchor -> exact
   const resolved = await adapter.resolveTextAnchor(anchor);

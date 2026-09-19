@@ -8,3 +8,4 @@ export * from './validation.ts';
 export * from './history.ts';
 export * from './knowledge.ts';
 export * from './annotation-promotion.ts';
+export * from './scene-sync.ts';

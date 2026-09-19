@@ -27,6 +27,7 @@ import {
   RefreshCw,
   ExternalLink,
   Blocks,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { KnowledgePanel } from './knowledge-panel';
@@ -42,8 +43,12 @@ import type {
 import {
   createKnowledgeBlock,
   findBlockByAnnotation,
-  updateBlock,
 } from '@/lib/canvas/knowledge';
+import {
+  needsReconcile,
+  reconcileKnowledgeScene,
+  type SceneElementLike,
+} from '@/lib/canvas/scene-sync';
 import '@excalidraw/excalidraw/index.css';
 
 interface ExcalidrawApi {
@@ -115,6 +120,7 @@ export function ReadWatchCanvas({
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [knowledge, setKnowledge] = useState<CanvasKnowledge>({ blocks: [], relationships: [] });
+  const [excalidrawReady, setExcalidrawReady] = useState(false);
   const knowledgeRef = useRef<CanvasKnowledge>(knowledge);
   const titleRef = useRef(title);
   const docRef = useRef<ReadWatchCanvasDocument | null>(doc);
@@ -130,6 +136,7 @@ export function ReadWatchCanvas({
   useEffect(() => {
     docRef.current = doc;
   }, [doc]);
+
 
   const excalidrawApiRef = useRef<ExcalidrawApi | null>(null);
   const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -245,16 +252,36 @@ export function ReadWatchCanvas({
           knowledge: knowledgeToSave ?? knowledgeRef.current,
         };
 
+        const putOnce = async () =>
+          fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}${scopeQuery}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
         try {
           setSaveStatus('saving');
-          const res = await fetch(
-            `/api/reader/canvases/${encodeURIComponent(canvasId)}${scopeQuery}`,
-            {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            },
-          );
+          let res = await putOnce();
+
+          if (res.status === 409) {
+            // This canvas has a single writer (this editor), so a conflict almost
+            // always means our revision ref lagged a save that did land. Adopt the
+            // server's revision and re-apply the user's current state ONCE; a
+            // second conflict is a genuine race and is surfaced.
+            try {
+              const fresh = await fetch(
+                `/api/reader/canvases/${encodeURIComponent(canvasId)}${scopeQuery}`,
+              );
+              if (fresh.ok) {
+                const freshDoc: ReadWatchCanvasDocument = await fresh.json();
+                currentRevisionRef.current = freshDoc.revision;
+                payload.expectedRevision = freshDoc.revision;
+                res = await putOnce();
+              }
+            } catch {
+              // Fall through to the original conflict handling.
+            }
+          }
 
           if (res.status === 409) {
             setSaveStatus('conflict');
@@ -290,10 +317,49 @@ export function ReadWatchCanvas({
   // visual element so both halves stay one workspace.
   // ---------------------------------------------------------------------------
 
+  /**
+   * Heal a loaded canvas once the scene is available: a saved document may be
+   * missing a connector (a relationship created before its blocks were placed)
+   * or may reference an app-owned element that no longer exists.
+   */
+  const reconciledCanvasRef = useRef<string | null>(null);
+  useEffect(() => {
+    const api = excalidrawApiRef.current;
+    if (!api || !doc || !excalidrawReady) return;
+    const key = `${doc.canvasId}@${doc.revision}`;
+    if (reconciledCanvasRef.current === key) return;
+    reconciledCanvasRef.current = key;
+
+    const scene = api.getSceneElements() as ReadonlyArray<SceneElementLike>;
+    const result = reconcileKnowledgeScene({
+      elements: scene,
+      knowledge: knowledgeRef.current,
+    });
+    if (!result.changed) return;
+    api.updateScene({ elements: result.elements });
+    knowledgeRef.current = result.knowledge;
+    setKnowledge(result.knowledge);
+    void saveCanvas({ elements: result.elements }, undefined, result.knowledge);
+  }, [doc, excalidrawReady, saveCanvas]);
+
   const handleKnowledgeChange = useCallback(
     (next: CanvasKnowledge) => {
-      setKnowledge(next);
-      void saveCanvas(undefined, undefined, next);
+      // Structured edits flow through the ONE reconciliation helper so the
+      // semantic model and the freeform scene can never drift apart.
+      const api = excalidrawApiRef.current;
+      const scene = (api?.getSceneElements() ?? []) as ReadonlyArray<SceneElementLike>;
+      const result = reconcileKnowledgeScene({ elements: scene, knowledge: next });
+      // The ref must be current BEFORE updateScene: Excalidraw's change event
+      // fires from it, and the reconciliation guard reads this ref. Otherwise the
+      // guard sees the brand-new block elements as orphans and deletes them.
+      knowledgeRef.current = result.knowledge;
+      setKnowledge(result.knowledge);
+      if (api && result.changed) api.updateScene({ elements: result.elements });
+      void saveCanvas(
+        api ? { elements: result.elements } : undefined,
+        undefined,
+        result.knowledge,
+      );
     },
     [saveCanvas],
   );
@@ -303,78 +369,18 @@ export function ReadWatchCanvas({
     (block: KnowledgeBlock) => {
       const api = excalidrawApiRef.current;
       if (!api) return;
-      const existing = api.getSceneElements();
-      const rectId = `kb-${block.id}`;
-      const textId = `kb-${block.id}-label`;
-      const nonce = Math.floor(Math.random() * 2 ** 31);
-      const baseY = 120 + (knowledge.blocks.findIndex((b) => b.id === block.id) % 6) * 130;
-      const rect = {
-        id: rectId,
-        type: 'rectangle',
-        x: 140,
-        y: baseY,
-        width: 240,
-        height: 84,
-        angle: 0,
-        strokeColor: '#2f6f63',
-        backgroundColor: '#f4f1ea',
-        fillStyle: 'solid',
-        strokeWidth: 1,
-        strokeStyle: 'solid',
-        roughness: 1,
-        opacity: 100,
-        groupIds: [],
-        frameId: null,
-        roundness: { type: 3 },
-        seed: nonce,
-        version: 1,
-        versionNonce: nonce,
-        isDeleted: false,
-        boundElements: [{ type: 'text', id: textId }],
-        updated: Date.now(),
-        link: null,
-        locked: false,
-      };
-      const label = {
-        id: textId,
-        type: 'text',
-        x: 152,
-        y: baseY + 24,
-        width: 216,
-        height: 32,
-        angle: 0,
-        strokeColor: '#232323',
-        backgroundColor: 'transparent',
-        fillStyle: 'solid',
-        strokeWidth: 1,
-        strokeStyle: 'solid',
-        roughness: 1,
-        opacity: 100,
-        groupIds: [],
-        frameId: null,
-        roundness: null,
-        seed: nonce + 1,
-        version: 1,
-        versionNonce: nonce + 1,
-        isDeleted: false,
-        boundElements: null,
-        updated: Date.now(),
-        link: null,
-        locked: false,
-        text: block.title || 'Untitled block',
-        fontSize: 16,
-        fontFamily: 1,
-        textAlign: 'left',
-        verticalAlign: 'middle',
-        containerId: rectId,
-        originalText: block.title || 'Untitled block',
-        lineHeight: 1.25,
-      };
-      const elements = [...existing, rect, label];
-      api.updateScene({ elements });
-      const next = updateBlock(knowledge, block.id, { elementId: rectId });
-      setKnowledge(next);
-      void saveCanvas({ elements }, undefined, next);
+      const scene = api.getSceneElements() as ReadonlyArray<SceneElementLike>;
+      const result = reconcileKnowledgeScene({
+        elements: scene,
+        knowledge,
+        placeBlockId: block.id,
+      });
+      const placed = result.knowledge.blocks.find((b) => b.id === block.id);
+      if (!placed?.elementId) return;
+      knowledgeRef.current = result.knowledge;
+      setKnowledge(result.knowledge);
+      api.updateScene({ elements: result.elements });
+      void saveCanvas({ elements: result.elements }, undefined, result.knowledge);
     },
     [knowledge, saveCanvas],
   );
@@ -389,76 +395,33 @@ export function ReadWatchCanvas({
     api.scrollToContent?.(target, { fitToViewport: true, animate: true });
   }, []);
 
-  /** Draw a connector for a named relationship when both blocks are on canvas. */
+  /**
+   * A relationship created before its blocks were placed gains its connector
+   * automatically once both endpoints exist (see reconcileKnowledgeScene).
+   */
   const handleRelationshipCreated = useCallback(
     (relationship: KnowledgeRelationship) => {
       const api = excalidrawApiRef.current;
       if (!api) return;
-      const source = knowledge.blocks.find((b) => b.id === relationship.sourceBlockId);
-      const target = knowledge.blocks.find((b) => b.id === relationship.targetBlockId);
-      if (!source?.elementId || !target?.elementId) return;
-      const elements = api.getSceneElements() as ReadonlyArray<{
-        id?: string;
-        x?: number;
-        y?: number;
-        width?: number;
-        height?: number;
-      }>;
-      const from = elements.find((el) => el.id === source.elementId);
-      const to = elements.find((el) => el.id === target.elementId);
-      if (!from || !to) return;
-      const startX = (from.x ?? 0) + (from.width ?? 0);
-      const startY = (from.y ?? 0) + (from.height ?? 0) / 2;
-      const endX = to.x ?? 0;
-      const endY = (to.y ?? 0) + (to.height ?? 0) / 2;
-      const nonce = Math.floor(Math.random() * 2 ** 31);
-      const arrowId = `kr-${relationship.id}`;
-      const arrow = {
-        id: arrowId,
-        type: 'arrow',
-        x: startX,
-        y: startY,
-        width: Math.max(1, Math.abs(endX - startX)),
-        height: Math.max(1, Math.abs(endY - startY)),
-        angle: 0,
-        strokeColor: '#2f6f63',
-        backgroundColor: 'transparent',
-        fillStyle: 'solid',
-        strokeWidth: 1,
-        strokeStyle: 'solid',
-        roughness: 1,
-        opacity: 100,
-        groupIds: [],
-        frameId: null,
-        roundness: { type: 2 },
-        seed: nonce,
-        version: 1,
-        versionNonce: nonce,
-        isDeleted: false,
-        boundElements: null,
-        updated: Date.now(),
-        link: null,
-        locked: false,
-        points: [
-          [0, 0],
-          [endX - startX, endY - startY],
-        ],
-        lastCommittedPoint: null,
-        startBinding: { elementId: source.elementId, focus: 0, gap: 4 },
-        endBinding: { elementId: target.elementId, focus: 0, gap: 4 },
-        startArrowhead: relationship.direction === 'mutual' ? 'arrow' : null,
-        endArrowhead: 'arrow',
-      };
-      const nextElements = [...elements, arrow];
-      api.updateScene({ elements: nextElements });
-      const next = {
-        ...knowledge,
-        relationships: knowledge.relationships.map((rel) =>
-          rel.id === relationship.id ? { ...rel, linkedElementId: arrowId } : rel,
-        ),
-      };
-      setKnowledge(next);
-      void saveCanvas({ elements: nextElements }, undefined, next);
+      const scene = api.getSceneElements() as ReadonlyArray<SceneElementLike>;
+      const result = reconcileKnowledgeScene({
+        elements: scene,
+        knowledge: {
+          ...knowledge,
+          relationships: [
+            ...knowledge.relationships.filter((r) => r.id !== relationship.id),
+            relationship,
+          ],
+        },
+      });
+      knowledgeRef.current = result.knowledge;
+      setKnowledge(result.knowledge);
+      if (result.changed) api.updateScene({ elements: result.elements });
+      void saveCanvas(
+        result.changed ? { elements: result.elements } : undefined,
+        undefined,
+        result.knowledge,
+      );
     },
     [knowledge, saveCanvas],
   );
@@ -470,6 +433,26 @@ export function ReadWatchCanvas({
 
       const appState = (rawAppState || {}) as Record<string, unknown>;
       const files = (rawFiles || {}) as Record<string, unknown>;
+
+      // Reconcile only when the semantic model and the scene structurally
+      // disagree (for example the user deleted an app-owned block element).
+      // Running the full reconciliation on every frame would fight a drag.
+      const sceneElements = elements as ReadonlyArray<SceneElementLike>;
+      if (needsReconcile(sceneElements, knowledgeRef.current)) {
+        const result = reconcileKnowledgeScene({
+          elements: sceneElements,
+          knowledge: knowledgeRef.current,
+        });
+        knowledgeRef.current = result.knowledge;
+        setKnowledge(result.knowledge);
+        excalidrawApiRef.current?.updateScene({ elements: result.elements });
+        void saveCanvas(
+          { elements: result.elements, appState, files },
+          undefined,
+          result.knowledge,
+        );
+        return;
+      }
 
       if (autosaveTimeoutRef.current) {
         clearTimeout(autosaveTimeoutRef.current);
@@ -562,7 +545,8 @@ export function ReadWatchCanvas({
         isDeleted: false,
         groupIds: [],
         updated: now,
-        link: `/reader/${targetItemId}?annotation=${String(ann.id)}`,
+        // Canonical reader deep-link contract: `annotationId`.
+        link: `/reader/${targetItemId}?annotationId=${String(ann.id)}`,
         customData: {
           itemId: targetItemId,
           annotationId: ann.id,
@@ -663,7 +647,7 @@ export function ReadWatchCanvas({
       const base64Data = dataUrl.split(',')[1];
 
       try {
-        const res = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}/assets`, {
+        const res = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}/assets${scopeQuery}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -715,7 +699,7 @@ export function ReadWatchCanvas({
   // 9. Full Export Handler
   const handleExport = async () => {
     try {
-      const res = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}/export`);
+      const res = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}/export${scopeQuery}`);
       if (!res.ok) throw new Error('Export failed');
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -920,6 +904,7 @@ export function ReadWatchCanvas({
           <Excalidraw
             excalidrawAPI={(api: unknown) => {
               excalidrawApiRef.current = api as ExcalidrawApi;
+              setExcalidrawReady(true);
             }}
             initialData={{
               elements: doc.scene?.elements || [],
@@ -977,7 +962,7 @@ export function ReadWatchCanvas({
                 className="h-5 w-5 p-0 text-muted-foreground"
                 onClick={() => setSelectedLink(null)}
               >
-                ✕
+                <X size={12} />
               </Button>
             </div>
             <p className="text-xs text-foreground font-serif italic mb-2 line-clamp-2">
@@ -986,7 +971,7 @@ export function ReadWatchCanvas({
             <Link
               href={
                 selectedLink.annotationId
-                  ? `/reader/${selectedLink.itemId}?annotation=${selectedLink.annotationId}`
+                  ? `/reader/${selectedLink.itemId}?annotationId=${selectedLink.annotationId}`
                   : `/reader/${selectedLink.itemId}`
               }
             >
@@ -1014,7 +999,7 @@ export function ReadWatchCanvas({
                 className="h-6 w-6 p-0"
                 onClick={() => setIsExcerptModalOpen(false)}
               >
-                ✕
+                <X size={12} />
               </Button>
             </div>
 

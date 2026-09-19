@@ -198,8 +198,10 @@ test('A book canvas and a location canvas both keep their scope in SQLite and th
     assert.equal(bookCanvas.scope.kind, 'book');
 
     const location = {
+      schemaVersion: 1,
       kind: 'page',
-      payload: { sourceHash: 'hash-a', pageNumber: 27 },
+      sourceHash: 'hash-a',
+      payload: { pageNumber: 27 },
     };
     const pageCanvas = canvasStore.createCanvas({
       itemId: BOOK_A,
@@ -343,7 +345,7 @@ test('Canvas scope validation drops a location scope that has no anchor', () => 
   const kept = validateCanvasScope({
     kind: 'location',
     label: 'Page 3',
-    anchor: { sourceHash: 'h', location: { kind: 'page' } },
+    anchor: { sourceHash: 'h', location: { schemaVersion: 1, kind: 'page', sourceHash: 'h', payload: { pageNumber: 3 } } },
   });
   assert.equal(kept.kind, 'location');
   assert.equal(kept.label, 'Page 3');
@@ -796,7 +798,7 @@ test('Legacy graph conversion is a pure projection', () => {
 
 test('Scope and structured knowledge survive a file-first canvas recovery', () =>
   withStores(({ canvasStore, databasePath, userDataRoot }) => {
-    const location = { kind: 'page', payload: { pageNumber: 12 } };
+    const location = { schemaVersion: 1, kind: 'page', sourceHash: 'h', payload: { pageNumber: 12 } };
     const created = canvasStore.createCanvas({
       itemId: BOOK_A,
       title: 'Page 12 canvas',
@@ -831,7 +833,7 @@ test('Scope and structured knowledge survive a file-first canvas recovery', () =
 
 test('Canvas export/import preserves scope, knowledge, and ownership', () =>
   withStores(({ canvasStore, dir }) => {
-    const location = { kind: 'page', payload: { pageNumber: 5 } };
+    const location = { schemaVersion: 1, kind: 'page', sourceHash: 'h', payload: { pageNumber: 5 } };
     const created = canvasStore.createCanvas({
       itemId: BOOK_A,
       title: 'Portable canvas',
@@ -963,8 +965,26 @@ test('Selection rectangles normalize against the page and merge per line', () =>
   });
   assert.equal(reflowable.kind, 'reflowable-text');
   assert.equal(reflowable.spineIndex, 3);
-  assert.ok(reflowable.startCfi.includes('epubcfi'));
+  assert.equal(
+    reflowable.startCfi,
+    undefined,
+    'a CFI the engine never provided must not be forged',
+  );
+  assert.equal(reflowable.fidelity, 'section');
   assert.equal('pageNumber' in reflowable, false, 'no page number is invented for reflowable');
+
+  // A genuine engine CFI is preserved verbatim and labelled as such.
+  const withCfi = reflowableTextAnchorFromSelection({
+    sourceHash: 'hash',
+    quote: 'quoted',
+    spineIndex: 3,
+    startCfi: '/6/8!/4/2/1:5',
+    endCfi: '/6/8!/4/2/1:19',
+  });
+  assert.equal(withCfi.startCfi, '/6/8!/4/2/1:5');
+  assert.equal(withCfi.endCfi, '/6/8!/4/2/1:19');
+  assert.equal(withCfi.fidelity, 'cfi');
+  assert.equal(withCfi.spineIndex, 3);
 });
 
 test('Reader layout states hide the right pane and restore deterministically', () => {
@@ -974,7 +994,11 @@ test('Reader layout states hide the right pane and restore deterministically', (
 
   assert.equal(sidePaneVisible('split', true), true);
   assert.equal(sidePaneVisible('split', false), false);
-  assert.equal(sidePaneVisible('full', true), false, 'full reader hides the study pane');
+  assert.equal(
+    sidePaneVisible('full', true),
+    true,
+    'the study pane stays mounted in full mode (hidden, so note drafts survive)',
+  );
   assert.equal(sidePaneVisible('minimized', true), true);
 
   assert.ok(readerPaneClass('full', true).includes('flex-1'));
@@ -983,6 +1007,11 @@ test('Reader layout states hide the right pane and restore deterministically', (
     readerPaneClass('minimized', true),
     'hidden',
     'minimizing hides the pane with CSS so the adapter container stays mounted',
+  );
+  assert.equal(
+    sidePaneClass('full'),
+    'hidden',
+    'full reader hides the study pane without unmounting it',
   );
   assert.ok(sidePaneClass('minimized').includes('flex-1'));
   assert.ok(sidePaneClass('split').includes('border-l'));

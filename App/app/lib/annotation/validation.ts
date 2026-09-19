@@ -104,19 +104,40 @@ function validatePdfDrawingAnchor(a: Record<string, unknown>): PdfDrawingAnchor 
 }
 
 function validateReflowableTextAnchor(a: Record<string, unknown>): ReflowableTextAnchor {
-  const startCfi = requireString(a.startCfi, 'anchor.startCfi');
-  const endCfi = requireString(a.endCfi, 'anchor.endCfi');
+  // A CFI is optional: it is present only when the engine genuinely supplied one.
+  // Section-level anchors rely on the canonical location plus quote/context.
+  const startCfi = typeof a.startCfi === 'string' && a.startCfi.trim() ? a.startCfi : undefined;
+  const endCfi = typeof a.endCfi === 'string' && a.endCfi.trim() ? a.endCfi : undefined;
   const spineIndex = requireNumber(a.spineIndex, 'anchor.spineIndex');
   if (!Number.isInteger(spineIndex) || spineIndex < 0)
     bad('anchor.spineIndex must be a non-negative integer');
   const quote = requireString(a.quote, 'anchor.quote');
   const sourceHash = requireString(a.sourceHash, 'anchor.sourceHash');
+  const fidelity =
+    a.fidelity === 'cfi' || a.fidelity === 'section'
+      ? a.fidelity
+      : startCfi
+        ? 'cfi'
+        : 'section';
+  if (fidelity === 'cfi' && !startCfi) {
+    bad('anchor.fidelity "cfi" requires a real startCfi');
+  }
+  if (a.location !== undefined && a.location !== null && typeof a.location !== 'object') {
+    bad('anchor.location must be an object when provided');
+  }
   return {
     kind: 'reflowable-text',
-    startCfi,
-    endCfi,
+    ...(startCfi ? { startCfi } : {}),
+    ...(endCfi ? { endCfi } : {}),
     spineIndex,
+    ...(typeof a.sectionId === 'string' && a.sectionId ? { sectionId: a.sectionId } : {}),
+    ...(typeof a.startOffset === 'number' ? { startOffset: a.startOffset } : {}),
+    ...(typeof a.endOffset === 'number' ? { endOffset: a.endOffset } : {}),
+    ...(a.location !== undefined && a.location !== null
+      ? { location: a.location }
+      : {}),
     quote,
+    fidelity,
     ...(typeof a.prefix === 'string' ? { prefix: a.prefix } : {}),
     ...(typeof a.suffix === 'string' ? { suffix: a.suffix } : {}),
     sourceHash,

@@ -33,6 +33,7 @@ import {
   annotationSourceLabel,
 } from '@/lib/canvas';
 import type { Annotation } from '@/lib/annotation';
+import { describeLocation } from '@/lib/document/location-key.mjs';
 
 function annotationIcon(annotation: Annotation) {
   if (annotation.kind === 'drawing') return <PenLine size={12} />;
@@ -73,6 +74,11 @@ export function ReaderStudyPane() {
     setStudyPane,
     drawMode,
     setDrawMode,
+    markColor,
+    setMarkColor,
+    drawStrokeWidth,
+    setDrawStrokeWidth,
+    setAnnotationColor,
   } = useReader();
   const toast = useToast();
   // The pane's active tab IS the requested study pane, so the toolbar button and
@@ -92,19 +98,33 @@ export function ReaderStudyPane() {
 
   const createCanvas = async (scopeKind: 'book' | 'location') => {
     try {
+      const isPaged = snapshot.capabilities.has('pageNavigation');
+      // Honest labels: reflowable books have no physical pages, so they get a
+      // location/section label instead of a fabricated page number.
+      const locationLabel = isPaged
+        ? `Page ${snapshot.currentPage || 1}`
+        : snapshot.currentLocation
+          ? describeLocation(snapshot.currentLocation)
+          : 'Current location';
+      if (scopeKind === 'location' && !snapshot.currentLocation) {
+        toast.error('The reader has no current location yet, so a page/location canvas cannot be created.');
+        return;
+      }
       const title =
         scopeKind === 'book'
-          ? `${snapshot.metadata?.title || 'Book'} — Knowledge Canvas`
-          : `Page ${snapshot.currentPage || 1} canvas`;
+          ? `${snapshot.metadata?.title || 'Book'} - Knowledge Canvas`
+          : isPaged
+            ? `Page ${snapshot.currentPage || 1} canvas`
+            : `${locationLabel} canvas`;
       const scope =
         scopeKind === 'location'
           ? {
               kind: 'location' as const,
-              label: `Page ${snapshot.currentPage || 1}`,
+              label: locationLabel,
               anchor: {
                 ...(snapshot.source ? { sourceHash: snapshot.source.sourceHash } : {}),
-                ...(snapshot.currentLocation ? { location: snapshot.currentLocation } : {}),
-                locationLabel: `Page ${snapshot.currentPage || 1}`,
+                location: snapshot.currentLocation,
+                locationLabel,
               },
             }
           : { kind: 'book' as const, label: 'Whole book' };
@@ -174,7 +194,7 @@ export function ReaderStudyPane() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            title: `${snapshot.metadata?.title || 'Book'} — Knowledge Canvas`,
+            title: `${snapshot.metadata?.title || 'Book'} - Knowledge Canvas`,
             scope: { kind: 'book', label: 'Whole book' },
           }),
         });
@@ -201,11 +221,35 @@ export function ReaderStudyPane() {
 
   const jumpToAnnotation = async (annotation: Annotation) => {
     setActiveAnnotationId(annotation.id);
+    const { createPageLocation, createSemanticLocation, validateDocumentLocation } =
+      await import('@/lib/document');
     if (annotation.anchor.kind === 'pdf-text' || annotation.anchor.kind === 'pdf-drawing') {
-      const { createPageLocation } = await import('@/lib/document');
       if (snapshot.source) {
         await goTo(createPageLocation(snapshot.source.sourceHash, annotation.anchor.pageNumber));
       }
+      return;
+    }
+    // Reflowable: prefer the canonical location captured at creation, then a real
+    // CFI, then the section/spine anchor. Never silently do nothing.
+    const anchor = annotation.anchor;
+    if (anchor.location) {
+      try {
+        await goTo(validateDocumentLocation(anchor.location));
+        return;
+      } catch {
+        // fall through to the CFI/section branches
+      }
+    }
+    if (snapshot.source && (anchor.startCfi || typeof anchor.spineIndex === 'number')) {
+      await goTo(
+        createSemanticLocation(snapshot.source.sourceHash, {
+          ...(anchor.startCfi ? { cfi: anchor.startCfi } : {}),
+          ...(typeof anchor.spineIndex === 'number' ? { spineIndex: anchor.spineIndex } : {}),
+          ...(typeof anchor.startOffset === 'number'
+            ? { startOffset: anchor.startOffset }
+            : {}),
+        }),
+      );
     }
   };
 
@@ -359,9 +403,18 @@ export function ReaderStudyPane() {
                           variant="ghost"
                           className="h-6 px-2 text-[11px] text-destructive"
                           onClick={async () => {
-                            await saveAnnotationNote(activeAnnotation.id, '');
-                            setAnnotationNoteDraft('');
-                            toast.success('Note removed. The annotation is unchanged.');
+                            try {
+                              await saveAnnotationNote(activeAnnotation.id, '');
+                              setAnnotationNoteDraft('');
+                              toast.success('Note removed. The annotation is unchanged.');
+                            } catch (err) {
+                              // Keep the note visible locally; nothing was saved.
+                              toast.error(
+                                err instanceof Error
+                                  ? err.message
+                                  : 'Could not remove the note',
+                              );
+                            }
                           }}
                         >
                           Delete note
@@ -385,8 +438,20 @@ export function ReaderStudyPane() {
                         size="sm"
                         className="h-6 px-2 text-[11px]"
                         onClick={async () => {
-                          await saveAnnotationNote(activeAnnotation.id, annotationNoteDraft);
-                          setNoteEditing(false);
+                          try {
+                            await saveAnnotationNote(
+                              activeAnnotation.id,
+                              annotationNoteDraft,
+                            );
+                            setNoteEditing(false);
+                            toast.success('Note saved');
+                          } catch (err) {
+                            // Editor stays open with the draft intact so the user
+                            // can retry; no false success is reported.
+                            toast.error(
+                              err instanceof Error ? err.message : 'Could not save the note',
+                            );
+                          }
                         }}
                       >
                         Save note
@@ -409,6 +474,26 @@ export function ReaderStudyPane() {
                 )}
 
                 <div className="mt-3 space-y-2 border-t border-border/60 pt-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Colour
+                    </span>
+                    {['#d6b34c', '#2f6f63', '#b45309', '#b91c1c', '#4b5563'].map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        aria-label={`Set mark colour ${color}`}
+                        data-testid={`mark-colour-${color.slice(1)}`}
+                        onClick={() => void setAnnotationColor(activeAnnotation.id, color)}
+                        style={{ backgroundColor: color }}
+                        className={`size-4 rounded border ${
+                          (activeAnnotation.content as { color?: string }).color === color
+                            ? 'border-foreground'
+                            : 'border-border'
+                        }`}
+                      />
+                    ))}
+                  </div>
                   <label className="block">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Add to Knowledge Canvas
@@ -588,6 +673,35 @@ export function ReaderStudyPane() {
                 <PenLine size={11} className="mr-1" />
                 {drawMode ? 'Stop drawing' : 'Draw on this page'}
               </Button>
+              {drawMode && (
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Ink
+                  </span>
+                  {['#b45309', '#2f6f63', '#b91c1c', '#1f2937'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      aria-label={`Ink colour ${color}`}
+                      onClick={() => setMarkColor(color)}
+                      style={{ backgroundColor: color }}
+                      className={`size-4 rounded border ${
+                        markColor === color ? 'border-foreground' : 'border-border'
+                      }`}
+                    />
+                  ))}
+                  <select
+                    aria-label="Ink width"
+                    value={String(drawStrokeWidth)}
+                    onChange={(e) => setDrawStrokeWidth(Number(e.target.value))}
+                    className="ml-1 rounded border border-border bg-surface px-1 py-0.5 text-[10px] text-foreground"
+                  >
+                    <option value="0.002">Thin</option>
+                    <option value="0.004">Medium</option>
+                    <option value="0.008">Thick</option>
+                  </select>
+                </div>
+              )}
               <p className="mt-1 text-[10px] text-muted-foreground">
                 Freehand markup is anchored to the page. Reflowable books use a page/location
                 canvas for drawing instead.

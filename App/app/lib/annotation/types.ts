@@ -97,12 +97,27 @@ export interface PdfDrawingAnchor {
 /** CFI range anchor for a reflowable book. */
 export interface ReflowableTextAnchor {
   readonly kind: 'reflowable-text';
-  /** Start EPUB CFI. */
-  readonly startCfi: string;
-  /** End EPUB CFI. */
-  readonly endCfi: string;
+  /**
+   * Start EPUB CFI. Present ONLY when the engine genuinely supplied one; a
+   * section-level anchor never carries a manufactured CFI.
+   */
+  readonly startCfi?: string;
+  /** End EPUB CFI (only with a genuine startCfi). */
+  readonly endCfi?: string;
   /** 0-based spine index. */
   readonly spineIndex: number;
+  /** Engine-provided section/chapter identity when available. */
+  readonly sectionId?: string;
+  /** Character offsets within the section when the engine provides them. */
+  readonly startOffset?: number;
+  readonly endOffset?: number;
+  /** Canonical reader location captured for this selection. */
+  readonly location?: unknown;
+  /**
+   * Anchor fidelity: `cfi` when a real CFI range was captured, `section` when
+   * only section/offset/quote information is available.
+   */
+  readonly fidelity?: 'cfi' | 'section';
   /** Selected text quote (exact). */
   readonly quote: string;
   /** Characters before selection for fallback resolution. */
