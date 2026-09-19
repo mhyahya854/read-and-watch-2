@@ -6,7 +6,7 @@ export default async function Home(props: {
     selected?: string;
     mode?: 'split' | 'maximized' | 'closed';
     sidebar?: 'collapsed' | 'expanded';
-    tab?: 'overview' | 'thoughts' | 'notes' | 'metadata' | 'media' | 'relationships' | 'highlights' | 'canvas';
+    tab?: 'overview' | 'thoughts' | 'notes' | 'metadata' | 'media' | 'relationships' | 'highlights' | 'canvas' | 'workspace';
     media?: string;
   }>;
 }) {

@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { UserDataEditor } from '@/components/user-data-editor';
+import { WatchWorkspace } from '@/components/watch/watch-workspace';
 import type { CatalogMedia, LibraryItem } from '@/lib/catalog';
 import { libraryAssetUrl } from '@/lib/catalog';
 
@@ -33,7 +34,8 @@ export type DetailTab =
   | 'media'
   | 'relationships'
   | 'highlights'
-  | 'canvas';
+  | 'canvas'
+  | 'workspace';
 
 function present(value: string | number | null | undefined) {
   return value === null || value === undefined || String(value).trim() === ''
@@ -66,7 +68,7 @@ export function ItemDetail({
   onReload: () => void;
   onSelectItem?: (id: string) => void;
 }) {
-  const [tab, setTab] = useState<DetailTab>(initialTab);
+  const [selectedTab, setSelectedTab] = useState<DetailTab>(initialTab);
   const [thoughtsDirty, setThoughtsDirty] = useState(false);
   const [notesDirty, setNotesDirty] = useState(false);
   const [metadataDirty, setMetadataDirty] = useState(false);
@@ -87,17 +89,36 @@ export function ItemDetail({
     [metadataDirty, notesDirty, onDirtyChange, thoughtsDirty],
   );
 
+  // Compute effective tab based on collection constraints
+  const tab: DetailTab =
+    item.collection === 'read' && selectedTab === 'workspace'
+      ? 'overview'
+      : item.collection === 'watch' && (selectedTab === 'highlights' || selectedTab === 'canvas')
+        ? 'workspace'
+        : selectedTab;
+
   const people = item.collection === 'read' ? item.authors : item.creators;
-  const tabs: Array<[DetailTab, string]> = [
-    ['overview', 'Overview'],
-    ['thoughts', 'Thoughts'],
-    ['notes', 'Notes'],
-    ['metadata', 'Metadata'],
-    ['media', `Media (${item.media.length})`],
-    ['relationships', `Links (${item.relationshipIds.length})`],
-    ['highlights', 'Highlights'],
-    ['canvas', 'Canvas'],
-  ];
+  const tabs: Array<[DetailTab, string]> =
+    item.collection === 'watch'
+      ? [
+          ['overview', 'Overview'],
+          ['thoughts', 'Thoughts'],
+          ['notes', 'Notes'],
+          ['metadata', 'Metadata'],
+          ['media', `Media (${item.media.length})`],
+          ['relationships', `Links (${item.relationshipIds.length})`],
+          ['workspace', 'Workspace'],
+        ]
+      : [
+          ['overview', 'Overview'],
+          ['thoughts', 'Thoughts'],
+          ['notes', 'Notes'],
+          ['metadata', 'Metadata'],
+          ['media', `Media (${item.media.length})`],
+          ['relationships', `Links (${item.relationshipIds.length})`],
+          ['highlights', 'Highlights'],
+          ['canvas', 'Canvas'],
+        ];
 
   const relatedItems = item.relationshipIds
     .map((id) => catalogItems.find((c) => c.id === id))
@@ -210,9 +231,9 @@ export function ItemDetail({
             role="tablist"
             aria-label="Item sections"
             className={
-              mode === 'maximized'
+              mode === 'maximized' && tab !== 'workspace'
                 ? 'mx-auto flex max-w-4xl overflow-x-auto px-4 scrollbar-none'
-                : 'flex overflow-x-auto px-3 scrollbar-none'
+                : 'flex overflow-x-auto px-3 sm:px-4 scrollbar-none'
             }
           >
             {tabs.map(([value, label]) => (
@@ -220,7 +241,7 @@ export function ItemDetail({
                 key={value}
                 role="tab"
                 aria-selected={tab === value}
-                onClick={() => setTab(value)}
+                onClick={() => setSelectedTab(value)}
                 className={`shrink-0 border-b-2 px-3 py-2.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
                   tab === value
                     ? 'border-primary text-primary'
@@ -233,7 +254,12 @@ export function ItemDetail({
           </div>
         </div>
 
-        <div className={mode === 'maximized' ? 'mx-auto max-w-4xl p-6 md:p-8' : 'p-5'}>
+        {tab === 'workspace' && item.collection === 'watch' ? (
+          <div className="h-[calc(100vh-14rem)] min-h-[38rem] w-full p-2 sm:p-4">
+            <WatchWorkspace item={item} mode={mode} />
+          </div>
+        ) : (
+          <div className={mode === 'maximized' ? 'mx-auto max-w-4xl p-6 md:p-8' : 'p-5'}>
           {tab === 'overview' && (
             <div className="space-y-6">
               <section>
@@ -514,6 +540,7 @@ export function ItemDetail({
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Lightbox Dialog for Media */}

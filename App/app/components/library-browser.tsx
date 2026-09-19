@@ -115,7 +115,7 @@ export function LibraryBrowser({
   initialSelectedId?: string | null;
   initialDetailMode?: 'split' | 'maximized' | 'closed';
   initialSidebarCollapsed?: boolean;
-  initialTab?: 'overview' | 'thoughts' | 'notes' | 'metadata' | 'media' | 'relationships' | 'highlights' | 'canvas';
+  initialTab?: 'overview' | 'thoughts' | 'notes' | 'metadata' | 'media' | 'relationships' | 'highlights' | 'canvas' | 'workspace';
   initialPreviewIndex?: number;
 }) {
   const toast = useToast();

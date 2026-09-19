@@ -569,7 +569,10 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     if (pathname.startsWith('/api/canvases')) {
       const sub = pathname.replace(/^\/api\/canvases\/?/, '');
       if (sub === '' || sub === '/') {
-        if (method === 'GET') return sendJson(res, 200, canvasStore.listCanvases());
+        if (method === 'GET') {
+          const itemId = url.searchParams.get('itemId') || undefined;
+          return sendJson(res, 200, canvasStore.listCanvases({ itemId }));
+        }
         if (method === 'POST') {
           const body = await readJsonBody(req);
           return sendJson(res, 201, canvasStore.createCanvas(body));
@@ -606,16 +609,33 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         return sendJson(res, 200, knowledgeStore.resolveDeepLink(body));
       }
       if (sub === 'graphs' && method === 'GET') {
-        return sendJson(res, 200, knowledgeStore.listGraphs());
+        const itemId = url.searchParams.get('itemId') || null;
+        const standalone = url.searchParams.get('standalone') === 'true';
+        return sendJson(
+          res,
+          200,
+          knowledgeStore.listGraphs({ associatedItemId: itemId, standaloneOnly: standalone })
+        );
       }
       if (sub === 'graphs' && method === 'POST') {
         const body = await readJsonBody(req);
-        return sendJson(res, 201, knowledgeStore.createGraph(body));
+        const payload = body || {};
+        if (payload.itemId && !payload.associatedItemId) {
+          payload.associatedItemId = payload.itemId;
+        }
+        return sendJson(res, 201, knowledgeStore.createGraph(payload));
       }
       const gMatch = sub.match(/^graphs\/([^/]+)$/);
       if (gMatch) {
         const id = decodeURIComponent(gMatch[1]);
-        if (method === 'GET') return sendJson(res, 200, knowledgeStore.getGraph(id));
+        if (method === 'GET') {
+          const doc = knowledgeStore.getGraph(id);
+          const itemId = url.searchParams.get('itemId');
+          if (itemId && doc.associatedItemId && doc.associatedItemId !== itemId) {
+            return sendJson(res, 404, { error: 'Knowledge graph not found for this item' });
+          }
+          return sendJson(res, 200, doc);
+        }
         if (method === 'PUT') {
           const body = await readJsonBody(req);
           return sendJson(res, 200, knowledgeStore.saveGraphDocument(id, body));
@@ -623,7 +643,8 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         if (method === 'DELETE') return sendJson(res, 200, knowledgeStore.deleteGraph(id));
       }
       if (sub === 'diagrams' && method === 'GET') {
-        return sendJson(res, 200, knowledgeStore.listDiagrams());
+        const itemId = url.searchParams.get('itemId') || null;
+        return sendJson(res, 200, knowledgeStore.listDiagrams({ associatedItemId: itemId }));
       }
       if (sub === 'diagrams' && method === 'POST') {
         const body = await readJsonBody(req);

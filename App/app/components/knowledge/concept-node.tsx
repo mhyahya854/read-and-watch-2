@@ -2,7 +2,7 @@
 
 /**
  * ConceptNode Custom Component for React Flow.
- * Phase 13 — Knowledge and Diagram System.
+ * Phase 13: Knowledge and Diagram System.
  *
  * Implements tasteful, polished node aesthetics following Apple / Emil Kowalski design principles:
  *   - Balanced typographic hierarchy
@@ -25,11 +25,46 @@ export interface ConceptNodeData {
   [key: string]: unknown;
 }
 
-const TYPE_STYLES: Record<KnowledgeNodeType, { label: string; badgeClass: string; dotClass: string }> = {
+const TYPE_STYLES: Record<string, { label: string; badgeClass: string; dotClass: string }> = {
   concept: {
     label: 'Concept',
     badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
     dotClass: 'bg-indigo-500',
+  },
+  character: {
+    label: 'Character',
+    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+    dotClass: 'bg-emerald-500',
+  },
+  location: {
+    label: 'Location',
+    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+    dotClass: 'bg-amber-500',
+  },
+  group: {
+    label: 'Group / Faction',
+    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20',
+    dotClass: 'bg-violet-500',
+  },
+  object: {
+    label: 'Object',
+    badgeClass: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20',
+    dotClass: 'bg-orange-500',
+  },
+  theme: {
+    label: 'Theme',
+    badgeClass: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/20',
+    dotClass: 'bg-fuchsia-500',
+  },
+  episode: {
+    label: 'Episode',
+    badgeClass: 'bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20',
+    dotClass: 'bg-slate-500',
+  },
+  theory: {
+    label: 'Theory',
+    badgeClass: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20',
+    dotClass: 'bg-cyan-500',
   },
   thesis: {
     label: 'Thesis',
@@ -38,8 +73,8 @@ const TYPE_STYLES: Record<KnowledgeNodeType, { label: string; badgeClass: string
   },
   evidence: {
     label: 'Evidence',
-    badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-    dotClass: 'bg-emerald-500',
+    badgeClass: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20',
+    dotClass: 'bg-teal-500',
   },
   source: {
     label: 'Source',
@@ -48,8 +83,8 @@ const TYPE_STYLES: Record<KnowledgeNodeType, { label: string; badgeClass: string
   },
   person: {
     label: 'Person / Author',
-    badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-    dotClass: 'bg-amber-500',
+    badgeClass: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20',
+    dotClass: 'bg-yellow-500',
   },
   event: {
     label: 'Event / History',

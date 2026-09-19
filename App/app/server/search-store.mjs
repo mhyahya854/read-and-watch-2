@@ -585,14 +585,19 @@ export function createSearchStore({
             graphId: g.id,
           };
 
+          const bookTitle = g.associated_item_id ? (itemBookTitleMap.get(g.associated_item_id) || '') : '';
+          const secondaryLabel = g.associated_item_id
+            ? `${nodes.length} concepts · ${bookTitle || 'Watch title'}`
+            : `${nodes.length} concepts`;
+
           insertRecord.run(
             g.id,
             'knowledge',
             'graph',
-            null,
-            null,
+            g.associated_item_id || null,
+            bookTitle || null,
             g.title,
-            `${nodes.length} concepts`,
+            secondaryLabel,
             (g.description || nodeTexts).slice(0, 200),
             JSON.stringify(target),
             null,
@@ -604,11 +609,11 @@ export function createSearchStore({
             g.id,
             'knowledge',
             'graph',
-            null,
+            g.associated_item_id || null,
             g.title,
-            'Concept Graph',
+            bookTitle || 'Concept Graph',
             fullText,
-            `knowledge graph concept ${g.title}`,
+            `knowledge graph concept ${g.title} ${bookTitle}`,
           );
 
           counts.graphs++;

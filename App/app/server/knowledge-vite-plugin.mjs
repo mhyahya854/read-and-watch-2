@@ -115,13 +115,25 @@ export function knowledgePlugin(options = {}) {
           // ---------------------------------------------------------------
           if (path === '/api/knowledge/graphs') {
             if (req.method === 'GET') {
+              const associatedItemId = parsed.query.itemId
+                ? String(parsed.query.itemId)
+                : null;
+              const standaloneOnly = parsed.query.standalone === 'true';
               const tag = parsed.query.tag ? String(parsed.query.tag) : null;
-              const graphs = store.listGraphs({ tag });
+              const graphs = store.listGraphs({
+                associatedItemId,
+                standaloneOnly,
+                tag,
+              });
               return sendJson(res, 200, graphs);
             }
             if (req.method === 'POST') {
               const body = await readBody(req);
-              const created = store.createGraph(body || {});
+              const payload = body || {};
+              if (payload.itemId && !payload.associatedItemId) {
+                payload.associatedItemId = payload.itemId;
+              }
+              const created = store.createGraph(payload);
               return sendJson(res, 201, created);
             }
           }
@@ -131,6 +143,9 @@ export function knowledgePlugin(options = {}) {
             const graphId = decodeURIComponent(graphMatch[1]);
             if (req.method === 'GET') {
               const doc = store.getGraph(graphId);
+              if (parsed.query.itemId && doc.associatedItemId && doc.associatedItemId !== String(parsed.query.itemId)) {
+                return sendJson(res, 404, { error: 'Knowledge graph not found for this item' });
+              }
               return sendJson(res, 200, doc);
             }
             if (req.method === 'PUT') {

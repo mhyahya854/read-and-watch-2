@@ -2,16 +2,24 @@
 
 /**
  * ConceptGraphCanvas Component.
- * Phase 13 — Knowledge and Diagram System.
+ * Phase 13: Knowledge and Diagram System.
+ * Watch-Specific Knowledge Workspace & Relationship System.
  *
  * Implements:
- *   - P13-T003: React Flow projection for semantic topology
- *   - P13-T005: Read & Watch owned relationships and deep links
- *   - Accessible alternative table/outline view
+ *   - AFFiNE-style node-and-line interaction:
+ *     - Drag nodes, connect any node to any node
+ *     - First-class editable relationship lines with custom user labels
+ *     - Swappable directions and mutual / bidirectional relations
+ *     - Love triangles (A->B, B->C, C->A), multiple edges, complex networks
+ *     - Direct edge selection & relationship inspector
+ *   - Support for Watch-oriented nodes (Character, Location, Group, Event, etc.)
+ *   - Readable, non-overlapping labels directly on edges
+ *   - Double-click to add block at cursor position
+ *   - Accessible table/outline alternative view for keyboard & screen-reader users
  *   - Optimistic concurrency save with conflict handling
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -38,6 +46,9 @@ import {
   Trash2,
   Check,
   AlertTriangle,
+  ArrowLeftRight,
+  ArrowRight,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,43 +59,110 @@ import type {
   KnowledgeNode,
   KnowledgeEdge,
   KnowledgeNodeType,
-  KnowledgeRelationshipType,
   DeepLinkRef,
 } from '@/lib/knowledge';
 
 interface ConceptGraphCanvasProps {
   initialDocument: KnowledgeGraphDocument;
+  collection?: 'read' | 'watch';
   onDocumentChange?: (doc: KnowledgeGraphDocument) => void;
 }
 
-const _RELATIONSHIP_OPTIONS: Array<{ value: KnowledgeRelationshipType; label: string }> = [
-  { value: 'supports', label: 'Supports / Evidence For' },
-  { value: 'refutes', label: 'Refutes / Contradicts' },
-  { value: 'derives-from', label: 'Derives From / Extends' },
-  { value: 'influences', label: 'Influences / Shapes' },
-  { value: 'part-of', label: 'Part Of / Component Of' },
-  { value: 'contrasts-with', label: 'Contrasts With' },
-  { value: 'relates-to', label: 'Relates To' },
+const WATCH_RELATIONSHIP_PRESETS = [
+  'loves',
+  'dated',
+  'rivalry',
+  'friend of',
+  'sibling of',
+  'family',
+  'works for',
+  'betrayed',
+  'suspects',
+  'allies with',
+  'mentors',
+  'causes',
+  'reveals',
+  'enemy of',
+  'supports',
+  'contradicts',
 ];
 
-export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: ConceptGraphCanvasProps) {
+const ACADEMIC_RELATIONSHIP_PRESETS = [
+  'supports',
+  'refutes',
+  'derives-from',
+  'influences',
+  'part-of',
+  'contrasts-with',
+  'relates-to',
+];
+
+export function ConceptGraphCanvas({
+  initialDocument,
+  collection = 'watch',
+  onDocumentChange,
+}: ConceptGraphCanvasProps) {
   const [doc, setDoc] = useState<KnowledgeGraphDocument>(initialDocument);
   const [viewMode, setViewMode] = useState<'canvas' | 'table'>('canvas');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  // Inspector state
-  const [inspectorOpen, setInspectorOpen] = useState(false);
+  // Selection states
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+
+  // Node Inspector state
+  const [nodeInspectorOpen, setNodeInspectorOpen] = useState(false);
   const [editLabel, setEditLabel] = useState('');
-  const [editType, setEditType] = useState<KnowledgeNodeType>('concept');
+  const [editType, setEditType] = useState<KnowledgeNodeType>(
+    collection === 'watch' ? 'character' : 'concept',
+  );
   const [editNotes, setEditNotes] = useState('');
-  const [editLinkType, setEditLinkType] = useState<'none' | 'item' | 'external'>('none');
+  const [editLinkType, setEditLinkType] = useState<
+    'none' | 'item' | 'external'
+  >('none');
   const [editLinkTarget, setEditLinkTarget] = useState('');
+
+  // Edge Inspector state
+  const [edgeInspectorOpen, setEdgeInspectorOpen] = useState(false);
+  const [editEdgeLabel, setEditEdgeLabel] = useState('');
+  const [editEdgeType, setEditEdgeType] = useState('relates-to');
+  const [editEdgeBidirectional, setEditEdgeBidirectional] = useState(false);
+  const [editEdgeSourceId, setEditEdgeSourceId] = useState('');
+  const [editEdgeTargetId, setEditEdgeTargetId] = useState('');
+
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   // Register custom node types
   const nodeTypes = useMemo(() => ({ concept: ConceptNode }), []);
+
+  // Open inspector for a node
+  const openNodeInspector = useCallback(
+    (nodeId: string) => {
+      const targetNode = doc.nodes.find((n) => n.id === nodeId);
+      if (targetNode) {
+        setSelectedNodeId(nodeId);
+        setSelectedEdgeId(null);
+        setEdgeInspectorOpen(false);
+
+        setEditLabel(targetNode.label);
+        setEditType(targetNode.nodeType);
+        setEditNotes(targetNode.notes || '');
+        if (targetNode.deepLink) {
+          setEditLinkType(
+            targetNode.deepLink.type === 'item' ? 'item' : 'external',
+          );
+          setEditLinkTarget(targetNode.deepLink.target);
+        } else {
+          setEditLinkType('none');
+          setEditLinkTarget('');
+        }
+        setNodeInspectorOpen(true);
+      }
+    },
+    [doc.nodes],
+  );
 
   // Map canonical nodes to React Flow projection nodes
   const initialNodes = useMemo<Node[]>(() => {
@@ -98,41 +176,72 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
         notes: n.notes,
         deepLink: n.deepLink,
         onEdit: (nodeId: string) => {
-          const targetNode = doc.nodes.find((dn) => dn.id === nodeId);
-          if (targetNode) {
-            setSelectedNodeId(nodeId);
-            setEditLabel(targetNode.label);
-            setEditType(targetNode.nodeType);
-            setEditNotes(targetNode.notes || '');
-            if (targetNode.deepLink) {
-              setEditLinkType(targetNode.deepLink.type === 'item' ? 'item' : 'external');
-              setEditLinkTarget(targetNode.deepLink.target);
-            } else {
-              setEditLinkType('none');
-              setEditLinkTarget('');
-            }
-            setInspectorOpen(true);
-          }
+          openNodeInspector(nodeId);
         },
       } satisfies ConceptNodeData,
     }));
-  }, [doc.nodes]);
+  }, [doc.nodes, openNodeInspector]);
 
   // Map canonical edges to React Flow projection edges
   const initialEdges = useMemo<Edge[]>(() => {
-    return doc.edges.map((e) => ({
-      id: e.id,
-      source: e.sourceNodeId,
-      target: e.targetNodeId,
-      label: e.label || e.relationshipType,
-      markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
-      style: {
-        strokeWidth: 1.5,
-        stroke: e.relationshipType === 'refutes' ? '#ef4444' : e.relationshipType === 'supports' ? '#10b981' : '#6366f1',
-      },
-      data: { relationshipType: e.relationshipType },
-    }));
-  }, [doc.edges]);
+    return doc.edges.map((e) => {
+      const isSelected = selectedEdgeId === e.id;
+      const strokeColor = isSelected
+        ? '#4f46e5'
+        : e.relationshipType === 'refutes' || e.label === 'rivalry' || e.label === 'enemy of'
+          ? '#ef4444'
+          : e.relationshipType === 'supports' || e.label === 'allies with'
+            ? '#10b981'
+            : e.label === 'loves' || e.label === 'dated'
+              ? '#f43f5e'
+              : '#6366f1';
+
+      return {
+        id: e.id,
+        source: e.sourceNodeId,
+        target: e.targetNodeId,
+        type: 'smoothstep',
+        label: e.label || e.relationshipType || 'relates to',
+        labelStyle: {
+          fill: isSelected ? '#1e1b4b' : '#334155',
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: '0.01em',
+        },
+        labelBgStyle: {
+          fill: isSelected ? '#e0e7ff' : '#ffffff',
+          fillOpacity: 0.96,
+          stroke: isSelected ? '#4f46e5' : '#cbd5e1',
+          strokeWidth: isSelected ? 1.5 : 1,
+        },
+        labelBgPadding: [6, 4] as [number, number],
+        labelBgBorderRadius: 4,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 14,
+          height: 14,
+          color: strokeColor,
+        },
+        markerStart: e.bidirectional
+          ? {
+              type: MarkerType.ArrowClosed,
+              width: 14,
+              height: 14,
+              color: strokeColor,
+            }
+          : undefined,
+        style: {
+          strokeWidth: isSelected ? 2.5 : 1.5,
+          stroke: strokeColor,
+        },
+        data: {
+          relationshipType: e.relationshipType,
+          label: e.label,
+          bidirectional: e.bidirectional,
+        },
+      };
+    });
+  }, [doc.edges, selectedEdgeId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -158,14 +267,16 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
   const onConnect = useCallback(
     (params: Connection) => {
       if (!params.source || !params.target) return;
-      const newEdgeId = `edge-${Date.now()}`;
+      const newEdgeId = `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const defaultLabel = collection === 'watch' ? 'relates to' : 'relates to';
+
       const newCanonicalEdge: KnowledgeEdge = {
         id: newEdgeId,
         graphId: doc.id,
         sourceNodeId: params.source,
         targetNodeId: params.target,
         relationshipType: 'relates-to',
-        label: 'relates to',
+        label: defaultLabel,
         bidirectional: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -176,46 +287,70 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
           {
             ...params,
             id: newEdgeId,
-            label: 'relates to',
-            markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15 },
+            type: 'smoothstep',
+            label: defaultLabel,
+            labelStyle: { fill: '#334155', fontSize: 11, fontWeight: 600 },
+            labelBgStyle: {
+              fill: '#ffffff',
+              fillOpacity: 0.96,
+              stroke: '#cbd5e1',
+              strokeWidth: 1,
+            },
+            labelBgPadding: [6, 4],
+            labelBgBorderRadius: 4,
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 14,
+              height: 14,
+              color: '#6366f1',
+            },
             style: { strokeWidth: 1.5, stroke: '#6366f1' },
           },
-          eds
-        )
+          eds,
+        ),
       );
 
       setDoc((prev) => ({
         ...prev,
         edges: [...prev.edges, newCanonicalEdge],
       }));
+
+      // Immediately select the new edge for instant labeling
+      setSelectedEdgeId(newEdgeId);
+      setEditEdgeLabel(defaultLabel);
+      setEditEdgeType('relates-to');
+      setEditEdgeBidirectional(false);
+      setEditEdgeSourceId(params.source);
+      setEditEdgeTargetId(params.target);
+      setEdgeInspectorOpen(true);
+      setNodeInspectorOpen(false);
     },
-    [doc.id, setEdges]
+    [collection, doc.id, setEdges],
   );
 
-  // Open inspector for a node
-  const openInspector = useCallback(
-    (nodeId: string) => {
-      const targetNode = doc.nodes.find((n) => n.id === nodeId);
-      if (targetNode) {
-        setSelectedNodeId(nodeId);
-        setEditLabel(targetNode.label);
-        setEditType(targetNode.nodeType);
-        setEditNotes(targetNode.notes || '');
-        if (targetNode.deepLink) {
-          setEditLinkType(targetNode.deepLink.type === 'item' ? 'item' : 'external');
-          setEditLinkTarget(targetNode.deepLink.target);
-        } else {
-          setEditLinkType('none');
-          setEditLinkTarget('');
-        }
-        setInspectorOpen(true);
+
+  // Open inspector for an edge
+  const openEdgeInspector = useCallback(
+    (edgeId: string) => {
+      const targetEdge = doc.edges.find((e) => e.id === edgeId);
+      if (targetEdge) {
+        setSelectedEdgeId(edgeId);
+        setSelectedNodeId(null);
+        setNodeInspectorOpen(false);
+
+        setEditEdgeLabel(targetEdge.label || targetEdge.relationshipType);
+        setEditEdgeType(targetEdge.relationshipType || 'relates-to');
+        setEditEdgeBidirectional(Boolean(targetEdge.bidirectional));
+        setEditEdgeSourceId(targetEdge.sourceNodeId);
+        setEditEdgeTargetId(targetEdge.targetNodeId);
+        setEdgeInspectorOpen(true);
       }
     },
-    [doc.nodes]
+    [doc.edges],
   );
 
-  // Save inspector changes
-  const applyInspectorChanges = () => {
+  // Save node inspector changes
+  const applyNodeInspectorChanges = () => {
     if (!selectedNodeId) return;
 
     let deepLink: DeepLinkRef | null = null;
@@ -223,16 +358,21 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
       deepLink = {
         type: editLinkType,
         target: editLinkTarget.trim(),
-        label: editLinkType === 'item' ? 'Book Reference' : 'External Web Reference',
+        label:
+          editLinkType === 'item'
+            ? 'Library Reference'
+            : 'External Reference',
       };
     }
+
+    const trimmedLabel = editLabel.trim() || 'Untitled Block';
 
     setDoc((prev) => {
       const updatedNodes = prev.nodes.map((n) => {
         if (n.id === selectedNodeId) {
           return {
             ...n,
-            label: editLabel.trim() || 'Untitled Concept',
+            label: trimmedLabel,
             nodeType: editType,
             notes: editNotes.trim(),
             deepLink,
@@ -251,7 +391,7 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
             ...n,
             data: {
               ...n.data,
-              label: editLabel.trim() || 'Untitled Concept',
+              label: trimmedLabel,
               nodeType: editType,
               notes: editNotes.trim(),
               deepLink,
@@ -259,22 +399,96 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
           };
         }
         return n;
-      })
+      }),
     );
 
-    setInspectorOpen(false);
+    setNodeInspectorOpen(false);
   };
 
-  // Add new concept node
-  const handleAddNode = () => {
-    const newNodeId = `node-${Date.now()}`;
+  // Save edge inspector changes
+  const applyEdgeInspectorChanges = () => {
+    if (!selectedEdgeId) return;
+
+    const trimmedLabel = editEdgeLabel.trim() || editEdgeType || 'relates to';
+
+    setDoc((prev) => {
+      const updatedEdges = prev.edges.map((e) => {
+        if (e.id === selectedEdgeId) {
+          return {
+            ...e,
+            sourceNodeId: editEdgeSourceId,
+            targetNodeId: editEdgeTargetId,
+            label: trimmedLabel,
+            relationshipType: editEdgeType,
+            bidirectional: editEdgeBidirectional,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return e;
+      });
+      return { ...prev, edges: updatedEdges };
+    });
+
+    setEdges((eds) =>
+      eds.map((e) => {
+        if (e.id === selectedEdgeId) {
+          return {
+            ...e,
+            source: editEdgeSourceId,
+            target: editEdgeTargetId,
+            label: trimmedLabel,
+            markerStart: editEdgeBidirectional
+              ? {
+                  type: MarkerType.ArrowClosed,
+                  width: 14,
+                  height: 14,
+                  color: '#6366f1',
+                }
+              : undefined,
+          };
+        }
+        return e;
+      }),
+    );
+
+    setEdgeInspectorOpen(false);
+  };
+
+  // Swap edge direction (A -> B into B -> A)
+  const handleSwapEdgeDirection = () => {
+    setEditEdgeSourceId((prevSource) => {
+      const newSource = editEdgeTargetId;
+      setEditEdgeTargetId(prevSource);
+      return newSource;
+    });
+  };
+
+  // Add new block
+  const handleAddNode = (customType?: KnowledgeNodeType) => {
+    const defaultType =
+      customType || (collection === 'watch' ? 'character' : 'concept');
+    const defaultLabel =
+      defaultType === 'character'
+        ? 'New Character'
+        : defaultType === 'location'
+          ? 'New Location'
+          : defaultType === 'event'
+            ? 'New Event'
+            : 'New Concept';
+
+    const newNodeId = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const position = {
+      x: 120 + Math.random() * 240,
+      y: 120 + Math.random() * 240,
+    };
+
     const newNode: KnowledgeNode = {
       id: newNodeId,
       graphId: doc.id,
-      label: 'New Concept',
-      nodeType: 'concept',
+      label: defaultLabel,
+      nodeType: defaultType,
       notes: '',
-      position: { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 },
+      position,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -289,17 +503,17 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
       {
         id: newNodeId,
         type: 'concept',
-        position: newNode.position,
+        position,
         data: {
           label: newNode.label,
           nodeType: newNode.nodeType,
           notes: '',
-          onEdit: openInspector,
+          onEdit: openNodeInspector,
         },
       },
     ]);
 
-    openInspector(newNodeId);
+    openNodeInspector(newNodeId);
   };
 
   // Delete node
@@ -307,13 +521,30 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
     setDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.filter((n) => n.id !== nodeId),
-      edges: prev.edges.filter((e) => e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId),
+      edges: prev.edges.filter(
+        (e) => e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId,
+      ),
     }));
     setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+    setEdges((eds) =>
+      eds.filter((e) => e.source !== nodeId && e.target !== nodeId),
+    );
     if (selectedNodeId === nodeId) {
-      setInspectorOpen(false);
+      setNodeInspectorOpen(false);
       setSelectedNodeId(null);
+    }
+  };
+
+  // Delete edge
+  const handleDeleteEdge = (edgeId: string) => {
+    setDoc((prev) => ({
+      ...prev,
+      edges: prev.edges.filter((e) => e.id !== edgeId),
+    }));
+    setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+    if (selectedEdgeId === edgeId) {
+      setEdgeInspectorOpen(false);
+      setSelectedEdgeId(null);
     }
   };
 
@@ -325,30 +556,37 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
     setSaveSuccess(false);
 
     try {
-      // Capture updated positions from flow nodes
       const finalNodes = doc.nodes.map((n) => {
         const flowNode = nodes.find((fn) => fn.id === n.id);
         return {
           ...n,
-          position: flowNode ? { x: flowNode.position.x, y: flowNode.position.y } : n.position,
+          position: flowNode
+            ? { x: flowNode.position.x, y: flowNode.position.y }
+            : n.position,
         };
       });
 
-      const res = await fetch(`/api/knowledge/graphs/${encodeURIComponent(doc.id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: doc.title,
-          description: doc.description,
-          tags: doc.tags,
-          nodes: finalNodes,
-          edges: doc.edges,
-          expectedRevision: doc.revision,
-        }),
-      });
+      const res = await fetch(
+        `/api/knowledge/graphs/${encodeURIComponent(doc.id)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: doc.title,
+            description: doc.description,
+            tags: doc.tags,
+            associatedItemId: doc.associatedItemId,
+            nodes: finalNodes,
+            edges: doc.edges,
+            expectedRevision: doc.revision,
+          }),
+        },
+      );
 
       if (res.status === 409) {
-        setConflictError('Conflict: This graph was modified in another session. Please reload.');
+        setConflictError(
+          'Conflict: This graph was modified in another session. Please reload.',
+        );
         setIsSaving(false);
         return;
       }
@@ -381,32 +619,44 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
         graph: doc,
       },
       null,
-      2
+      2,
     );
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${doc.title.toLowerCase().replace(/\s+/g, '-') || 'concept-graph'}.rwgraph`;
+    a.download = `${doc.title.toLowerCase().replace(/\s+/g, '-') || 'knowledge-graph'}.rwgraph`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
+  const selectedEdgeSourceNode = doc.nodes.find(
+    (n) => n.id === editEdgeSourceId,
+  );
+  const selectedEdgeTargetNode = doc.nodes.find(
+    (n) => n.id === editEdgeTargetId,
+  );
+
   return (
-    <div className="flex flex-col h-full w-full bg-background select-none">
+    <div className="flex flex-col h-full w-full bg-background select-none overflow-hidden">
       {/* Top Toolbar */}
-      <header className="h-14 border-b border-border bg-surface px-4 flex items-center justify-between gap-4 shrink-0">
+      <header className="h-12 border-b border-border bg-surface px-4 flex items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <Workflow className="h-5 w-5 text-primary shrink-0" />
+          <Workflow className="h-4 w-4 text-primary shrink-0" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-foreground truncate">{doc.title}</h2>
-              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-mono">
-                Rev {doc.revision}
+              <h2 className="text-xs font-semibold text-foreground truncate">
+                {doc.title}
+              </h2>
+              <Badge
+                variant="secondary"
+                className="text-[10px] h-4 px-1 font-mono"
+              >
+                r{doc.revision}
               </Badge>
             </div>
-            <p className="text-[11px] text-muted-foreground truncate">
-              {doc.nodes.length} concepts · {doc.edges.length} relationships
+            <p className="text-[10px] text-muted-foreground truncate">
+              {doc.nodes.length} blocks · {doc.edges.length} relationships
             </p>
           </div>
         </div>
@@ -414,41 +664,52 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
         {/* Action Controls */}
         <div className="flex items-center gap-2">
           {/* View mode toggle: Visual Flow vs Accessible Table */}
-          <div className="flex rounded-lg border border-border bg-surface-muted/60 p-0.5">
+          <div className="flex rounded-md border border-border bg-surface-muted/60 p-0.5">
             <button
               type="button"
               onClick={() => setViewMode('canvas')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+              className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded transition-colors ${
                 viewMode === 'canvas'
                   ? 'bg-surface text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Interactive Visual Canvas"
             >
-              <Workflow size={13} />
-              <span>Canvas</span>
+              <Workflow size={12} />
+              <span>Graph</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('table')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+              className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded transition-colors ${
                 viewMode === 'table'
                   ? 'bg-surface text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Accessible Table View"
             >
-              <Table size={13} />
-              <span>Outline / Table</span>
+              <Table size={12} />
+              <span>Table</span>
             </button>
           </div>
 
-          <Button size="sm" variant="secondary" onClick={handleAddNode} className="h-8 text-xs">
-            <Plus size={13} className="mr-1" />
-            Add Concept
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => handleAddNode()}
+            className="h-7 text-xs px-2.5"
+          >
+            <Plus size={12} className="mr-1" />
+            Add Block
           </Button>
 
-          <Button size="sm" variant="ghost" onClick={handleExport} className="h-8 text-xs" title="Export .rwgraph">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleExport}
+            className="h-7 w-7 p-0"
+            title="Export .rwgraph"
+          >
             <Download size={13} />
           </Button>
 
@@ -456,16 +717,18 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
             size="sm"
             onClick={() => void handleSave()}
             disabled={isSaving}
-            className={`h-8 text-xs ${saveSuccess ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+            className={`h-7 text-xs px-2.5 ${
+              saveSuccess ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''
+            }`}
           >
             {saveSuccess ? (
               <>
-                <Check size={13} className="mr-1" />
+                <Check size={12} className="mr-1" />
                 Saved
               </>
             ) : (
               <>
-                <Save size={13} className="mr-1" />
+                <Save size={12} className="mr-1" />
                 {isSaving ? 'Saving...' : 'Save'}
               </>
             )}
@@ -475,19 +738,24 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
 
       {/* Conflict Warning Banner */}
       {conflictError && (
-        <div className="p-3 bg-amber-500/15 border-b border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+        <div className="p-2.5 bg-amber-500/15 border-b border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle size={15} />
+            <AlertTriangle size={14} />
             <span>{conflictError}</span>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => window.location.reload()} className="h-6 text-xs">
-            Reload Graph
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => window.location.reload()}
+            className="h-6 text-[11px]"
+          >
+            Reload
           </Button>
         </div>
       )}
 
       {/* Main Workspace: Canvas or Table */}
-      <div className="flex-1 relative overflow-hidden">
+      <div ref={reactFlowWrapper} className="flex-1 relative overflow-hidden">
         {viewMode === 'canvas' ? (
           <ReactFlow
             nodes={nodes}
@@ -495,6 +763,60 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onEdgeClick={(_event, edge) => {
+              openEdgeInspector(edge.id);
+            }}
+            onPaneClick={() => {
+              if (selectedEdgeId) {
+                setSelectedEdgeId(null);
+                setEdgeInspectorOpen(false);
+              }
+              if (selectedNodeId) {
+                setSelectedNodeId(null);
+                setNodeInspectorOpen(false);
+              }
+            }}
+            onDoubleClick={(event) => {
+              // Create node on double click in empty space
+              const bounds = reactFlowWrapper.current?.getBoundingClientRect();
+              if (bounds) {
+                const x = event.clientX - bounds.left;
+                const y = event.clientY - bounds.top;
+                const newNodeId = `node-${Date.now()}`;
+                const defaultType =
+                  collection === 'watch' ? 'character' : 'concept';
+                const defaultLabel =
+                  defaultType === 'character' ? 'New Character' : 'New Block';
+
+                const newNode: KnowledgeNode = {
+                  id: newNodeId,
+                  graphId: doc.id,
+                  label: defaultLabel,
+                  nodeType: defaultType,
+                  notes: '',
+                  position: { x, y },
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                };
+
+                setDoc((prev) => ({ ...prev, nodes: [...prev.nodes, newNode] }));
+                setNodes((nds) => [
+                  ...nds,
+                  {
+                    id: newNodeId,
+                    type: 'concept',
+                    position: { x, y },
+                    data: {
+                      label: newNode.label,
+                      nodeType: newNode.nodeType,
+                      notes: '',
+                      onEdit: openNodeInspector,
+                    },
+                  },
+                ]);
+                openNodeInspector(newNodeId);
+              }
+            }}
             nodeTypes={nodeTypes}
             fitView
             minZoom={0.2}
@@ -502,21 +824,26 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
             className="bg-dot-pattern"
           >
             <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-            <Controls className="!bg-surface !border-border !shadow-sm" />
+            <Controls className="!bg-surface !border-border !shadow-xs" />
             <MiniMap
               className="!bg-surface/90 !border-border !rounded-lg"
               nodeColor={(n) => {
                 const data = n.data as unknown as ConceptNodeData;
-                if (data.nodeType === 'thesis') return '#a855f7';
-                if (data.nodeType === 'evidence') return '#10b981';
-                if (data.nodeType === 'source') return '#3b82f6';
-                if (data.nodeType === 'person') return '#f59e0b';
+                if (data.nodeType === 'character') return '#10b981';
+                if (data.nodeType === 'location') return '#f59e0b';
+                if (data.nodeType === 'group') return '#8b5cf6';
                 if (data.nodeType === 'event') return '#f43f5e';
+                if (data.nodeType === 'object') return '#f97316';
+                if (data.nodeType === 'theme') return '#d946ef';
+                if (data.nodeType === 'theory') return '#06b6d4';
                 return '#6366f1';
               }}
             />
-            <Panel position="top-right" className="bg-surface/90 backdrop-blur border border-border rounded-lg p-2 text-xs text-muted-foreground shadow-xs">
-              <span className="font-semibold text-foreground">Tip:</span> Drag between node handles to create relationships.
+            <Panel
+              position="top-right"
+              className="bg-surface/90 backdrop-blur-xs border border-border rounded-md px-2.5 py-1 text-[11px] text-muted-foreground shadow-xs pointer-events-none"
+            >
+              Drag handles to connect · Click line to edit relation · Double click empty space to add block
             </Panel>
           </ReactFlow>
         ) : (
@@ -524,12 +851,16 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
           <div className="h-full overflow-y-auto p-6 max-w-5xl mx-auto space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-semibold text-foreground">Concepts & Nodes</h3>
-                <p className="text-xs text-muted-foreground">Screen-reader and keyboard accessible inventory of graph knowledge.</p>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Blocks &amp; Characters
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Accessible inventory of workspace entities.
+                </p>
               </div>
-              <Button size="sm" onClick={handleAddNode}>
-                <Plus size={13} className="mr-1" />
-                Add Concept
+              <Button size="sm" onClick={() => handleAddNode()} className="h-7 text-xs">
+                <Plus size={12} className="mr-1" />
+                Add Block
               </Button>
             </div>
 
@@ -537,51 +868,94 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
               <table className="w-full text-left text-xs">
                 <thead className="bg-surface-muted/60 border-b border-border text-muted-foreground uppercase text-[10px] tracking-wider">
                   <tr>
-                    <th className="py-2.5 px-4">Concept Label</th>
-                    <th className="py-2.5 px-3">Type</th>
-                    <th className="py-2.5 px-3">Notes</th>
-                    <th className="py-2.5 px-3">Source Link</th>
-                    <th className="py-2.5 px-3 text-right">Actions</th>
+                    <th className="py-2 px-3">Label</th>
+                    <th className="py-2 px-3">Type</th>
+                    <th className="py-2 px-3">Notes</th>
+                    <th className="py-2 px-3">Link</th>
+                    <th className="py-2 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {doc.nodes.map((n) => (
-                    <tr key={n.id} className="hover:bg-surface-muted/40 transition-colors">
-                      <td className="py-3 px-4 font-semibold text-foreground">{n.label}</td>
-                      <td className="py-3 px-3">
-                        <Badge variant="outline" className="text-[10px] capitalize">
+                    <tr
+                      key={n.id}
+                      className="hover:bg-surface-muted/40 transition-colors"
+                    >
+                      <td className="py-2.5 px-3 font-semibold text-foreground">
+                        {n.label}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] capitalize"
+                        >
                           {n.nodeType}
                         </Badge>
                       </td>
-                      <td className="py-3 px-3 text-muted-foreground max-w-xs truncate">{n.notes || '-'}</td>
-                      <td className="py-3 px-3">
-                        {n.deepLink ? <DeepLinkBadge link={n.deepLink} /> : <span className="text-muted-foreground">-</span>}
+                      <td className="py-2.5 px-3 text-muted-foreground max-w-xs truncate">
+                        {n.notes || '-'}
                       </td>
-                      <td className="py-3 px-3 text-right space-x-2">
-                        <Button size="sm" variant="ghost" onClick={() => openInspector(n.id)} className="h-7 text-xs px-2">
+                      <td className="py-2.5 px-3">
+                        {n.deepLink ? (
+                          <DeepLinkBadge link={n.deepLink} />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right space-x-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openNodeInspector(n.id)}
+                          className="h-6 text-xs px-2"
+                        >
                           Edit
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleDeleteNode(n.id)} className="h-7 text-xs px-2 text-destructive hover:bg-destructive/10">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteNode(n.id)}
+                          className="h-6 text-xs px-2 text-destructive hover:bg-destructive/10"
+                        >
                           Delete
                         </Button>
                       </td>
                     </tr>
                   ))}
+                  {doc.nodes.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-6 text-center text-muted-foreground"
+                      >
+                        No blocks created yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
 
             {/* Relationships Table */}
             <div className="space-y-3">
-              <h3 className="text-base font-semibold text-foreground">Semantic Relationships</h3>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Relationships &amp; Connections
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Connections between characters, events, and elements.
+                </p>
+              </div>
+
               <div className="border border-border rounded-lg overflow-hidden bg-surface">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-surface-muted/60 border-b border-border text-muted-foreground uppercase text-[10px] tracking-wider">
                     <tr>
-                      <th className="py-2.5 px-4">Source Concept</th>
-                      <th className="py-2.5 px-3">Relationship</th>
-                      <th className="py-2.5 px-3">Target Concept</th>
-                      <th className="py-2.5 px-3 text-right">Actions</th>
+                      <th className="py-2 px-3">Source Block</th>
+                      <th className="py-2 px-3">Relationship</th>
+                      <th className="py-2 px-3">Direction</th>
+                      <th className="py-2 px-3">Target Block</th>
+                      <th className="py-2 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -589,24 +963,38 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
                       const src = doc.nodes.find((n) => n.id === e.sourceNodeId);
                       const tgt = doc.nodes.find((n) => n.id === e.targetNodeId);
                       return (
-                        <tr key={e.id} className="hover:bg-surface-muted/40 transition-colors">
-                          <td className="py-2.5 px-4 font-medium text-foreground">{src?.label || e.sourceNodeId}</td>
-                          <td className="py-2.5 px-3">
-                            <span className="font-semibold text-primary">{e.relationshipType}</span>
+                        <tr
+                          key={e.id}
+                          className="hover:bg-surface-muted/40 transition-colors"
+                        >
+                          <td className="py-2 px-3 font-medium text-foreground">
+                            {src?.label || e.sourceNodeId}
                           </td>
-                          <td className="py-2.5 px-3 font-medium text-foreground">{tgt?.label || e.targetNodeId}</td>
-                          <td className="py-2.5 px-3 text-right">
+                          <td className="py-2 px-3">
+                            <span className="font-semibold text-primary">
+                              {e.label || e.relationshipType}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-muted-foreground">
+                            {e.bidirectional ? '↔ Mutual' : '→ Directed'}
+                          </td>
+                          <td className="py-2 px-3 font-medium text-foreground">
+                            {tgt?.label || e.targetNodeId}
+                          </td>
+                          <td className="py-2 px-3 text-right space-x-1">
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => {
-                                setDoc((prev) => ({
-                                  ...prev,
-                                  edges: prev.edges.filter((edge) => edge.id !== e.id),
-                                }));
-                                setEdges((eds) => eds.filter((edge) => edge.id !== e.id));
-                              }}
-                              className="h-7 text-xs px-2 text-destructive hover:bg-destructive/10"
+                              onClick={() => openEdgeInspector(e.id)}
+                              className="h-6 text-xs px-2"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteEdge(e.id)}
+                              className="h-6 text-xs px-2 text-destructive hover:bg-destructive/10"
                             >
                               Delete
                             </Button>
@@ -614,6 +1002,16 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
                         </tr>
                       );
                     })}
+                    {doc.edges.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="py-6 text-center text-muted-foreground"
+                        >
+                          No relationships created yet.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -622,91 +1020,137 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
         )}
 
         {/* Node Inspector Drawer */}
-        {inspectorOpen && (
-          <aside className="absolute top-0 right-0 w-80 h-full bg-surface border-l border-border shadow-xl p-5 flex flex-col gap-4 z-20 animate-in slide-in-from-right-2">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="text-sm font-semibold text-foreground">Edit Concept Node</h3>
+        {nodeInspectorOpen && (
+          <aside className="absolute top-0 right-0 w-80 h-full bg-surface border-l border-border shadow-xl p-4 flex flex-col gap-3.5 z-20 animate-in slide-in-from-right-2">
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <h3 className="text-xs font-semibold text-foreground">
+                Edit Block
+              </h3>
               <button
                 type="button"
-                onClick={() => setInspectorOpen(false)}
-                className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={() => setNodeInspectorOpen(false)}
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
               >
-                Close
+                <X size={14} />
               </button>
             </div>
 
-            <div className="space-y-3 flex-1 overflow-y-auto">
+            <div className="space-y-3 flex-1 overflow-y-auto pr-1">
               <div>
-                <label htmlFor="inspector-label" className="block text-xs font-medium text-foreground mb-1">Concept Label</label>
+                <label
+                  htmlFor="inspector-node-label"
+                  className="block text-xs font-medium text-foreground mb-1"
+                >
+                  Block Label
+                </label>
                 <input
-                  id="inspector-label"
+                  id="inspector-node-label"
                   type="text"
                   value={editLabel}
                   onChange={(e) => setEditLabel(e.target.value)}
-                  className="w-full bg-surface-muted border border-border text-xs rounded px-3 py-1.5 text-foreground focus:outline-none focus:border-primary"
+                  className="w-full bg-surface-muted border border-border text-xs rounded px-2.5 py-1.5 text-foreground focus:outline-none focus:border-primary"
                 />
               </div>
 
               <div>
-                <label htmlFor="inspector-type" className="block text-xs font-medium text-foreground mb-1">Concept Type</label>
-                <select
-                  id="inspector-type"
-                  value={editType}
-                  onChange={(e) => setEditType(e.target.value as KnowledgeNodeType)}
-                  className="w-full bg-surface-muted border border-border text-xs rounded px-3 py-1.5 text-foreground focus:outline-none focus:border-primary"
+                <label
+                  htmlFor="inspector-node-type"
+                  className="block text-xs font-medium text-foreground mb-1"
                 >
-                  <option value="concept">Concept</option>
-                  <option value="thesis">Thesis / Core Argument</option>
-                  <option value="evidence">Evidence / Data</option>
-                  <option value="source">Source Publication</option>
-                  <option value="person">Person / Author</option>
-                  <option value="event">Event / History</option>
-                  <option value="question">Open Question</option>
+                  Block Type
+                </label>
+                <select
+                  id="inspector-node-type"
+                  aria-label="Block Type"
+                  value={editType}
+                  onChange={(e) =>
+                    setEditType(e.target.value as KnowledgeNodeType)
+                  }
+                  className="w-full bg-surface-muted border border-border text-xs rounded px-2.5 py-1.5 text-foreground focus:outline-none focus:border-primary"
+                >
+                  <optgroup label="Story & Character Entities">
+                    <option value="character">Character</option>
+                    <option value="person">Person / Cast / Crew</option>
+                    <option value="location">Location / Setting</option>
+                    <option value="group">Group / Faction</option>
+                    <option value="event">Event / Plot Point</option>
+                    <option value="object">Object / Prop</option>
+                    <option value="theme">Theme / Motif</option>
+                    <option value="episode">Episode / Scene</option>
+                    <option value="theory">Theory / Speculation</option>
+                    <option value="concept">Concept</option>
+                  </optgroup>
+                  <optgroup label="Analysis & Arguments">
+                    <option value="thesis">Thesis / Core Argument</option>
+                    <option value="evidence">Evidence / Clip</option>
+                    <option value="source">Source Publication</option>
+                    <option value="question">Open Question</option>
+                  </optgroup>
                 </select>
               </div>
 
               <div>
-                <label htmlFor="inspector-notes" className="block text-xs font-medium text-foreground mb-1">Notes &amp; Explanation</label>
+                <label
+                  htmlFor="inspector-node-notes"
+                  className="block text-xs font-medium text-foreground mb-1"
+                >
+                  Description &amp; Notes
+                </label>
                 <textarea
-                  id="inspector-notes"
+                  id="inspector-node-notes"
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
                   rows={4}
-                  placeholder="Elaborate the concept, premise, or argument..."
-                  className="w-full bg-surface-muted border border-border text-xs rounded p-2.5 text-foreground focus:outline-none focus:border-primary"
+                  placeholder="Notes, character traits, role in plot..."
+                  className="w-full bg-surface-muted border border-border text-xs rounded p-2 text-foreground focus:outline-none focus:border-primary"
                 />
               </div>
 
               {/* Deep Link to Library Material */}
               <div className="pt-2 border-t border-border/50">
-                <label htmlFor="inspector-link-type" className="block text-xs font-semibold text-foreground mb-1">Deep Link to Source</label>
-                <p className="text-[11px] text-muted-foreground mb-2">Connect this concept node to a book or external source.</p>
+                <label
+                  htmlFor="inspector-link-type"
+                  className="block text-xs font-semibold text-foreground mb-1"
+                >
+                  Reference Link
+                </label>
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  Optional link to an external URL or item.
+                </p>
 
                 <select
                   id="inspector-link-type"
                   value={editLinkType}
-                  onChange={(e) => setEditLinkType(e.target.value as 'none' | 'item' | 'external')}
-                  className="w-full bg-surface-muted border border-border text-xs rounded px-3 py-1.5 text-foreground mb-2"
+                  onChange={(e) =>
+                    setEditLinkType(
+                      e.target.value as 'none' | 'item' | 'external',
+                    )
+                  }
+                  className="w-full bg-surface-muted border border-border text-xs rounded px-2.5 py-1.5 text-foreground mb-2"
                 >
                   <option value="none">No Link</option>
-                  <option value="item">Library Book ID</option>
+                  <option value="item">Library Item ID</option>
                   <option value="external">External Web URL</option>
                 </select>
 
                 {editLinkType !== 'none' && (
                   <input
                     type="text"
-                    placeholder={editLinkType === 'item' ? 'e.g. read-book00000000000000000000000001' : 'e.g. https://plato.stanford.edu/...'}
+                    placeholder={
+                      editLinkType === 'item'
+                        ? 'e.g. watch-item-id'
+                        : 'e.g. https://imdb.com/...'
+                    }
                     value={editLinkTarget}
                     onChange={(e) => setEditLinkTarget(e.target.value)}
-                    className="w-full bg-surface-muted border border-border text-xs rounded px-3 py-1.5 text-foreground"
+                    className="w-full bg-surface-muted border border-border text-xs rounded px-2.5 py-1.5 text-foreground"
                   />
                 )}
               </div>
             </div>
 
             {/* Inspector Footer Actions */}
-            <div className="flex items-center justify-between border-t border-border pt-3">
+            <div className="flex items-center justify-between border-t border-border pt-2.5">
               {selectedNodeId && (
                 <Button
                   size="sm"
@@ -714,15 +1158,182 @@ export function ConceptGraphCanvas({ initialDocument, onDocumentChange }: Concep
                   onClick={() => handleDeleteNode(selectedNodeId)}
                   className="text-destructive hover:bg-destructive/10 text-xs px-2 h-7"
                 >
-                  <Trash2 size={13} className="mr-1" />
+                  <Trash2 size={12} className="mr-1" />
                   Delete
                 </Button>
               )}
-              <div className="flex gap-2 ml-auto">
-                <Button size="sm" variant="secondary" onClick={() => setInspectorOpen(false)} className="h-7 text-xs">
+              <div className="flex gap-1.5 ml-auto">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setNodeInspectorOpen(false)}
+                  className="h-7 text-xs"
+                >
                   Cancel
                 </Button>
-                <Button size="sm" onClick={applyInspectorChanges} className="h-7 text-xs">
+                <Button
+                  size="sm"
+                  onClick={applyNodeInspectorChanges}
+                  className="h-7 text-xs"
+                >
+                  Apply
+                </Button>
+              </div>
+            </div>
+          </aside>
+        )}
+
+        {/* Edge / Relationship Inspector Drawer */}
+        {edgeInspectorOpen && (
+          <aside className="absolute top-0 right-0 w-84 h-full bg-surface border-l border-border shadow-xl p-4 flex flex-col gap-3.5 z-20 animate-in slide-in-from-right-2">
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <h3 className="text-xs font-semibold text-foreground">
+                Edit Relationship
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEdgeInspectorOpen(false)}
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 flex-1 overflow-y-auto pr-1">
+              {/* Connected Blocks Preview & Swap Direction */}
+              <div className="rounded-md border border-border bg-surface-muted/30 p-2.5">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
+                  Connection
+                </div>
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-foreground truncate flex-1">
+                    {selectedEdgeSourceNode?.label || 'Source'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSwapEdgeDirection}
+                    title="Swap direction"
+                    className="p-1 rounded hover:bg-surface-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                  >
+                    <ArrowLeftRight size={13} />
+                  </button>
+                  <span className="font-semibold text-foreground truncate flex-1 text-right">
+                    {selectedEdgeTargetNode?.label || 'Target'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Relationship Label Input */}
+              <div>
+                <label
+                  htmlFor="inspector-edge-label"
+                  className="block text-xs font-medium text-foreground mb-1"
+                >
+                  Relationship Label
+                </label>
+                <input
+                  id="inspector-edge-label"
+                  type="text"
+                  value={editEdgeLabel}
+                  onChange={(e) => setEditEdgeLabel(e.target.value)}
+                  placeholder="e.g. loves, dated, rivalry, sibling of..."
+                  className="w-full bg-surface-muted border border-border text-xs rounded px-2.5 py-1.5 text-foreground focus:outline-none focus:border-primary font-medium"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Type any custom label or select a preset below.
+                </p>
+              </div>
+
+              {/* Direction Toggle */}
+              <div>
+                <span className="block text-xs font-medium text-foreground mb-1.5">
+                  Direction
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditEdgeBidirectional(false)}
+                    className={`flex items-center justify-center gap-1 py-1.5 text-xs rounded-md border transition-colors ${
+                      !editEdgeBidirectional
+                        ? 'bg-primary text-primary-foreground border-primary font-medium'
+                        : 'bg-surface border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <ArrowRight size={12} />
+                    <span>Directed</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditEdgeBidirectional(true)}
+                    className={`flex items-center justify-center gap-1 py-1.5 text-xs rounded-md border transition-colors ${
+                      editEdgeBidirectional
+                        ? 'bg-primary text-primary-foreground border-primary font-medium'
+                        : 'bg-surface border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <ArrowLeftRight size={12} />
+                    <span>Mutual (↔)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Presets Chips */}
+              <div>
+                <span className="block text-xs font-medium text-foreground mb-1.5">
+                  Quick Relationship Presets
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {(collection === 'watch'
+                    ? WATCH_RELATIONSHIP_PRESETS
+                    : ACADEMIC_RELATIONSHIP_PRESETS
+                  ).map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => {
+                        setEditEdgeLabel(preset);
+                        setEditEdgeType(preset.replace(/\s+/g, '-'));
+                      }}
+                      className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
+                        editEdgeLabel.toLowerCase() === preset
+                          ? 'bg-primary/15 text-primary border-primary/30 font-medium'
+                          : 'border-border text-muted-foreground hover:bg-surface-muted hover:text-foreground'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Edge Inspector Footer Actions */}
+            <div className="flex items-center justify-between border-t border-border pt-2.5">
+              {selectedEdgeId && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDeleteEdge(selectedEdgeId)}
+                  className="text-destructive hover:bg-destructive/10 text-xs px-2 h-7"
+                >
+                  <Trash2 size={12} className="mr-1" />
+                  Delete
+                </Button>
+              )}
+              <div className="flex gap-1.5 ml-auto">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setEdgeInspectorOpen(false)}
+                  className="h-7 text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={applyEdgeInspectorChanges}
+                  className="h-7 text-xs"
+                >
                   Apply
                 </Button>
               </div>

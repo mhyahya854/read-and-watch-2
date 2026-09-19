@@ -31,15 +31,17 @@ import { randomUUID } from 'node:crypto';
 
 const DDL_KNOWLEDGE = `
 CREATE TABLE IF NOT EXISTS knowledge_graphs (
-  id             TEXT PRIMARY KEY,
-  title          TEXT NOT NULL,
-  description    TEXT NOT NULL DEFAULT '',
-  tags_json      TEXT NOT NULL DEFAULT '[]',
-  revision       INTEGER NOT NULL DEFAULT 1,
-  lifecycle      TEXT NOT NULL DEFAULT 'active',
-  created_at_utc TEXT NOT NULL,
-  updated_at_utc TEXT NOT NULL,
-  deleted_at_utc TEXT
+  id                  TEXT PRIMARY KEY,
+  title               TEXT NOT NULL,
+  description         TEXT NOT NULL DEFAULT '',
+  tags_json           TEXT NOT NULL DEFAULT '[]',
+  associated_item_id  TEXT,
+  revision            INTEGER NOT NULL DEFAULT 1,
+  lifecycle           TEXT NOT NULL DEFAULT 'active',
+  created_at_utc      TEXT NOT NULL,
+  updated_at_utc      TEXT NOT NULL,
+  deleted_at_utc      TEXT,
+  FOREIGN KEY (associated_item_id) REFERENCES items(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_knowledge_graphs_active ON knowledge_graphs(deleted_at_utc);
 
@@ -142,6 +144,20 @@ export function createKnowledgeStore({
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(DDL_KNOWLEDGE);
 
+  // Idempotently ensure associated_item_id exists on existing databases
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info('knowledge_graphs')").all();
+    const hasAssociatedItemId = tableInfo.some((col) => col.name === 'associated_item_id');
+    if (!hasAssociatedItemId) {
+      db.exec(`
+        ALTER TABLE knowledge_graphs ADD COLUMN associated_item_id TEXT REFERENCES items(id) ON DELETE SET NULL;
+      `);
+    }
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_knowledge_graphs_item ON knowledge_graphs(associated_item_id);
+    `);
+  } catch {}
+
   // Search invalidation helper
   function notifySearchInvalidation() {
     if (searchStore && typeof searchStore.rebuildIndex === 'function') {
@@ -184,6 +200,7 @@ export function createKnowledgeStore({
       title: row.title,
       description: row.description || '',
       tags: JSON.parse(row.tags_json || '[]'),
+      associatedItemId: row.associated_item_id ?? null,
       revision: row.revision,
       lifecycle: row.lifecycle,
       nodeCount: nodeCountRow?.count || 0,
@@ -273,9 +290,22 @@ export function createKnowledgeStore({
   // Knowledge Graph API
   // -------------------------------------------------------------------------
 
-  function listGraphs({ includeDeleted = false, tag = null } = {}) {
+  function listGraphs({
+    includeDeleted = false,
+    associatedItemId = null,
+    standaloneOnly = false,
+    tag = null,
+  } = {}) {
     let sql = 'SELECT * FROM knowledge_graphs WHERE 1=1';
     const params = [];
+
+    if (standaloneOnly) {
+      sql += ' AND associated_item_id IS NULL';
+    } else if (associatedItemId !== null && associatedItemId !== undefined) {
+      sql += ' AND associated_item_id = ?';
+      params.push(associatedItemId);
+    }
+
     if (!includeDeleted) {
       sql += ' AND deleted_at_utc IS NULL';
     }
@@ -311,6 +341,7 @@ export function createKnowledgeStore({
       title: meta.title,
       description: meta.description,
       tags: meta.tags,
+      associatedItemId: meta.associatedItemId ?? null,
       revision: meta.revision,
       lifecycle: meta.lifecycle,
       nodes: nodeRows.map(rowToNode),
@@ -333,6 +364,7 @@ export function createKnowledgeStore({
     title = 'Untitled Concept Graph',
     description = '',
     tags = [],
+    associatedItemId = null,
     nodes = [],
     edges = [],
   } = {}) {
@@ -342,9 +374,9 @@ export function createKnowledgeStore({
     db.exec('BEGIN IMMEDIATE');
     try {
       db.prepare(
-        `INSERT INTO knowledge_graphs (id, title, description, tags_json, revision, lifecycle, created_at_utc, updated_at_utc)
-         VALUES (?, ?, ?, ?, 1, 'active', ?, ?)`
-      ).run(graphId, title, description, JSON.stringify(tags), created, created);
+        `INSERT INTO knowledge_graphs (id, title, description, tags_json, associated_item_id, revision, lifecycle, created_at_utc, updated_at_utc)
+         VALUES (?, ?, ?, ?, ?, 1, 'active', ?, ?)`
+      ).run(graphId, title, description, JSON.stringify(tags), associatedItemId ?? null, created, created);
 
       const insertNode = db.prepare(
         `INSERT INTO knowledge_nodes (id, graph_id, label, node_type, notes, position_x, position_y, width, height, color, deep_link_type, deep_link_target, deep_link_anchor_json, deep_link_label, created_at_utc, updated_at_utc)
@@ -408,7 +440,15 @@ export function createKnowledgeStore({
 
   function saveGraphDocument(
     graphId,
-    { title, description, tags, nodes = [], edges = [], expectedRevision } = {}
+    {
+      title,
+      description,
+      tags,
+      associatedItemId,
+      nodes = [],
+      edges = [],
+      expectedRevision,
+    } = {}
   ) {
     if (!graphId) fail('Invalid graphId');
     const existing = db.prepare('SELECT * FROM knowledge_graphs WHERE id = ?').get(graphId);
@@ -423,17 +463,20 @@ export function createKnowledgeStore({
 
     const updated = nowUtc();
     const newRevision = existing.revision + 1;
+    const targetAssociatedItemId =
+      associatedItemId !== undefined ? associatedItemId : existing.associated_item_id ?? null;
 
     db.exec('BEGIN IMMEDIATE');
     try {
       db.prepare(
         `UPDATE knowledge_graphs
-         SET title = ?, description = ?, tags_json = ?, revision = ?, updated_at_utc = ?
+         SET title = ?, description = ?, tags_json = ?, associated_item_id = ?, revision = ?, updated_at_utc = ?
          WHERE id = ?`
       ).run(
         title !== undefined ? title : existing.title,
         description !== undefined ? description : existing.description,
         tags !== undefined ? JSON.stringify(tags) : existing.tags_json,
+        targetAssociatedItemId,
         newRevision,
         updated,
         graphId
@@ -859,13 +902,14 @@ export function createKnowledgeStore({
             if (!exists) {
               db.exec('BEGIN IMMEDIATE');
               db.prepare(
-                `INSERT INTO knowledge_graphs (id, title, description, tags_json, revision, lifecycle, created_at_utc, updated_at_utc)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+                `INSERT INTO knowledge_graphs (id, title, description, tags_json, associated_item_id, revision, lifecycle, created_at_utc, updated_at_utc)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
               ).run(
                 raw.id,
                 raw.title,
                 raw.description || '',
                 JSON.stringify(raw.tags || []),
+                raw.associatedItemId || null,
                 raw.revision || 1,
                 raw.lifecycle || 'active',
                 raw.createdAt || nowUtc(),

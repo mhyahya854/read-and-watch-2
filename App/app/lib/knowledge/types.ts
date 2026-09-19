@@ -12,12 +12,20 @@ export const KNOWLEDGE_SCHEMA_VERSION = 1;
 
 export type KnowledgeNodeType =
   | 'concept'
+  | 'character'
+  | 'person'
+  | 'event'
+  | 'location'
+  | 'group'
+  | 'object'
+  | 'theme'
+  | 'episode'
+  | 'theory'
   | 'thesis'
   | 'evidence'
   | 'source'
-  | 'person'
-  | 'event'
-  | 'question';
+  | 'question'
+  | (string & {});
 
 export type KnowledgeRelationshipType =
   | 'supports'
@@ -26,7 +34,21 @@ export type KnowledgeRelationshipType =
   | 'influences'
   | 'part-of'
   | 'contrasts-with'
-  | 'relates-to';
+  | 'relates-to'
+  | 'loves'
+  | 'dated'
+  | 'rivalry'
+  | 'friend-of'
+  | 'sibling-of'
+  | 'family'
+  | 'works-for'
+  | 'betrayed'
+  | 'suspects'
+  | 'allies-with'
+  | 'mentors'
+  | 'causes'
+  | 'reveals'
+  | (string & {});
 
 export type DeepLinkType =
   | 'item'
@@ -88,6 +110,7 @@ export interface KnowledgeGraphMetadata {
   title: string;
   description: string;
   tags: string[];
+  associatedItemId?: string | null;
   revision: number;
   lifecycle: 'active' | 'archived' | 'soft-deleted';
   nodeCount: number;
@@ -103,6 +126,7 @@ export interface KnowledgeGraphDocument {
   title: string;
   description: string;
   tags: string[];
+  associatedItemId?: string | null;
   revision: number;
   lifecycle: 'active' | 'archived' | 'soft-deleted';
   nodes: KnowledgeNode[];
