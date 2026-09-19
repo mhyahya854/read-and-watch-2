@@ -1052,6 +1052,16 @@ export function createPortabilityStore({
     const validated = validateBackupPackage(backupPackage);
     verifyBackupChecksums(validated);
 
+    // Ownership is restored exactly as backed up, but only when the owning item
+    // still exists locally. A missing owner restores the artifact as
+    // legacy/unassigned instead of attaching it to whatever title happens to
+    // share the id space.
+    const knownItemIds = new Set(
+      (libraryStore.getCatalog()?.items ?? []).map((item) => item.id),
+    );
+    const restoreOwnerItemId = (value) =>
+      value && knownItemIds.has(value) ? value : null;
+
     const restoredCounts = {
       items: 0,
       annotations: 0,
@@ -1196,14 +1206,18 @@ export function createPortabilityStore({
                   title: g.title,
                   description: g.description,
                   tags: g.tags,
+                  associatedItemId: restoreOwnerItemId(g.associatedItemId),
                   nodes: g.nodes,
                   edges: g.edges,
                   expectedRevision: existing.revision,
-                });
+                }, { allowOwnershipChange: true });
                 restoredCounts.knowledgeGraphs++;
               }
             } else {
-              knowledgeStore.createGraph(g);
+              knowledgeStore.createGraph({
+                ...g,
+                associatedItemId: restoreOwnerItemId(g.associatedItemId),
+              });
               restoredCounts.knowledgeGraphs++;
             }
           } catch {
@@ -1230,13 +1244,16 @@ export function createPortabilityStore({
                   diagramType: d.diagramType,
                   sourceText: d.sourceText,
                   tags: d.tags,
-                  associatedItemId: d.associatedItemId,
+                  associatedItemId: restoreOwnerItemId(d.associatedItemId),
                   expectedRevision: existing.revision,
-                });
+                }, { allowOwnershipChange: true });
                 restoredCounts.mermaidDocuments++;
               }
             } else {
-              knowledgeStore.createDiagram(d);
+              knowledgeStore.createDiagram({
+                ...d,
+                associatedItemId: restoreOwnerItemId(d.associatedItemId),
+              });
               restoredCounts.mermaidDocuments++;
             }
           } catch {

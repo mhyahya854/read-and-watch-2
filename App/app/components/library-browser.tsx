@@ -10,22 +10,29 @@ import {
   Clapperboard,
   Columns3,
   FolderOpen,
-  Highlighter,
   LibraryBig,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PenTool,
   Search,
   Settings,
-  Workflow,
 } from 'lucide-react';
 
+import { AppSidebar } from '@/components/app-sidebar';
 import { ItemDetail } from '@/components/item-detail';
 import { PortableRecoveryNotice } from '@/components/portable-recovery-notice';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
+import {
+  closeDetail,
+  escapeShell,
+  initialShellState,
+  libraryListVisible,
+  selectItem as selectItemShellMode,
+  titlePanelVisible,
+  toggleMaximize,
+  toggleSidebar,
+  type ShellState,
+} from '@/lib/shell/shell-state';
 import {
   Table,
   TableBody,
@@ -132,10 +139,13 @@ export function LibraryBrowser({
     () => new Set(['type', 'status', 'tags', 'people']),
   );
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
-  const [detailMode, setDetailMode] = useState<'split' | 'maximized' | 'closed'>(
-    initialDetailMode,
+  const [shell, setShell] = useState<ShellState>(() =>
+    initialShellState({
+      sidebar: initialSidebarCollapsed ? 'collapsed' : 'expanded',
+      detail: initialDetailMode,
+    }),
   );
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
+  const detailMode = shell.detail;
   const [dirty, setDirty] = useState(false);
   const [views, setViews] = useState<LibraryView[]>([]);
   const [viewName, setViewName] = useState('');
@@ -216,13 +226,11 @@ export function LibraryBrowser({
         searchRef.current?.focus();
       }
       if (event.key === 'Escape' && !editing) {
-        if (detailMode === 'maximized') {
-          event.preventDefault();
-          setDetailMode('split');
-        } else if (selectedId && detailMode !== 'closed' && confirmDiscard()) {
-          event.preventDefault();
-          setDetailMode('closed');
-        }
+        const next = escapeShell(shell, { hasSelection: Boolean(selectedId) });
+        if (next === shell) return;
+        if (next.detail === 'closed' && !confirmDiscard()) return;
+        event.preventDefault();
+        setShell(next);
       }
     }
     window.addEventListener('keydown', shortcut);
@@ -289,7 +297,7 @@ export function LibraryBrowser({
     setStatus('');
     setTag('');
     setSelectedId(null);
-    setDetailMode('split');
+    setShell((s) => ({ ...s, detail: 'split' }));
     window.history.replaceState(null, '', `/?collection=${next}`);
   }
 
@@ -431,169 +439,23 @@ export function LibraryBrowser({
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside
-          aria-label="Application navigation"
-          className={`hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-150 md:flex ${
-            sidebarCollapsed
-              ? 'w-14 px-2 py-3'
-              : 'w-[var(--sidebar-width)] px-3 py-4'
-          }`}
-        >
-          <div
-            className={`flex items-center ${
-              sidebarCollapsed
-                ? 'justify-center pb-2'
-                : 'justify-between px-2 pb-2'
-            }`}
-          >
-            {!sidebarCollapsed && (
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Collections
-              </p>
-            )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={
-                sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
-              }
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              onClick={() => setSidebarCollapsed((v) => !v)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              {sidebarCollapsed ? (
-                <PanelLeftOpen size={16} />
-              ) : (
-                <PanelLeftClose size={16} />
-              )}
-            </Button>
-          </div>
-
-          <nav aria-label="Library collections" className="space-y-1">
-            {(
-              [
-                ['read', 'Read', BookOpen, catalog?.counts.read],
-                ['watch', 'Watch', Clapperboard, catalog?.counts.watch],
-              ] as const
-            ).map(([value, label, Icon, count]) => {
-              const isActive = collection === value;
-              if (sidebarCollapsed) {
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => chooseCollection(value)}
-                    aria-current={isActive ? 'page' : undefined}
-                    aria-label={`${label} (${count ?? 0})`}
-                    title={`${label} (${count ?? 0})`}
-                    className={`grid size-9 place-items-center mx-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${
-                      isActive
-                        ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                        : 'text-sidebar-foreground hover:bg-surface-muted'
-                    }`}
-                  >
-                    <Icon size={17} />
-                  </button>
-                );
-              }
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => chooseCollection(value)}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={`flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${
-                    isActive
-                      ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground hover:bg-surface-muted'
-                  }`}
-                >
-                  <Icon size={16} />
-                  <span className="flex-1">{label}</span>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {count ?? ''}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {sidebarCollapsed && (
-            <div className="my-2 h-px w-6 mx-auto bg-sidebar-border" />
-          )}
-
-          {!sidebarCollapsed && (
-            <p className="mb-2 mt-5 px-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Workspace
-            </p>
-          )}
-          <nav aria-label="Workspace" className="space-y-1 text-sm">
-            {[
-              ['/highlights', 'Highlights', Highlighter],
-              ['/knowledge', 'Knowledge & Diagrams', Workflow],
-              ['/canvas-notes', 'Canvas Notes', PenTool],
-            ].map(([href, label, Icon]) => {
-              if (sidebarCollapsed) {
-                return (
-                  <Link
-                    key={href as string}
-                    href={href as string}
-                    aria-label={label as string}
-                    title={label as string}
-                    className="grid size-9 place-items-center mx-auto rounded-md text-sidebar-foreground outline-none hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-                  >
-                    <Icon size={17} />
-                  </Link>
-                );
-              }
-              return (
-                <Link
-                  key={href as string}
-                  href={href as string}
-                  className="flex h-9 items-center gap-2 rounded-md px-2 text-sidebar-foreground outline-none hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-                >
-                  <Icon size={16} />
-                  {label as string}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="flex-1 min-h-6" />
-
-          <div className="border-t border-sidebar-border pt-2">
-            {sidebarCollapsed ? (
-              <Link
-                href="/settings"
-                aria-label="Settings"
-                title="Settings"
-                className="grid size-9 place-items-center mx-auto rounded-md text-sidebar-foreground outline-none hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-              >
-                <Settings size={17} />
-              </Link>
-            ) : (
-              <Link
-                href="/settings"
-                className="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-sidebar-foreground outline-none hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-              >
-                <Settings size={16} />
-                Settings
-              </Link>
-            )}
-            {!sidebarCollapsed && (
-              <div className="px-2 pt-2 text-xs leading-5 text-muted-foreground">
-                {catalog
-                  ? `${catalog.counts.total} local library items`
-                  : 'Local library'}
-              </div>
-            )}
-          </div>
-        </aside>
+        <AppSidebar
+          sidebar={shell.sidebar}
+          onToggleSidebar={() => setShell(toggleSidebar)}
+          activeCollection={collection}
+          onSelectCollection={chooseCollection}
+          counts={{ read: catalog?.counts.read, watch: catalog?.counts.watch }}
+          totalItemsLabel={
+            catalog
+              ? `${catalog.counts.total} local library items`
+              : 'Local library'
+          }
+        />
 
         <div className="relative flex min-w-0 flex-1 overflow-hidden">
           <section
             className={`min-w-0 flex-1 flex-col overflow-hidden ${
-              detailMode === 'maximized' && selectedItem ? 'hidden' : 'flex'
+              libraryListVisible(shell, Boolean(selectedItem)) ? 'flex' : 'hidden'
             }`}
             aria-labelledby="library-title"
           >
@@ -871,9 +733,7 @@ export function LibraryBrowser({
                           onClick={() => {
                             if (confirmDiscard()) {
                               setSelectedId(item.id);
-                              if (detailMode === 'closed') {
-                                setDetailMode('split');
-                              }
+                              setShell(selectItemShellMode);
                             }
                           }}
                           onKeyDown={(event) => {
@@ -881,9 +741,7 @@ export function LibraryBrowser({
                               event.preventDefault();
                               if (confirmDiscard()) {
                                 setSelectedId(item.id);
-                                if (detailMode === 'closed') {
-                                  setDetailMode('split');
-                                }
+                                setShell(selectItemShellMode);
                               }
                             }
                             if (
@@ -1016,21 +874,17 @@ export function LibraryBrowser({
             </div>
           </section>
 
-          {selectedItem && detailMode !== 'closed' && (
+          {titlePanelVisible(shell, Boolean(selectedItem)) && selectedItem && (
             <ItemDetail
               item={selectedItem}
               catalogItems={catalog?.items ?? []}
               initialTab={initialTab}
               initialPreviewIndex={initialPreviewIndex}
-              mode={detailMode}
-              onToggleMaximize={() =>
-                setDetailMode((m) =>
-                  m === 'maximized' ? 'split' : 'maximized',
-                )
-              }
+              mode={detailMode === 'maximized' ? 'maximized' : 'split'}
+              onToggleMaximize={() => setShell(toggleMaximize)}
               onClose={() => {
                 if (confirmDiscard()) {
-                  setDetailMode('closed');
+                  setShell(closeDetail);
                 }
               }}
               onDirtyChange={setDirty}

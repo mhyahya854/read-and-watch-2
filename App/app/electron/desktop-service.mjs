@@ -571,7 +571,12 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
       if (sub === '' || sub === '/') {
         if (method === 'GET') {
           const itemId = url.searchParams.get('itemId') || undefined;
-          return sendJson(res, 200, canvasStore.listCanvases({ itemId }));
+          const excludeWatchOwned = url.searchParams.get('scope') === 'global';
+          return sendJson(
+            res,
+            200,
+            canvasStore.listCanvases({ itemId, excludeWatchOwned })
+          );
         }
         if (method === 'POST') {
           const body = await readJsonBody(req);
@@ -581,13 +586,29 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
       const canvasMatch = sub.match(/^([^/]+)$/);
       if (canvasMatch) {
         const id = decodeURIComponent(canvasMatch[1]);
-        if (method === 'GET') return sendJson(res, 200, canvasStore.getCanvas(id));
+        const itemId = url.searchParams.get('itemId');
+        if (method === 'GET') {
+          canvasStore.assertCanvasOwnership(id, itemId);
+          return sendJson(res, 200, canvasStore.getCanvas(id));
+        }
         if (method === 'PUT') {
+          canvasStore.assertCanvasOwnership(id, itemId);
           const body = await readJsonBody(req);
-          return sendJson(res, 200, canvasStore.updateCanvas(id, body));
+          const expectedRev =
+            typeof body?.expectedRevision === 'number' ? body.expectedRevision : body?.revision;
+          return sendJson(res, 200, canvasStore.updateCanvas(id, body, expectedRev));
         }
         if (method === 'DELETE') {
-          return sendJson(res, 200, canvasStore.deleteCanvas(id));
+          canvasStore.assertCanvasOwnership(id, itemId);
+          const body = await readJsonBody(req);
+          const revParam = url.searchParams.get('expectedRevision');
+          const expectedRev =
+            typeof body?.expectedRevision === 'number'
+              ? body.expectedRevision
+              : revParam !== null
+                ? Number(revParam)
+                : undefined;
+          return sendJson(res, 200, canvasStore.deleteCanvas(id, expectedRev));
         }
       }
       return sendJson(res, 404, { error: 'Canvas route not found' });
@@ -599,9 +620,11 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
     if (pathname.startsWith('/api/knowledge')) {
       const sub = pathname.replace(/^\/api\/knowledge\/?/, '');
       if (sub === 'summary' && method === 'GET') {
-        const graphs = knowledgeStore.listGraphs();
-        const diagrams = knowledgeStore.listDiagrams();
-        const standalone = canvasStore.listCanvases({ standaloneOnly: true });
+        // Global legacy surfaces only: Watch title-owned artifacts stay inside
+        // their own Watch title workspace.
+        const graphs = knowledgeStore.listGraphs({ excludeWatchOwned: true });
+        const diagrams = knowledgeStore.listDiagrams({ excludeWatchOwned: true });
+        const standalone = canvasStore.listCanvases({ excludeWatchOwned: true });
         return sendJson(res, 200, { graphs, diagrams, conceptCanvasesCount: standalone.length });
       }
       if (sub === 'resolve-link' && method === 'POST') {
@@ -628,23 +651,27 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
       const gMatch = sub.match(/^graphs\/([^/]+)$/);
       if (gMatch) {
         const id = decodeURIComponent(gMatch[1]);
+        const itemId = url.searchParams.get('itemId');
         if (method === 'GET') {
-          const doc = knowledgeStore.getGraph(id);
-          const itemId = url.searchParams.get('itemId');
-          if (itemId && doc.associatedItemId && doc.associatedItemId !== itemId) {
-            return sendJson(res, 404, { error: 'Knowledge graph not found for this item' });
-          }
+          const doc = knowledgeStore.getGraph(id, { itemId });
           return sendJson(res, 200, doc);
         }
         if (method === 'PUT') {
           const body = await readJsonBody(req);
-          return sendJson(res, 200, knowledgeStore.saveGraphDocument(id, body));
+          return sendJson(res, 200, knowledgeStore.saveGraphDocument(id, body, { itemId }));
         }
-        if (method === 'DELETE') return sendJson(res, 200, knowledgeStore.deleteGraph(id));
+        if (method === 'DELETE') {
+          return sendJson(res, 200, knowledgeStore.deleteGraph(id, { itemId }));
+        }
       }
       if (sub === 'diagrams' && method === 'GET') {
         const itemId = url.searchParams.get('itemId') || null;
-        return sendJson(res, 200, knowledgeStore.listDiagrams({ associatedItemId: itemId }));
+        const standalone = url.searchParams.get('standalone') === 'true';
+        return sendJson(
+          res,
+          200,
+          knowledgeStore.listDiagrams({ associatedItemId: itemId, standaloneOnly: standalone })
+        );
       }
       if (sub === 'diagrams' && method === 'POST') {
         const body = await readJsonBody(req);
@@ -653,12 +680,17 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
       const dMatch = sub.match(/^diagrams\/([^/]+)$/);
       if (dMatch) {
         const id = decodeURIComponent(dMatch[1]);
-        if (method === 'GET') return sendJson(res, 200, knowledgeStore.getDiagram(id));
+        const itemId = url.searchParams.get('itemId');
+        if (method === 'GET') {
+          return sendJson(res, 200, knowledgeStore.getDiagram(id, { itemId }));
+        }
         if (method === 'PUT') {
           const body = await readJsonBody(req);
-          return sendJson(res, 200, knowledgeStore.updateDiagram(id, body));
+          return sendJson(res, 200, knowledgeStore.updateDiagram(id, body, { itemId }));
         }
-        if (method === 'DELETE') return sendJson(res, 200, knowledgeStore.deleteDiagram(id));
+        if (method === 'DELETE') {
+          return sendJson(res, 200, knowledgeStore.deleteDiagram(id, { itemId }));
+        }
       }
       return sendJson(res, 404, { error: 'Knowledge route not found' });
     }

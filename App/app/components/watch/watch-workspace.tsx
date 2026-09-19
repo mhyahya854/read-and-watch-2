@@ -12,7 +12,7 @@
  *   4. Highlights & Evidence (Title-scoped annotations with "Add to Graph" action)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Workflow,
   PenTool,
@@ -21,6 +21,7 @@ import {
   Plus,
   ArrowLeft,
   Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +35,12 @@ import type {
   KnowledgeGraphMetadata,
   MermaidDocument,
 } from '@/lib/knowledge';
+import {
+  collectPromotedAnnotationIds,
+  isHighlightPromoted,
+  mergePromotedAnnotationIds,
+  resolveActiveGraphId,
+} from '@/lib/knowledge/watch-workspace-state';
 
 type WatchWorkspaceTool = 'graph' | 'canvas' | 'diagrams' | 'highlights';
 
@@ -66,9 +73,11 @@ function getRandomOffset(): number {
 export function WatchWorkspace({
   item,
   mode: _mode = 'split',
+  onWorkspaceDirtyChange,
 }: {
   item: LibraryItem;
   mode?: 'split' | 'maximized';
+  onWorkspaceDirtyChange?: (dirty: boolean) => void;
 }) {
   const [activeTool, setActiveTool] = useState<WatchWorkspaceTool>('graph');
 
@@ -76,7 +85,10 @@ export function WatchWorkspace({
   const [graphs, setGraphs] = useState<KnowledgeGraphMetadata[]>([]);
   const [activeGraphId, setActiveGraphId] = useState<string | null>(null);
   const [activeGraphDoc, setActiveGraphDoc] = useState<KnowledgeGraphDocument | null>(null);
-  const [graphsLoading, setGraphsLoading] = useState(false);
+  const [graphsInitialLoading, setGraphsInitialLoading] = useState(true);
+  const graphsLoadedRef = useRef(false);
+  const [graphsError, setGraphsError] = useState<string | null>(null);
+  const [graphDirty, setGraphDirty] = useState(false);
   const [isCreatingGraph, setIsCreatingGraph] = useState(false);
 
   // Canvas state
@@ -85,55 +97,64 @@ export function WatchWorkspace({
   // Diagram state
   const [diagrams, setDiagrams] = useState<MermaidDocument[]>([]);
   const [activeDiagramId, setActiveDiagramId] = useState<string | null>(null);
-  const [diagramsLoading, setDiagramsLoading] = useState(false);
+  const [diagramsInitialLoading, setDiagramsInitialLoading] = useState(true);
+  const diagramsLoadedRef = useRef(false);
+  const [diagramsError, setDiagramsError] = useState<string | null>(null);
 
   // Highlights state
   const [highlights, setHighlights] = useState<WatchAnnotation[]>([]);
   const [highlightsLoading, setHighlightsLoading] = useState(false);
+  const [highlightsError, setHighlightsError] = useState<string | null>(null);
   const [highlightAddedMap, setHighlightAddedMap] = useState<Record<string, boolean>>({});
+  const [highlightActionError, setHighlightActionError] = useState<string | null>(null);
+  const [pendingHighlightId, setPendingHighlightId] = useState<string | null>(null);
 
   // -------------------------------------------------------------------------
   // 1. Fetch Graphs scoped to this Watch item
   // -------------------------------------------------------------------------
   const fetchGraphs = useCallback(async () => {
+    // Yield to a microtask before touching state so effect-driven callers never
+    // trigger a synchronous state update inside the effect body.
+    await Promise.resolve();
+    // A refresh must never tear down an already-mounted graph canvas, so only
+    // the very first load uses the full-workspace loading state.
+    const initial = !graphsLoadedRef.current;
+    if (initial) {
+      setGraphsInitialLoading(true);
+      setGraphsError(null);
+    }
     try {
       const res = await fetch(`/api/knowledge/graphs?itemId=${encodeURIComponent(item.id)}`);
-      if (res.ok) {
-        const list = (await res.json()) as KnowledgeGraphMetadata[];
-        setGraphs(list);
-        if (list.length > 0) {
-          setActiveGraphId((prev) => prev ?? list[0].id);
-        }
+      if (!res.ok) {
+        throw new Error(`Failed to load knowledge graphs (HTTP ${res.status})`);
       }
+      const list = (await res.json()) as KnowledgeGraphMetadata[];
+      setGraphs(list);
+      // Never keep a graph id that does not belong to this title's list.
+      setActiveGraphId((prev) => resolveActiveGraphId(prev, list));
+      setGraphsError(null);
     } catch (err) {
-      console.error('Failed to fetch watch graphs:', err);
+      setGraphsError(err instanceof Error ? err.message : 'Failed to load knowledge graphs');
+      if (initial) {
+        setGraphs([]);
+        setActiveGraphId(null);
+        setActiveGraphDoc(null);
+      }
     } finally {
-      setGraphsLoading(false);
+      graphsLoadedRef.current = true;
+      setGraphsInitialLoading(false);
     }
   }, [item.id]);
 
   useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const res = await fetch(`/api/knowledge/graphs?itemId=${encodeURIComponent(item.id)}`);
-        if (res.ok && active) {
-          const list = (await res.json()) as KnowledgeGraphMetadata[];
-          setGraphs(list);
-          if (list.length > 0) {
-            setActiveGraphId((prev) => prev ?? list[0].id);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch watch graphs:', err);
-      } finally {
-        if (active) setGraphsLoading(false);
-      }
-    })();
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) void fetchGraphs();
+    });
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [item.id]);
+  }, [fetchGraphs]);
 
   // Fetch full document when activeGraphId changes
   useEffect(() => {
@@ -146,13 +167,14 @@ export function WatchWorkspace({
         return (await res.json()) as KnowledgeGraphDocument;
       })
       .then((doc) => {
-        if (active) setActiveGraphDoc(doc);
+        if (!active) return;
+        setActiveGraphDoc(doc);
+        setGraphDirty(false);
       })
       .catch((err) => {
-        if (active) {
-          console.error('Failed to load active watch graph:', err);
-          setActiveGraphDoc(null);
-        }
+        if (!active) return;
+        setGraphsError(err instanceof Error ? err.message : 'Failed to load knowledge graph');
+        setActiveGraphDoc(null);
       });
 
     return () => {
@@ -160,8 +182,30 @@ export function WatchWorkspace({
     };
   }, [activeGraphId, item.id]);
 
+  /**
+   * Evidence already promoted into any graph owned by this Watch title. Used to
+   * keep "Add to Graph" from silently duplicating a highlight after reload.
+   */
+  const scanPromotedAnnotationIds = useCallback(async () => {
+    let linked: Record<string, boolean> = {};
+    for (const graph of graphs) {
+      try {
+        const res = await fetch(
+          `/api/knowledge/graphs/${encodeURIComponent(graph.id)}?itemId=${encodeURIComponent(item.id)}`
+        );
+        if (!res.ok) continue;
+        const doc = (await res.json()) as KnowledgeGraphDocument;
+        linked = collectPromotedAnnotationIds(doc.nodes, linked);
+      } catch {
+        // A best-effort scan: an unreadable graph must not block the workspace.
+      }
+    }
+    return linked;
+  }, [graphs, item.id]);
+
   const handleCreateGraph = useCallback(async () => {
     setIsCreatingGraph(true);
+    setGraphsError(null);
     try {
       const title = graphs.length === 0 ? `${item.title} - Knowledge Graph` : `${item.title} - Graph ${graphs.length + 1}`;
       const res = await fetch('/api/knowledge/graphs', {
@@ -184,14 +228,16 @@ export function WatchWorkspace({
         }),
       });
 
-      if (res.ok) {
-        const created = (await res.json()) as KnowledgeGraphDocument;
-        await fetchGraphs();
-        setActiveGraphId(created.id);
-        setActiveGraphDoc(created);
+      if (!res.ok) {
+        throw new Error(`Failed to create graph (HTTP ${res.status})`);
       }
+      const created = (await res.json()) as KnowledgeGraphDocument;
+      await fetchGraphs();
+      setActiveGraphId(created.id);
+      setActiveGraphDoc(created);
+      setGraphDirty(false);
     } catch (err) {
-      console.error('Failed to create watch graph:', err);
+      setGraphsError(err instanceof Error ? err.message : 'Failed to create knowledge graph');
     } finally {
       setIsCreatingGraph(false);
     }
@@ -201,41 +247,46 @@ export function WatchWorkspace({
   // 2. Fetch Diagrams scoped to this Watch item
   // -------------------------------------------------------------------------
   const fetchDiagrams = useCallback(async () => {
+    await Promise.resolve();
+    const initial = !diagramsLoadedRef.current;
+    if (initial) {
+      setDiagramsInitialLoading(true);
+      setDiagramsError(null);
+    }
     try {
       const res = await fetch(`/api/knowledge/diagrams?itemId=${encodeURIComponent(item.id)}`);
-      if (res.ok) {
-        const list = (await res.json()) as MermaidDocument[];
-        setDiagrams(list);
+      if (!res.ok) {
+        throw new Error(`Failed to load diagrams (HTTP ${res.status})`);
       }
+      const list = (await res.json()) as MermaidDocument[];
+      setDiagrams(list);
+      setActiveDiagramId((prev) => (prev && list.some((d) => d.id === prev) ? prev : null));
+      setDiagramsError(null);
     } catch (err) {
-      console.error('Failed to fetch watch diagrams:', err);
+      setDiagramsError(err instanceof Error ? err.message : 'Failed to load diagrams');
+      if (initial) {
+        setDiagrams([]);
+        setActiveDiagramId(null);
+      }
     } finally {
-      setDiagramsLoading(false);
+      diagramsLoadedRef.current = true;
+      setDiagramsInitialLoading(false);
     }
   }, [item.id]);
 
   useEffect(() => {
     if (activeTool !== 'diagrams') return;
-    let active = true;
-    void (async () => {
-      try {
-        const res = await fetch(`/api/knowledge/diagrams?itemId=${encodeURIComponent(item.id)}`);
-        if (res.ok && active) {
-          const list = (await res.json()) as MermaidDocument[];
-          setDiagrams(list);
-        }
-      } catch (err) {
-        console.error('Failed to fetch watch diagrams:', err);
-      } finally {
-        if (active) setDiagramsLoading(false);
-      }
-    })();
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) void fetchDiagrams();
+    });
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [activeTool, item.id]);
+  }, [activeTool, fetchDiagrams]);
 
   const handleCreateDiagram = useCallback(async () => {
+    setDiagramsError(null);
     try {
       const res = await fetch('/api/knowledge/diagrams', {
         method: 'POST',
@@ -248,13 +299,14 @@ export function WatchWorkspace({
           associatedItemId: item.id,
         }),
       });
-      if (res.ok) {
-        const created = (await res.json()) as MermaidDocument;
-        await fetchDiagrams();
-        setActiveDiagramId(created.id);
+      if (!res.ok) {
+        throw new Error(`Failed to create diagram (HTTP ${res.status})`);
       }
+      const created = (await res.json()) as MermaidDocument;
+      await fetchDiagrams();
+      setActiveDiagramId(created.id);
     } catch (err) {
-      console.error('Failed to create watch diagram:', err);
+      setDiagramsError(err instanceof Error ? err.message : 'Failed to create diagram');
     }
   }, [fetchDiagrams, item.id, item.title]);
 
@@ -264,14 +316,32 @@ export function WatchWorkspace({
     if (activeTool !== 'highlights') return;
     let active = true;
     void (async () => {
+      // Defer so the effect body itself performs no synchronous state update.
+      await Promise.resolve();
+      if (!active) return;
+      setHighlightsLoading(true);
+      setHighlightsError(null);
       try {
         const res = await fetch(`/api/reader/items/${encodeURIComponent(item.id)}/annotations`);
-        if (res.ok && active) {
-          const list = (await res.json()) as WatchAnnotation[];
-          setHighlights(list);
+        if (!res.ok) {
+          throw new Error(`Failed to load highlights (HTTP ${res.status})`);
+        }
+        const list = (await res.json()) as WatchAnnotation[];
+        if (!active) return;
+        setHighlights(list);
+        // Recover already-promoted evidence so a reload never re-offers to add
+        // the same highlight twice.
+        const linked = await scanPromotedAnnotationIds();
+        if (active && Object.keys(linked).length > 0) {
+          setHighlightAddedMap((prev) => mergePromotedAnnotationIds(prev, linked));
         }
       } catch (err) {
-        console.error('Failed to fetch watch annotations:', err);
+        if (active) {
+          setHighlightsError(
+            err instanceof Error ? err.message : 'Failed to load highlights'
+          );
+          setHighlights([]);
+        }
       } finally {
         if (active) setHighlightsLoading(false);
       }
@@ -279,10 +349,13 @@ export function WatchWorkspace({
     return () => {
       active = false;
     };
-  }, [activeTool, item.id]);
+  }, [activeTool, item.id, scanPromotedAnnotationIds]);
 
   // Add highlight to current graph as a block
   const handleAddHighlightToGraph = useCallback(async (highlight: WatchAnnotation) => {
+    setHighlightActionError(null);
+    setPendingHighlightId(highlight.id);
+
     const quoteText =
       highlight.content?.passage ||
       highlight.anchor?.quote ||
@@ -290,81 +363,143 @@ export function WatchWorkspace({
       highlight.content?.comment ||
       'Highlight Evidence';
 
-    // If no graph exists yet, create one
-    let targetGraphId = activeGraphId;
-    if (!targetGraphId || !activeGraphDoc) {
-      const title = `${item.title} - Knowledge Graph`;
-      const res = await fetch('/api/knowledge/graphs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description: `Knowledge graph for ${item.title}`,
-          associatedItemId: item.id,
-          nodes: [],
-          edges: [],
-        }),
-      });
-      if (res.ok) {
+    try {
+      // If no graph exists yet, create one
+      let targetGraphId = activeGraphId;
+      if (!targetGraphId || !activeGraphDoc) {
+        const res = await fetch('/api/knowledge/graphs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `${item.title} - Knowledge Graph`,
+            description: `Knowledge graph for ${item.title}`,
+            associatedItemId: item.id,
+            nodes: [],
+            edges: [],
+          }),
+        });
+        if (!res.ok) {
+          throw new Error(`Could not create a knowledge graph (HTTP ${res.status})`);
+        }
         const created = (await res.json()) as KnowledgeGraphDocument;
         targetGraphId = created.id;
         setActiveGraphId(created.id);
         setActiveGraphDoc(created);
       }
+
+      if (!targetGraphId) {
+        throw new Error('No knowledge graph is available for this title');
+      }
+
+      // Load the freshest graph document before mutating it.
+      const freshRes = await fetch(
+        `/api/knowledge/graphs/${encodeURIComponent(targetGraphId)}?itemId=${encodeURIComponent(item.id)}`
+      );
+      if (!freshRes.ok) {
+        throw new Error(`Could not open the knowledge graph (HTTP ${freshRes.status})`);
+      }
+      const freshDoc = (await freshRes.json()) as KnowledgeGraphDocument;
+
+      // Already-promoted evidence is never pushed twice by the normal action.
+      const alreadyPromoted = isHighlightPromoted(freshDoc.nodes, highlight.id);
+      if (alreadyPromoted) {
+        setHighlightAddedMap((prev) => ({ ...prev, [highlight.id]: true }));
+        setActiveGraphId(targetGraphId);
+        setActiveGraphDoc(freshDoc);
+        setGraphDirty(false);
+        setActiveTool('graph');
+        return;
+      }
+
+      const newNodeId = generateNodeId('node');
+      const newNodes = [
+        ...freshDoc.nodes,
+        {
+          id: newNodeId,
+          graphId: targetGraphId,
+          label: quoteText.slice(0, 48) + (quoteText.length > 48 ? '...' : ''),
+          nodeType: 'evidence' as const,
+          notes: quoteText,
+          position: {
+            x: getRandomOffset(),
+            y: getRandomOffset(),
+          },
+          deepLink: {
+            type: 'annotation' as const,
+            target: highlight.id,
+            label: 'Highlight Link',
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+
+      const putRes = await fetch(
+        `/api/knowledge/graphs/${encodeURIComponent(targetGraphId)}?itemId=${encodeURIComponent(item.id)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: freshDoc.title,
+            description: freshDoc.description,
+            tags: freshDoc.tags,
+            associatedItemId: item.id,
+            nodes: newNodes,
+            edges: freshDoc.edges,
+            expectedRevision: freshDoc.revision,
+          }),
+        }
+      );
+
+      if (!putRes.ok) {
+        throw new Error(
+          putRes.status === 409
+            ? 'This graph changed in another session. Reload and try again.'
+            : `Adding this highlight failed (HTTP ${putRes.status}). Nothing was saved.`
+        );
+      }
+
+      const updated = (await putRes.json()) as KnowledgeGraphDocument;
+      setActiveGraphDoc(updated);
+      setGraphDirty(false);
+      setHighlightAddedMap((prev) => ({ ...prev, [highlight.id]: true }));
+      setActiveGraphId(targetGraphId);
+      setActiveTool('graph');
+      void fetchGraphs();
+    } catch (err) {
+      setHighlightActionError(
+        err instanceof Error ? err.message : 'Adding this highlight failed.'
+      );
+    } finally {
+      setPendingHighlightId(null);
     }
-
-    if (!targetGraphId) return;
-
-    // Load fresh graph document
-    const freshRes = await fetch(
-      `/api/knowledge/graphs/${encodeURIComponent(targetGraphId)}?itemId=${encodeURIComponent(item.id)}`
-    );
-    if (!freshRes.ok) return;
-    const freshDoc = (await freshRes.json()) as KnowledgeGraphDocument;
-
-    const newNodeId = generateNodeId('node');
-    const newNodes = [
-      ...freshDoc.nodes,
-      {
-        id: newNodeId,
-        graphId: targetGraphId,
-        label: quoteText.slice(0, 48) + (quoteText.length > 48 ? '...' : ''),
-        nodeType: 'evidence' as const,
-        notes: quoteText,
-        position: {
-          x: getRandomOffset(),
-          y: getRandomOffset(),
-        },
-        deepLink: {
-          type: 'annotation' as const,
-          target: highlight.id,
-          label: 'Highlight Link',
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    ];
-
-    await fetch(`/api/knowledge/graphs/${encodeURIComponent(targetGraphId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: freshDoc.title,
-        description: freshDoc.description,
-        tags: freshDoc.tags,
-        associatedItemId: item.id,
-        nodes: newNodes,
-        edges: freshDoc.edges,
-        expectedRevision: freshDoc.revision,
-      }),
-    });
-
-    setHighlightAddedMap((prev) => ({ ...prev, [highlight.id]: true }));
-    setActiveGraphId(targetGraphId);
-    setActiveTool('graph');
-  }, [activeGraphDoc, activeGraphId, item.id, item.title]);
+  }, [activeGraphDoc, activeGraphId, fetchGraphs, item.id, item.title]);
 
   const activeDiagramDoc = diagrams.find((d) => d.id === activeDiagramId);
+
+  useEffect(() => {
+    onWorkspaceDirtyChange?.(graphDirty);
+  }, [graphDirty, onWorkspaceDirtyChange]);
+
+  /**
+   * Switching graphs must never silently discard unsaved edits.
+   */
+  const selectGraph = useCallback(
+    (nextGraphId: string) => {
+      if (nextGraphId === activeGraphId) return;
+      if (
+        graphDirty &&
+        !window.confirm('Discard unsaved changes to the current graph?')
+      ) {
+        return;
+      }
+      setActiveGraphDoc(null);
+      setGraphDirty(false);
+      setGraphsError(null);
+      setActiveGraphId(nextGraphId);
+    },
+    [activeGraphId, graphDirty]
+  );
 
   return (
     <div className="flex flex-col h-full w-full bg-surface border border-border rounded-lg overflow-hidden shadow-xs">
@@ -458,7 +593,7 @@ export function WatchWorkspace({
           <div className="flex items-center gap-1.5">
             <select
               value={activeGraphId || ''}
-              onChange={(e) => setActiveGraphId(e.target.value)}
+              onChange={(e) => selectGraph(e.target.value)}
               className="h-6 text-[11px] bg-surface border border-border rounded px-2 text-foreground font-medium"
             >
               {graphs.map((g) => (
@@ -488,9 +623,26 @@ export function WatchWorkspace({
         {/* =============================================================== */}
         {activeTool === 'graph' && (
           <div className="h-full w-full">
-            {graphsLoading ? (
+            {graphsInitialLoading ? (
               <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
                 Loading knowledge workspace...
+              </div>
+            ) : graphs.length === 0 && graphsError ? (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto space-y-3">
+                <span className="grid size-12 place-items-center rounded-xl border border-border bg-surface text-destructive shadow-xs">
+                  <AlertTriangle size={22} />
+                </span>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Knowledge graph unavailable
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {graphsError}
+                  </p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => void fetchGraphs()} className="h-8 text-xs">
+                  Retry
+                </Button>
               </div>
             ) : graphs.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto space-y-3">
@@ -518,16 +670,24 @@ export function WatchWorkspace({
               </div>
             ) : activeGraphDoc ? (
               <ConceptGraphCanvas
+                key={activeGraphDoc.id}
                 initialDocument={activeGraphDoc}
                 collection="watch"
+                onDirtyChange={setGraphDirty}
                 onDocumentChange={(updated) => {
                   setActiveGraphDoc(updated);
+                  setGraphDirty(false);
                   void fetchGraphs();
                 }}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
-                Select a graph above.
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-xs text-muted-foreground">
+                <span>{graphsError ?? 'Select a graph above.'}</span>
+                {graphsError && (
+                  <Button size="sm" variant="secondary" onClick={() => void fetchGraphs()} className="h-8 text-xs">
+                    Retry
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -597,9 +757,24 @@ export function WatchWorkspace({
                   />
                 </div>
               </div>
-            ) : diagramsLoading ? (
+            ) : diagramsInitialLoading ? (
               <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
                 Loading diagrams...
+              </div>
+            ) : diagrams.length === 0 && diagramsError ? (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto space-y-3">
+                <span className="grid size-12 place-items-center rounded-xl border border-border bg-surface text-destructive shadow-xs">
+                  <AlertTriangle size={22} />
+                </span>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Diagrams unavailable
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{diagramsError}</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => void fetchDiagrams()} className="h-8 text-xs">
+                  Retry
+                </Button>
               </div>
             ) : diagrams.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto space-y-3">
@@ -677,6 +852,28 @@ export function WatchWorkspace({
               <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
                 Loading highlights...
               </div>
+            ) : highlightsError ? (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto space-y-3">
+                <span className="grid size-12 place-items-center rounded-xl border border-border bg-surface text-destructive shadow-xs">
+                  <AlertTriangle size={22} />
+                </span>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Highlights unavailable
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {highlightsError}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setActiveTool('graph')}
+                  className="h-8 text-xs"
+                >
+                  Back to graph
+                </Button>
+              </div>
             ) : highlights.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto space-y-3">
                 <span className="grid size-12 place-items-center rounded-xl border border-border bg-surface text-primary shadow-xs">
@@ -702,6 +899,13 @@ export function WatchWorkspace({
                   </p>
                 </div>
 
+                {highlightActionError && (
+                  <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <span>{highlightActionError}</span>
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   {highlights.map((h) => {
                     const text =
@@ -711,6 +915,7 @@ export function WatchWorkspace({
                       h.content?.comment ||
                       'Evidence passage';
                     const isAdded = highlightAddedMap[h.id];
+                    const isPending = pendingHighlightId === h.id;
 
                     return (
                       <div
@@ -725,13 +930,18 @@ export function WatchWorkspace({
                             size="sm"
                             variant={isAdded ? 'secondary' : 'default'}
                             onClick={() => void handleAddHighlightToGraph(h)}
-                            disabled={isAdded}
+                            disabled={isAdded || isPending}
                             className="h-6 text-[11px] px-2"
                           >
                             {isAdded ? (
                               <>
                                 <Check size={11} className="mr-1" />
                                 Added to Graph
+                              </>
+                            ) : isPending ? (
+                              <>
+                                <Plus size={11} className="mr-1" />
+                                Adding...
                               </>
                             ) : (
                               <>

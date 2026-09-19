@@ -463,7 +463,7 @@ export function KnowledgeHub() {
               </p>
             </div>
             <div className="border border-border rounded-xl bg-surface overflow-hidden h-[600px] flex flex-col">
-              <CanvasList />
+              <CanvasList globalScope />
             </div>
           </div>
         )}

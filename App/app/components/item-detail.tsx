@@ -25,6 +25,14 @@ import { UserDataEditor } from '@/components/user-data-editor';
 import { WatchWorkspace } from '@/components/watch/watch-workspace';
 import type { CatalogMedia, LibraryItem } from '@/lib/catalog';
 import { libraryAssetUrl } from '@/lib/catalog';
+import {
+  canOpenInReader,
+  canPreviewAsImage,
+  classifyMediaExtension,
+  describeMediaExtension,
+  mediaKindExplanation,
+  normalizeExtension,
+} from '@/lib/media-kind';
 
 export type DetailTab =
   | 'overview'
@@ -72,11 +80,19 @@ export function ItemDetail({
   const [thoughtsDirty, setThoughtsDirty] = useState(false);
   const [notesDirty, setNotesDirty] = useState(false);
   const [metadataDirty, setMetadataDirty] = useState(false);
-  const [previewMedia, setPreviewMedia] = useState<CatalogMedia | null>(
+  const [workspaceDirty, setWorkspaceDirty] = useState(false);
+  // The preview is stored by media path and resolved against the *current* item,
+  // so switching titles can never leave the previous title's media on screen.
+  const [previewMediaPath, setPreviewMediaPath] = useState<string | null>(
     typeof initialPreviewIndex === 'number' && item.media[initialPreviewIndex]
-      ? item.media[initialPreviewIndex]
+      ? item.media[initialPreviewIndex].path
       : null,
   );
+  const previewMedia: CatalogMedia | null = previewMediaPath
+    ? item.media.find((media) => media.path === previewMediaPath) ?? null
+    : null;
+  const setPreviewMedia = (media: CatalogMedia | null) =>
+    setPreviewMediaPath(media ? media.path : null);
   const [mediaLoadErrorPath, setMediaLoadErrorPath] = useState<string | null>(
     null,
   );
@@ -85,8 +101,11 @@ export function ItemDetail({
   );
 
   useEffect(
-    () => onDirtyChange(thoughtsDirty || notesDirty || metadataDirty),
-    [metadataDirty, notesDirty, onDirtyChange, thoughtsDirty],
+    () =>
+      onDirtyChange(
+        thoughtsDirty || notesDirty || metadataDirty || workspaceDirty,
+      ),
+    [metadataDirty, notesDirty, onDirtyChange, thoughtsDirty, workspaceDirty],
   );
 
   // Compute effective tab based on collection constraints
@@ -130,7 +149,11 @@ export function ItemDetail({
       className={
         mode === 'maximized'
           ? 'flex min-w-0 flex-1 flex-col bg-surface overflow-hidden'
-          : 'w-full sm:w-[28rem] lg:w-[32rem] xl:w-[34rem] max-w-[50vw] shrink-0 flex flex-col border-l border-border bg-surface overflow-hidden'
+          : tab === 'workspace' && item.collection === 'watch'
+            ? // The Watch workspace needs room for a graph canvas plus its
+              // inspector drawer. Read keeps the original panel width.
+              'w-full sm:w-[34rem] lg:w-[38rem] xl:w-[42rem] max-w-[64vw] shrink-0 flex flex-col border-l border-border bg-surface overflow-hidden'
+            : 'w-full sm:w-[28rem] lg:w-[32rem] xl:w-[34rem] max-w-[50vw] shrink-0 flex flex-col border-l border-border bg-surface overflow-hidden'
       }
     >
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4 bg-surface">
@@ -255,8 +278,19 @@ export function ItemDetail({
         </div>
 
         {tab === 'workspace' && item.collection === 'watch' ? (
-          <div className="h-[calc(100vh-14rem)] min-h-[38rem] w-full p-2 sm:p-4">
-            <WatchWorkspace item={item} mode={mode} />
+          <div
+            className={
+              mode === 'maximized'
+                ? 'h-[calc(100dvh-16rem)] min-h-[36rem] w-full p-2 sm:p-3'
+                : 'h-[calc(100dvh-14rem)] min-h-[32rem] w-full p-2 sm:p-3'
+            }
+          >
+            <WatchWorkspace
+              key={item.id}
+              item={item}
+              mode={mode}
+              onWorkspaceDirtyChange={setWorkspaceDirty}
+            />
           </div>
         ) : (
           <div className={mode === 'maximized' ? 'mx-auto max-w-4xl p-6 md:p-8' : 'p-5'}>
@@ -418,14 +452,7 @@ export function ItemDetail({
                   }
                 >
                   {item.media.map((media) => {
-                    const isImage = [
-                      '.jpg',
-                      '.jpeg',
-                      '.png',
-                      '.gif',
-                      '.webp',
-                      '.avif',
-                    ].includes(media.extension.toLowerCase());
+                    const isImage = canPreviewAsImage(media.extension);
                     return (
                       <div
                         key={media.path}
@@ -455,7 +482,7 @@ export function ItemDetail({
                               {media.name}
                             </p>
                             <p className="text-[10px] text-muted-foreground uppercase mt-0.5">
-                              {media.extension.replace('.', '')}
+                              {normalizeExtension(media.extension).replace('.', '')}
                             </p>
                           </div>
                         </button>
@@ -548,23 +575,12 @@ export function ItemDetail({
         open={Boolean(previewMedia)}
         onClose={() => setPreviewMedia(null)}
         title={previewMedia?.name ?? 'Media preview'}
-        description={
-          previewMedia
-            ? ['.pdf'].includes(previewMedia.extension.toLowerCase())
-              ? 'PDF Document'
-              : ['.epub', '.mobi', '.azw', '.azw3', '.fb2', '.cbz'].includes(previewMedia.extension.toLowerCase())
-                ? 'Publication Document'
-                : ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg'].includes(previewMedia.extension.toLowerCase())
-                  ? `${previewMedia.extension.replace('.', '').toUpperCase()} Image`
-                  : `${previewMedia.extension.replace('.', '').toUpperCase()} File`
-            : undefined
-        }
+        description={previewMedia ? describeMediaExtension(previewMedia.extension) : undefined}
         maxWidth="max-w-2xl"
         footer={
           previewMedia ? (
             <>
-              {['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.fb2', '.cbz'].includes(previewMedia.extension.toLowerCase()) &&
-                item.collection === 'read' && (
+              {canOpenInReader(previewMedia.extension) && item.collection === 'read' && (
                   <Link
                     href={`/reader/${encodeURIComponent(item.id)}`}
                     className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -597,8 +613,7 @@ export function ItemDetail({
         {previewMedia && (
           <div className="space-y-4">
             <div className="flex min-h-[16rem] max-h-[50vh] items-center justify-center overflow-hidden rounded-md border border-border bg-surface-muted/30 p-4">
-              {['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg'].includes(previewMedia.extension.toLowerCase()) &&
-              !mediaLoadError ? (
+              {canPreviewAsImage(previewMedia.extension) && !mediaLoadError ? (
                 <img
                   src={libraryAssetUrl(previewMedia.path)}
                   alt={previewMedia.name}
@@ -608,10 +623,11 @@ export function ItemDetail({
               ) : (
                 <div className="flex flex-col items-center justify-center p-6 text-center space-y-3">
                   <span className="grid size-14 place-items-center rounded-lg border border-border bg-surface text-primary shadow-xs">
-                    {previewMedia.extension.toLowerCase() === '.pdf' ||
-                    ['.epub', '.mobi', '.txt', '.md'].includes(previewMedia.extension.toLowerCase()) ? (
+                    {classifyMediaExtension(previewMedia.extension) === 'pdf' ||
+                    classifyMediaExtension(previewMedia.extension) === 'publication' ||
+                    classifyMediaExtension(previewMedia.extension) === 'document' ? (
                       <FileText size={28} />
-                    ) : ['.mp4', '.webm', '.mkv'].includes(previewMedia.extension.toLowerCase()) ? (
+                    ) : classifyMediaExtension(previewMedia.extension) === 'video' ? (
                       <Clapperboard size={28} />
                     ) : (
                       <File size={28} />
@@ -619,7 +635,7 @@ export function ItemDetail({
                   </span>
                   <div className="space-y-1">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {previewMedia.extension.replace('.', '').toUpperCase()} Document
+                      {normalizeExtension(previewMedia.extension).replace('.', '').toUpperCase()} Document
                     </p>
                     <p
                       className="font-editorial text-base font-semibold text-foreground max-w-md break-words"
@@ -628,9 +644,7 @@ export function ItemDetail({
                       {previewMedia.name}
                     </p>
                     <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                      {previewMedia.extension.toLowerCase() === '.pdf'
-                        ? 'PDF documents are read using the integrated Reader or external viewer.'
-                        : 'Direct visual preview is not supported for this file format.'}
+                      {mediaKindExplanation(previewMedia.extension)}
                     </p>
                   </div>
                 </div>

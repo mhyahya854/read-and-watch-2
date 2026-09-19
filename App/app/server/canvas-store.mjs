@@ -124,6 +124,19 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(DDL_CANVASES);
 
+  // Older or reduced schemas may not carry a collection discriminator; treat
+  // collection-scoped filtering as a no-op rather than a hard failure.
+  const itemsHasCollection = (() => {
+    try {
+      return db
+        .prepare("PRAGMA table_info('items')")
+        .all()
+        .some((col) => col.name === 'collection');
+    } catch {
+      return false;
+    }
+  })();
+
   // Directory resolution
   function canvasDir(canvasId) {
     if (typeof canvasId !== 'string' || !canvasId.trim() || !/^[a-zA-Z0-9_-]+$/.test(canvasId)) {
@@ -256,7 +269,12 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
   // -------------------------------------------------------------------------
 
   /** List canvas metadata records. */
-  function listCanvases({ itemId = null, standaloneOnly = false, includeDeleted = false } = {}) {
+  function listCanvases({
+    itemId = null,
+    standaloneOnly = false,
+    excludeWatchOwned = false,
+    includeDeleted = false,
+  } = {}) {
     let sql = 'SELECT * FROM canvases WHERE 1=1';
     const params = [];
 
@@ -265,6 +283,13 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     } else if (itemId !== null && itemId !== undefined) {
       sql += ' AND item_id = ?';
       params.push(itemId);
+    }
+    if (excludeWatchOwned && itemsHasCollection) {
+      // Global legacy surfaces keep standalone and Read-linked canvases only.
+      sql += ` AND (item_id IS NULL OR NOT EXISTS (
+        SELECT 1 FROM items owner
+        WHERE owner.id = canvases.item_id AND owner.collection = 'watch'
+      ))`;
     }
     if (!includeDeleted) {
       sql += ' AND deleted_at_utc IS NULL';
@@ -281,6 +306,17 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
     const row = db.prepare('SELECT * FROM canvases WHERE id = ?').get(canvasId);
     if (!row) fail('Canvas not found', 404);
     return rowToMetadata(row);
+  }
+
+  /**
+   * Item-scoped canvas requests must prove ownership. An unassigned canvas is a
+   * legacy/standalone canvas and is deliberately not reachable through an
+   * item-scoped route; legacy routes keep it available.
+   */
+  function assertCanvasOwnership(canvasId, itemId) {
+    if (!itemId) return;
+    const meta = getCanvasMetadata(canvasId);
+    if ((meta.itemId ?? null) !== itemId) fail('Canvas not found for this item', 404);
   }
 
   /** Get complete canvas document (metadata + scene + links + assets). */
@@ -924,6 +960,7 @@ export function createCanvasStore({ databasePath, userDataRoot, searchStore = nu
   return {
     listCanvases,
     getCanvasMetadata,
+    assertCanvasOwnership,
     getCanvas,
     createCanvas,
     updateCanvas,

@@ -1201,3 +1201,57 @@ remains `IN_PROGRESS`, `P17-T004` remains the current incomplete task,
    human-validated ground truth was available or generated in this run, so no
    provider acceptance benchmark or P17-G002 gate was executed. Unlimited-OCR
    cannot run on this host, so English benchmark handoff remains required.
+
+## D-063 - Watch-title knowledge ownership is explicit and immutable
+
+Status: Accepted
+
+Watch knowledge graphs and Mermaid diagrams carry an explicit
+`associated_item_id` owner (nullable, `ON DELETE SET NULL`). `null` means
+legacy/unassigned and stays reachable only through unscoped legacy routes.
+
+An item-scoped request (`?itemId=`) succeeds only when the record's owner is
+exactly that item; every other case, including a legacy/unassigned record,
+returns 404. A legacy global artifact must never silently become one title's
+artifact because the caller supplied that title's id.
+
+Ownership is immutable for ordinary saves: an update payload that changes the
+owner is rejected with 409 unless the caller explicitly passes
+`{ allowOwnershipChange: true }`, which only the backup/restore association path
+uses. Backup/restore therefore restores the same ownership value, and
+corrupt-runtime/file-first reconstruction restores the owner when the owning item
+still exists (otherwise the record returns as legacy/unassigned rather than being
+attached to an unrelated title).
+
+Canvas access uses the same rule through an explicit item-ownership guard; Read
+and standalone canvas flows pass no item id and keep their behaviour.
+
+## D-064 - Watch content is excluded from the global legacy knowledge views
+
+Status: Accepted
+
+`/api/knowledge/summary`, the Knowledge hub, and the global Canvas Notes list are
+legacy surfaces that predate title ownership. Until the separate Read redesign,
+they exclude Watch-title-owned artifacts while continuing to list
+legacy/unassigned records and Read-associated records. Nothing is deleted, Read
+keeps its existing access, and legacy unassigned artifacts stay reachable.
+
+Global search remains global by design, but each knowledge hit now carries its
+owning item id and title so a Watch graph points at its own title.
+
+This is a transitional state, not the final information architecture.
+
+## D-065 - Every relationship is individually visible and editable
+
+Status: Accepted
+
+Relationships are stored as first-class rows with an arbitrary UTF-8 label, an
+explicit source/target direction and a `bidirectional` flag. Presets are
+conveniences only.
+
+Two relationships between the same pair of blocks, and an opposite-direction
+pair, must be individually visible, selectable, and deletable. Routing is a pure
+function of the edge list (`lib/knowledge/edge-routing.ts`): each relationship in
+a group gets a deterministic anchor pair, with an alternating bezier curvature
+once the four anchor combinations are exhausted. React Flow is never allowed to
+render two relationships as one indistinguishable line.

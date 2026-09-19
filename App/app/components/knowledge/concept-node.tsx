@@ -15,6 +15,7 @@ import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { DeepLinkBadge } from './deep-link-badge';
 import type { KnowledgeNodeType, DeepLinkRef } from '@/lib/knowledge';
+import { KNOWLEDGE_HANDLES } from '@/lib/knowledge/edge-routing';
 
 export interface ConceptNodeData {
   label: string;
@@ -25,76 +26,81 @@ export interface ConceptNodeData {
   [key: string]: unknown;
 }
 
+/**
+ * Restrained Read & Watch palette: warm neutrals, charcoal text, muted deep teal
+ * accent. No purple, neon, or gradient treatments — semantic distinction comes
+ * from a small set of muted hues only.
+ */
 const TYPE_STYLES: Record<string, { label: string; badgeClass: string; dotClass: string }> = {
   concept: {
     label: 'Concept',
-    badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
-    dotClass: 'bg-indigo-500',
+    badgeClass: 'bg-teal-600/10 text-teal-800 dark:text-teal-300 border-teal-700/25',
+    dotClass: 'bg-teal-700',
   },
   character: {
     label: 'Character',
-    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
-    dotClass: 'bg-emerald-500',
+    badgeClass: 'bg-emerald-600/10 text-emerald-800 dark:text-emerald-300 border-emerald-700/25',
+    dotClass: 'bg-emerald-700',
   },
   location: {
     label: 'Location',
-    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
-    dotClass: 'bg-amber-500',
+    badgeClass: 'bg-amber-600/10 text-amber-800 dark:text-amber-300 border-amber-700/25',
+    dotClass: 'bg-amber-700',
   },
   group: {
     label: 'Group / Faction',
-    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20',
-    dotClass: 'bg-violet-500',
+    badgeClass: 'bg-stone-600/10 text-stone-800 dark:text-stone-300 border-stone-700/25',
+    dotClass: 'bg-stone-700',
   },
   object: {
     label: 'Object',
-    badgeClass: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20',
-    dotClass: 'bg-orange-500',
+    badgeClass: 'bg-orange-600/10 text-orange-800 dark:text-orange-300 border-orange-700/25',
+    dotClass: 'bg-orange-700',
   },
   theme: {
     label: 'Theme',
-    badgeClass: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/20',
-    dotClass: 'bg-fuchsia-500',
+    badgeClass: 'bg-teal-700/10 text-teal-900 dark:text-teal-200 border-teal-800/25',
+    dotClass: 'bg-teal-800',
   },
   episode: {
     label: 'Episode',
-    badgeClass: 'bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20',
-    dotClass: 'bg-slate-500',
+    badgeClass: 'bg-stone-600/10 text-stone-800 dark:text-stone-300 border-stone-700/25',
+    dotClass: 'bg-stone-600',
   },
   theory: {
     label: 'Theory',
-    badgeClass: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20',
-    dotClass: 'bg-cyan-500',
+    badgeClass: 'bg-cyan-700/10 text-cyan-900 dark:text-cyan-300 border-cyan-800/25',
+    dotClass: 'bg-cyan-800',
   },
   thesis: {
     label: 'Thesis',
-    badgeClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
-    dotClass: 'bg-purple-500',
+    badgeClass: 'bg-teal-700/10 text-teal-900 dark:text-teal-200 border-teal-800/25',
+    dotClass: 'bg-teal-900',
   },
   evidence: {
     label: 'Evidence',
-    badgeClass: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20',
-    dotClass: 'bg-teal-500',
+    badgeClass: 'bg-emerald-700/10 text-emerald-900 dark:text-emerald-300 border-emerald-800/25',
+    dotClass: 'bg-emerald-800',
   },
   source: {
     label: 'Source',
-    badgeClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-    dotClass: 'bg-blue-500',
+    badgeClass: 'bg-stone-700/10 text-stone-800 dark:text-stone-300 border-stone-800/25',
+    dotClass: 'bg-stone-800',
   },
   person: {
     label: 'Person / Author',
-    badgeClass: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20',
-    dotClass: 'bg-yellow-500',
+    badgeClass: 'bg-amber-700/10 text-amber-900 dark:text-amber-300 border-amber-800/25',
+    dotClass: 'bg-amber-800',
   },
   event: {
     label: 'Event / History',
-    badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-    dotClass: 'bg-rose-500',
+    badgeClass: 'bg-rose-700/10 text-rose-900 dark:text-rose-300 border-rose-800/25',
+    dotClass: 'bg-rose-800',
   },
   question: {
     label: 'Question',
-    badgeClass: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20',
-    dotClass: 'bg-sky-500',
+    badgeClass: 'bg-amber-600/10 text-amber-800 dark:text-amber-300 border-amber-700/25',
+    dotClass: 'bg-amber-600',
   },
 };
 
@@ -105,29 +111,33 @@ function ConceptNodeBase({ id, data, selected }: NodeProps) {
 
   return (
     <div
-      className={`min-w-[220px] max-w-[320px] rounded-xl border bg-surface/95 backdrop-blur-sm p-3.5 shadow-sm transition-all duration-200 text-foreground ${
+      className={`min-w-[220px] max-w-[320px] rounded-lg border bg-surface p-3.5 shadow-xs transition-all duration-200 text-foreground ${
         selected
-          ? 'border-primary ring-2 ring-primary/20 shadow-md scale-[1.02]'
-          : 'border-border hover:border-border-hover hover:shadow'
+          ? 'border-primary ring-2 ring-primary/25 shadow-sm'
+          : 'border-border hover:border-primary/45 hover:shadow-xs'
       }`}
     >
-      {/* Connection Handles */}
+      {/* Connection Handles — named so multi-edge routing can pick distinct anchors */}
       <Handle
+        id={KNOWLEDGE_HANDLES.targetTop}
         type="target"
         position={Position.Top}
         className="!w-2.5 !h-2.5 !bg-muted-foreground/60 !border-2 !border-surface transition-transform hover:!scale-125"
       />
       <Handle
+        id={KNOWLEDGE_HANDLES.targetLeft}
         type="target"
         position={Position.Left}
         className="!w-2.5 !h-2.5 !bg-muted-foreground/60 !border-2 !border-surface transition-transform hover:!scale-125"
       />
       <Handle
+        id={KNOWLEDGE_HANDLES.sourceRight}
         type="source"
         position={Position.Right}
         className="!w-2.5 !h-2.5 !bg-primary !border-2 !border-surface transition-transform hover:!scale-125"
       />
       <Handle
+        id={KNOWLEDGE_HANDLES.sourceBottom}
         type="source"
         position={Position.Bottom}
         className="!w-2.5 !h-2.5 !bg-primary !border-2 !border-surface transition-transform hover:!scale-125"

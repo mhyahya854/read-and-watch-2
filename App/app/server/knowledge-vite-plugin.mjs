@@ -52,6 +52,7 @@ async function readBody(req) {
  *   userDataRoot?: string;
  *   searchStore?: any;
  *   knowledgeStore?: any;
+ *   canvasStore?: any;
  * }} [options]
  */
 export function knowledgePlugin(options = {}) {
@@ -60,6 +61,7 @@ export function knowledgePlugin(options = {}) {
     userDataRoot,
     searchStore = null,
     knowledgeStore = null,
+    canvasStore: providedCanvasStore = null,
   } = options;
   const store =
     knowledgeStore ||
@@ -69,10 +71,12 @@ export function knowledgePlugin(options = {}) {
       searchStore,
     });
 
-  const canvasStore = createCanvasStore({
-    databasePath: libraryDatabasePath,
-    userDataRoot,
-  });
+  const canvasStore =
+    providedCanvasStore ||
+    createCanvasStore({
+      databasePath: libraryDatabasePath,
+      userDataRoot,
+    });
 
   return {
     name: 'knowledge-api-plugin',
@@ -90,9 +94,14 @@ export function knowledgePlugin(options = {}) {
           // Summary endpoint: /api/knowledge/summary
           // ---------------------------------------------------------------
           if (path === '/api/knowledge/summary' && req.method === 'GET') {
-            const graphs = store.listGraphs();
-            const diagrams = store.listDiagrams();
-            const standaloneCanvases = canvasStore.listCanvases({ standaloneOnly: true });
+            // Global legacy surfaces: title-owned Watch artifacts live in their
+            // own Watch title workspace and must not masquerade as universal
+            // knowledge. Legacy/unassigned AND Read-associated records stay.
+            const graphs = store.listGraphs({ excludeWatchOwned: true });
+            const diagrams = store.listDiagrams({ excludeWatchOwned: true });
+            const standaloneCanvases = canvasStore.listCanvases({
+              excludeWatchOwned: true,
+            });
 
             return sendJson(res, 200, {
               graphs,
@@ -141,20 +150,20 @@ export function knowledgePlugin(options = {}) {
           const graphMatch = path.match(/^\/api\/knowledge\/graphs\/([^/]+)$/);
           if (graphMatch) {
             const graphId = decodeURIComponent(graphMatch[1]);
+            const itemId = parsed.query.itemId ? String(parsed.query.itemId) : null;
             if (req.method === 'GET') {
-              const doc = store.getGraph(graphId);
-              if (parsed.query.itemId && doc.associatedItemId && doc.associatedItemId !== String(parsed.query.itemId)) {
-                return sendJson(res, 404, { error: 'Knowledge graph not found for this item' });
-              }
+              const doc = store.getGraph(graphId, { itemId });
               return sendJson(res, 200, doc);
             }
             if (req.method === 'PUT') {
               const body = await readBody(req);
-              const updated = store.saveGraphDocument(graphId, body || {});
+              const updated = store.saveGraphDocument(graphId, body || {}, {
+                itemId,
+              });
               return sendJson(res, 200, updated);
             }
             if (req.method === 'DELETE') {
-              const result = store.deleteGraph(graphId);
+              const result = store.deleteGraph(graphId, { itemId });
               return sendJson(res, 200, result);
             }
           }
@@ -167,8 +176,13 @@ export function knowledgePlugin(options = {}) {
               const associatedItemId = parsed.query.itemId
                 ? String(parsed.query.itemId)
                 : null;
+              const standaloneOnly = parsed.query.standalone === 'true';
               const tag = parsed.query.tag ? String(parsed.query.tag) : null;
-              const diagrams = store.listDiagrams({ associatedItemId, tag });
+              const diagrams = store.listDiagrams({
+                associatedItemId,
+                standaloneOnly,
+                tag,
+              });
               return sendJson(res, 200, diagrams);
             }
             if (req.method === 'POST') {
@@ -181,17 +195,18 @@ export function knowledgePlugin(options = {}) {
           const diagramMatch = path.match(/^\/api\/knowledge\/diagrams\/([^/]+)$/);
           if (diagramMatch) {
             const diagramId = decodeURIComponent(diagramMatch[1]);
+            const itemId = parsed.query.itemId ? String(parsed.query.itemId) : null;
             if (req.method === 'GET') {
-              const doc = store.getDiagram(diagramId);
+              const doc = store.getDiagram(diagramId, { itemId });
               return sendJson(res, 200, doc);
             }
             if (req.method === 'PUT') {
               const body = await readBody(req);
-              const updated = store.updateDiagram(diagramId, body || {});
+              const updated = store.updateDiagram(diagramId, body || {}, { itemId });
               return sendJson(res, 200, updated);
             }
             if (req.method === 'DELETE') {
-              const result = store.deleteDiagram(diagramId);
+              const result = store.deleteDiagram(diagramId, { itemId });
               return sendJson(res, 200, result);
             }
           }

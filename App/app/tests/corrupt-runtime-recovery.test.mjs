@@ -126,12 +126,14 @@ async function fullFixture(t) {
   knowledgeStore.createGraph({
     id: 'graph-1',
     title: 'Recovered Graph',
+    associatedItemId: watchId,
     nodes: [{ id: 'node-1', label: 'Node One' }],
     edges: [],
   });
   knowledgeStore.createDiagram({
     id: 'diagram-1',
     title: 'Recovered Diagram',
+    associatedItemId: watchId,
     diagramType: 'flowchart',
     sourceText: 'graph TD\n  A --> B',
   });
@@ -257,6 +259,21 @@ test('full synthetic disaster recovery reconstructs portable and file-first user
   });
   assert.equal(knowledgeStore.getGraph(fx.graphId).title, 'Recovered Graph');
   assert.equal(knowledgeStore.getDiagram(fx.diagramId).title, 'Recovered Diagram');
+  assert.equal(
+    knowledgeStore.getGraph(fx.graphId).associatedItemId,
+    fx.watchId,
+    'title ownership must survive a corrupt-runtime staged recovery',
+  );
+  assert.equal(
+    knowledgeStore.getDiagram(fx.diagramId).associatedItemId,
+    fx.watchId,
+    'diagram ownership must survive a corrupt-runtime staged recovery',
+  );
+  assert.equal(
+    knowledgeStore.listGraphs({ associatedItemId: fx.readId }).length,
+    0,
+    'recovered graphs must not be reassigned to another title',
+  );
   knowledgeStore.close();
 
   const readerStore = createReaderStore({

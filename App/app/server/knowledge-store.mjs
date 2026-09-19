@@ -158,6 +158,70 @@ export function createKnowledgeStore({
     `);
   } catch {}
 
+  // Whether the runtime items table carries a collection discriminator. Older or
+  // reduced schemas may omit it, in which case collection-scoped filtering is a
+  // no-op instead of a hard failure.
+  const itemsHasCollection = (() => {
+    try {
+      return db
+        .prepare("PRAGMA table_info('items')")
+        .all()
+        .some((col) => col.name === 'collection');
+    } catch {
+      return false;
+    }
+  })();
+
+  /**
+   * Item-scoped requests must prove ownership.
+   *
+   * When a caller supplies `itemId`, only a record owned by exactly that item may
+   * be returned or mutated. An unassigned (legacy/global) record is deliberately
+   * NOT reachable through an item-scoped route: a legacy artifact must never
+   * silently become "Watch B's" artifact merely because B was named in the call.
+   * Legacy artifacts stay reachable through the unscoped legacy routes.
+   */
+  function assertOwnership(ownerItemId, itemId, notFoundMessage) {
+    if (!itemId) return;
+    if ((ownerItemId ?? null) === itemId) return;
+    fail(notFoundMessage, 404);
+  }
+
+  function assertKnownItem(itemId) {
+    if (!itemId) return;
+    try {
+      const row = db.prepare('SELECT id FROM items WHERE id = ?').get(itemId);
+      if (!row) fail('Unknown associated library item', 400);
+    } catch (err) {
+      if (err?.status) throw err;
+      // items table unavailable in this schema: skip the existence check.
+    }
+  }
+
+  function excludeWatchOwnedSql(alias) {
+    if (!itemsHasCollection) return '';
+    return ` AND (${alias}.associated_item_id IS NULL OR NOT EXISTS (
+      SELECT 1 FROM items owner
+      WHERE owner.id = ${alias}.associated_item_id AND owner.collection = 'watch'
+    ))`;
+  }
+
+  /**
+   * Ownership to persist when rebuilding from file mirrors. The association is
+   * kept when the owning item still exists; when the item is gone the record is
+   * restored as legacy/unassigned rather than being dropped or attached to
+   * another title.
+   */
+  function associatedItemIdForRestore(raw) {
+    const owner = raw?.associatedItemId ?? null;
+    if (!owner) return null;
+    try {
+      return db.prepare('SELECT id FROM items WHERE id = ?').get(owner) ? owner : null;
+    } catch {
+      return null;
+    }
+  }
+
   // Search invalidation helper
   function notifySearchInvalidation() {
     if (searchStore && typeof searchStore.rebuildIndex === 'function') {
@@ -294,6 +358,7 @@ export function createKnowledgeStore({
     includeDeleted = false,
     associatedItemId = null,
     standaloneOnly = false,
+    excludeWatchOwned = false,
     tag = null,
   } = {}) {
     let sql = 'SELECT * FROM knowledge_graphs WHERE 1=1';
@@ -304,6 +369,10 @@ export function createKnowledgeStore({
     } else if (associatedItemId !== null && associatedItemId !== undefined) {
       sql += ' AND associated_item_id = ?';
       params.push(associatedItemId);
+    }
+
+    if (excludeWatchOwned) {
+      sql += excludeWatchOwnedSql('knowledge_graphs');
     }
 
     if (!includeDeleted) {
@@ -326,8 +395,13 @@ export function createKnowledgeStore({
     return rowToGraphMetadata(row);
   }
 
-  function getGraph(graphId) {
-    const meta = getGraphMetadata(graphId);
+  function getGraph(graphId, { itemId = null } = {}) {
+    if (!graphId || typeof graphId !== 'string') fail('Invalid graphId');
+    const row = db.prepare('SELECT * FROM knowledge_graphs WHERE id = ?').get(graphId);
+    if (!row) fail('Knowledge graph not found', 404);
+    assertOwnership(row.associated_item_id, itemId, 'Knowledge graph not found for this item');
+
+    const meta = rowToGraphMetadata(row);
     const nodeRows = db
       .prepare('SELECT * FROM knowledge_nodes WHERE graph_id = ? AND deleted_at_utc IS NULL ORDER BY created_at_utc ASC')
       .all(graphId);
@@ -370,6 +444,7 @@ export function createKnowledgeStore({
   } = {}) {
     const graphId = id || randomUUID();
     const created = nowUtc();
+    assertKnownItem(associatedItemId);
 
     db.exec('BEGIN IMMEDIATE');
     try {
@@ -448,11 +523,14 @@ export function createKnowledgeStore({
       nodes = [],
       edges = [],
       expectedRevision,
-    } = {}
+    } = {},
+    { itemId = null, allowOwnershipChange = false } = {}
   ) {
     if (!graphId) fail('Invalid graphId');
     const existing = db.prepare('SELECT * FROM knowledge_graphs WHERE id = ?').get(graphId);
     if (!existing) fail('Knowledge graph not found', 404);
+
+    assertOwnership(existing.associated_item_id, itemId, 'Knowledge graph not found for this item');
 
     if (expectedRevision !== undefined && existing.revision !== expectedRevision) {
       fail(
@@ -463,8 +541,17 @@ export function createKnowledgeStore({
 
     const updated = nowUtc();
     const newRevision = existing.revision + 1;
-    const targetAssociatedItemId =
-      associatedItemId !== undefined ? associatedItemId : existing.associated_item_id ?? null;
+    const currentOwner = existing.associated_item_id ?? null;
+    const requestedOwner =
+      associatedItemId !== undefined ? associatedItemId ?? null : currentOwner;
+    if (requestedOwner !== currentOwner && !allowOwnershipChange) {
+      fail(
+        'Conflict: knowledge graph ownership cannot be changed by an ordinary save',
+        409
+      );
+    }
+    assertKnownItem(requestedOwner);
+    const targetAssociatedItemId = requestedOwner;
 
     db.exec('BEGIN IMMEDIATE');
     try {
@@ -548,9 +635,10 @@ export function createKnowledgeStore({
     return doc;
   }
 
-  function deleteGraph(graphId, { hard = false } = {}) {
+  function deleteGraph(graphId, { hard = false, itemId = null } = {}) {
     const existing = db.prepare('SELECT * FROM knowledge_graphs WHERE id = ?').get(graphId);
     if (!existing) fail('Knowledge graph not found', 404);
+    assertOwnership(existing.associated_item_id, itemId, 'Knowledge graph not found for this item');
 
     if (hard) {
       db.prepare('DELETE FROM knowledge_graphs WHERE id = ?').run(graphId);
@@ -559,13 +647,20 @@ export function createKnowledgeStore({
       } catch {}
     } else {
       const now = nowUtc();
+      // Capture the full document (and refresh its mirror) before soft deletion so
+      // the file-first mirror keeps nodes/edges instead of degrading to metadata.
+      const fullDoc = getGraph(graphId);
       db.prepare(
         `UPDATE knowledge_graphs
          SET deleted_at_utc = ?, lifecycle = 'soft-deleted', updated_at_utc = ?
          WHERE id = ?`
       ).run(now, now, graphId);
-      const doc = getGraphMetadata(graphId);
-      saveGraphFile(doc);
+      saveGraphFile({
+        ...fullDoc,
+        lifecycle: 'soft-deleted',
+        deletedAt: now,
+        updatedAt: now,
+      });
     }
 
     notifySearchInvalidation();
@@ -576,13 +671,24 @@ export function createKnowledgeStore({
   // Mermaid Document API
   // -------------------------------------------------------------------------
 
-  function listDiagrams({ includeDeleted = false, associatedItemId = null, tag = null } = {}) {
+  function listDiagrams({
+    includeDeleted = false,
+    associatedItemId = null,
+    standaloneOnly = false,
+    excludeWatchOwned = false,
+    tag = null,
+  } = {}) {
     let sql = 'SELECT * FROM mermaid_documents WHERE 1=1';
     const params = [];
 
-    if (associatedItemId) {
+    if (standaloneOnly) {
+      sql += ' AND associated_item_id IS NULL';
+    } else if (associatedItemId !== null && associatedItemId !== undefined) {
       sql += ' AND associated_item_id = ?';
       params.push(associatedItemId);
+    }
+    if (excludeWatchOwned) {
+      sql += excludeWatchOwnedSql('mermaid_documents');
     }
     if (!includeDeleted) {
       sql += ' AND deleted_at_utc IS NULL';
@@ -597,10 +703,11 @@ export function createKnowledgeStore({
     return results;
   }
 
-  function getDiagram(diagramId) {
+  function getDiagram(diagramId, { itemId = null } = {}) {
     if (!diagramId || typeof diagramId !== 'string') fail('Invalid diagramId');
     const row = db.prepare('SELECT * FROM mermaid_documents WHERE id = ?').get(diagramId);
     if (!row) fail('Mermaid diagram not found', 404);
+    assertOwnership(row.associated_item_id, itemId, 'Mermaid diagram not found for this item');
     const doc = rowToDiagram(row);
 
     // Save mirror if missing
@@ -622,6 +729,7 @@ export function createKnowledgeStore({
   } = {}) {
     const diagramId = id || randomUUID();
     const created = nowUtc();
+    assertKnownItem(associatedItemId);
 
     db.prepare(
       `INSERT INTO mermaid_documents (id, title, description, diagram_type, source_text, tags_json, associated_item_id, revision, lifecycle, created_at_utc, updated_at_utc)
@@ -655,10 +763,12 @@ export function createKnowledgeStore({
       tags,
       associatedItemId,
       expectedRevision,
-    } = {}
+    } = {},
+    { itemId = null, allowOwnershipChange = false } = {}
   ) {
     const existing = db.prepare('SELECT * FROM mermaid_documents WHERE id = ?').get(diagramId);
     if (!existing) fail('Mermaid diagram not found', 404);
+    assertOwnership(existing.associated_item_id, itemId, 'Mermaid diagram not found for this item');
 
     if (expectedRevision !== undefined && existing.revision !== expectedRevision) {
       fail(
@@ -669,6 +779,16 @@ export function createKnowledgeStore({
 
     const updated = nowUtc();
     const newRevision = existing.revision + 1;
+    const currentOwner = existing.associated_item_id ?? null;
+    const requestedOwner =
+      associatedItemId !== undefined ? associatedItemId ?? null : currentOwner;
+    if (requestedOwner !== currentOwner && !allowOwnershipChange) {
+      fail(
+        'Conflict: diagram ownership cannot be changed by an ordinary save',
+        409
+      );
+    }
+    assertKnownItem(requestedOwner);
 
     db.prepare(
       `UPDATE mermaid_documents
@@ -680,7 +800,7 @@ export function createKnowledgeStore({
       diagramType !== undefined ? diagramType : existing.diagram_type,
       sourceText !== undefined ? sourceText : existing.source_text,
       tags !== undefined ? JSON.stringify(tags) : existing.tags_json,
-      associatedItemId !== undefined ? associatedItemId : existing.associated_item_id,
+      requestedOwner,
       newRevision,
       updated,
       diagramId
@@ -693,9 +813,10 @@ export function createKnowledgeStore({
     return doc;
   }
 
-  function deleteDiagram(diagramId, { hard = false } = {}) {
+  function deleteDiagram(diagramId, { hard = false, itemId = null } = {}) {
     const existing = db.prepare('SELECT * FROM mermaid_documents WHERE id = ?').get(diagramId);
     if (!existing) fail('Mermaid diagram not found', 404);
+    assertOwnership(existing.associated_item_id, itemId, 'Mermaid diagram not found for this item');
 
     if (hard) {
       db.prepare('DELETE FROM mermaid_documents WHERE id = ?').run(diagramId);
@@ -902,18 +1023,19 @@ export function createKnowledgeStore({
             if (!exists) {
               db.exec('BEGIN IMMEDIATE');
               db.prepare(
-                `INSERT INTO knowledge_graphs (id, title, description, tags_json, associated_item_id, revision, lifecycle, created_at_utc, updated_at_utc)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                `INSERT INTO knowledge_graphs (id, title, description, tags_json, associated_item_id, revision, lifecycle, created_at_utc, updated_at_utc, deleted_at_utc)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
               ).run(
                 raw.id,
                 raw.title,
                 raw.description || '',
                 JSON.stringify(raw.tags || []),
-                raw.associatedItemId || null,
+                associatedItemIdForRestore(raw),
                 raw.revision || 1,
                 raw.lifecycle || 'active',
                 raw.createdAt || nowUtc(),
-                raw.updatedAt || nowUtc()
+                raw.updatedAt || nowUtc(),
+                raw.deletedAt || null
               );
 
               if (Array.isArray(raw.nodes)) {
@@ -986,8 +1108,8 @@ export function createKnowledgeStore({
             const exists = db.prepare('SELECT id FROM mermaid_documents WHERE id = ?').get(raw.id);
             if (!exists) {
               db.prepare(
-                `INSERT INTO mermaid_documents (id, title, description, diagram_type, source_text, tags_json, associated_item_id, revision, lifecycle, created_at_utc, updated_at_utc)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                `INSERT INTO mermaid_documents (id, title, description, diagram_type, source_text, tags_json, associated_item_id, revision, lifecycle, created_at_utc, updated_at_utc, deleted_at_utc)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
               ).run(
                 raw.id,
                 raw.title,
@@ -995,11 +1117,12 @@ export function createKnowledgeStore({
                 raw.diagramType || 'flowchart',
                 raw.sourceText || '',
                 JSON.stringify(raw.tags || []),
-                raw.associatedItemId || null,
+                associatedItemIdForRestore(raw),
                 raw.revision || 1,
                 raw.lifecycle || 'active',
                 raw.createdAt || nowUtc(),
-                raw.updatedAt || nowUtc()
+                raw.updatedAt || nowUtc(),
+                raw.deletedAt || null
               );
               restoredDiagrams++;
             }

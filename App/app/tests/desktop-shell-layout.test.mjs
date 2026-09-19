@@ -1,164 +1,158 @@
+/**
+ * Shared desktop shell contracts.
+ *
+ * These exercise the real shell state model and the real media classifier that
+ * the components import. Static source contracts are kept only where a class or
+ * structure genuinely cannot be verified without a browser.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-
 import { fileURLToPath } from 'node:url';
+
+import {
+  closeDetail,
+  escapeShell,
+  initialShellState,
+  libraryListVisible,
+  selectItem,
+  sidebarWidthClass,
+  titlePanelVisible,
+  toggleMaximize,
+  toggleSidebar,
+} from '../lib/shell/shell-state.ts';
+import {
+  canOpenInReader,
+  canPreviewAsImage,
+  classifyMediaExtension,
+  describeMediaExtension,
+} from '../lib/media-kind.ts';
 
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
+function read(relativePath) {
+  return readFileSync(resolve(appRoot, relativePath), 'utf-8');
+}
+
 test('sidebar state model supports expanded and collapsed icon-rail modes', () => {
-  // Model state transitions
-  let sidebarCollapsed = false;
+  const expanded = initialShellState();
+  assert.equal(expanded.sidebar, 'expanded');
+  assert.equal(sidebarWidthClass('expanded'), 'w-[var(--sidebar-width)] px-3 py-4');
 
-  function toggleSidebar() {
-    sidebarCollapsed = !sidebarCollapsed;
-  }
+  const collapsed = toggleSidebar(expanded);
+  assert.equal(collapsed.sidebar, 'collapsed');
+  assert.equal(sidebarWidthClass('collapsed'), 'w-14 px-2 py-3');
 
-  assert.equal(sidebarCollapsed, false, 'starts expanded');
-  toggleSidebar();
-  assert.equal(sidebarCollapsed, true, 'toggles to collapsed icon rail');
-  toggleSidebar();
-  assert.equal(sidebarCollapsed, false, 'restores to expanded mode');
+  assert.equal(toggleSidebar(collapsed).sidebar, 'expanded');
+  // Toggling the sidebar must not disturb the title panel mode.
+  assert.equal(collapsed.detail, 'split');
 });
 
-test('title-panel layout state transitions deterministically between split, maximized, and closed', () => {
-  let detailMode = 'split';
-  let selectedId = null;
+test('title-panel layout transitions deterministically between split, maximized, and closed', () => {
+  let shell = initialShellState();
 
-  function selectItem(id) {
-    selectedId = id;
-    if (detailMode === 'closed') {
-      detailMode = 'split';
-    }
-  }
+  shell = selectItem(shell);
+  assert.equal(shell.detail, 'split', 'selection opens in split mode');
+  assert.equal(libraryListVisible(shell, true), true);
+  assert.equal(titlePanelVisible(shell, true), true);
 
-  function toggleMaximize() {
-    detailMode = detailMode === 'maximized' ? 'split' : 'maximized';
-  }
+  shell = toggleMaximize(shell);
+  assert.equal(shell.detail, 'maximized', 'toggles to maximized focus mode');
+  assert.equal(libraryListVisible(shell, true), false, 'list collapses in maximized mode');
 
-  function handleEscape() {
-    if (detailMode === 'maximized') {
-      detailMode = 'split';
-    } else if (detailMode === 'split') {
-      detailMode = 'closed';
-    }
-  }
+  shell = toggleMaximize(shell);
+  assert.equal(shell.detail, 'split', 'toggling again restores split mode');
 
-  // 1. Initial selection
-  selectItem('read-123');
-  assert.equal(selectedId, 'read-123');
-  assert.equal(detailMode, 'split', 'selection opens in split mode');
+  shell = escapeShell(shell, { hasSelection: true });
+  assert.equal(shell.detail, 'closed', 'escape in split mode closes the workspace');
+  assert.equal(titlePanelVisible(shell, true), false);
 
-  // 2. Maximize workspace
-  toggleMaximize();
-  assert.equal(detailMode, 'maximized', 'toggles to maximized focus mode');
+  shell = selectItem(shell);
+  assert.equal(shell.detail, 'split', 'selecting while closed re-opens in split mode');
 
-  // 3. Escape in maximized restores split
-  handleEscape();
-  assert.equal(detailMode, 'split', 'escape in maximized restores split mode');
-
-  // 4. Escape in split closes/minimizes
-  handleEscape();
-  assert.equal(detailMode, 'closed', 'escape in split mode closes workspace');
-
-  // 5. Selecting row while closed reopens in split
-  selectItem('read-456');
-  assert.equal(selectedId, 'read-456');
-  assert.equal(detailMode, 'split', 'selecting while closed re-opens in split mode');
+  shell = closeDetail(shell);
+  assert.equal(shell.detail, 'closed');
+  assert.equal(titlePanelVisible(shell, false), false, 'no panel is rendered without a selection');
 });
 
-test('media preview helper correctly routes image vs non-image/pdf documents', () => {
-  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg'];
-  const documentExtensions = ['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.fb2', '.cbz', '.txt', '.md'];
-
-  function classifyMedia(ext) {
-    const lower = ext.toLowerCase();
-    const isImage = imageExtensions.includes(lower);
-    const isPdf = lower === '.pdf';
-    const isBook = ['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.fb2', '.cbz'].includes(lower);
-    const isVideo = ['.mp4', '.webm', '.mkv'].includes(lower);
-    return { isImage, isPdf, isBook, isVideo };
+test('media classification drives real preview, reader, and description decisions', () => {
+  for (const ext of ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg']) {
+    assert.equal(canPreviewAsImage(ext), true, `${ext} must preview as an image`);
+    assert.equal(classifyMediaExtension(ext), 'image');
   }
-
-  // Images should be previewed visually
-  for (const ext of imageExtensions) {
-    const res = classifyMedia(ext);
-    assert.equal(res.isImage, true, `${ext} should be classified as image`);
-    assert.equal(res.isPdf, false);
+  for (const ext of ['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.fb2', '.cbz']) {
+    assert.equal(canPreviewAsImage(ext), false, `${ext} must not render as an img element`);
+    assert.equal(canOpenInReader(ext), true, `${ext} must open in the reader`);
   }
-
-  // Non-images/documents should never be treated as direct image previews
-  for (const ext of documentExtensions) {
-    const res = classifyMedia(ext);
-    assert.equal(res.isImage, false, `${ext} must not be previewed directly as an img element`);
-  }
-
-  assert.equal(classifyMedia('.pdf').isPdf, true, '.pdf is identified as PDF');
-  assert.equal(classifyMedia('.pdf').isBook, true, '.pdf is identified as readable book format');
+  // Case and missing-dot forms are normalised the same way by the component.
+  assert.equal(classifyMediaExtension('JPG'), 'image');
+  assert.equal(describeMediaExtension('.pdf'), 'PDF Document');
+  assert.equal(describeMediaExtension('.EPUB'), 'Publication Document');
+  assert.equal(describeMediaExtension('.png'), 'PNG Image');
+  assert.equal(describeMediaExtension('.zip'), 'ZIP File');
+  assert.equal(canOpenInReader('.zip'), false);
 });
 
-test('dialog centering class contract guarantees in-flow flex participation and full viewport centering', () => {
-  const dialogSrc = readFileSync(resolve(appRoot, 'components/ui/dialog.tsx'), 'utf-8');
+test('static pages and the library shell share one collapsible sidebar primitive', () => {
+  const browserSrc = read('components/library-browser.tsx');
+  const staticSrc = read('components/static-product-page.tsx');
+  const sidebarSrc = read('components/app-sidebar.tsx');
 
-  // Must have fixed inset-0 flex items-center justify-center container
+  assert.ok(browserSrc.includes('<AppSidebar'), 'library shell must render the shared AppSidebar');
+  assert.ok(staticSrc.includes('<AppSidebar'), 'static pages must render the shared AppSidebar');
   assert.ok(
-    dialogSrc.includes('fixed inset-0 z-50 flex items-center justify-center'),
-    'Dialog wrapper must be a fixed viewport flex container with items-center justify-center',
+    staticSrc.includes('toggleSidebar'),
+    'static pages must support the shared collapse interaction',
+  );
+  assert.ok(
+    !browserSrc.includes('aria-label="Application navigation"'),
+    'the library shell must not keep a second sidebar implementation',
+  );
+  assert.ok(
+    !staticSrc.includes('aria-label="Application navigation"'),
+    'static pages must not keep a second sidebar implementation',
   );
 
-  // Dialog element itself must have relative positioning to participate in flex centering
-  assert.ok(
-    dialogSrc.includes('relative w-full'),
-    'Dialog element must have relative positioning to override user-agent absolute positioning',
-  );
-
-  // Dialog element must have m-0 and clean padding/overflow
-  assert.ok(
-    dialogSrc.includes('m-0'),
-    'Dialog element must reset margin to participate cleanly in flex centering',
-  );
-
-  // Accessibility
-  assert.ok(dialogSrc.includes('aria-modal="true"'), 'Dialog must include aria-modal="true"');
-  assert.ok(dialogSrc.includes('aria-labelledby="dialog-title"'), 'Dialog must label title');
+  // Settings stays anchored at the bottom-left of the shared sidebar.
+  assert.ok(sidebarSrc.includes('<div className="flex-1 min-h-6" />'));
+  assert.ok(sidebarSrc.includes('href="/settings"'));
 });
 
-test('sidebar Settings placement contract confirms bottom-left anchoring and no top-bar duplicate', () => {
-  const browserSrc = readFileSync(resolve(appRoot, 'components/library-browser.tsx'), 'utf-8');
-  const staticSrc = readFileSync(resolve(appRoot, 'components/static-product-page.tsx'), 'utf-8');
+test('the top product nav never duplicates the sidebar Settings link', () => {
+  for (const file of ['components/library-browser.tsx', 'components/static-product-page.tsx']) {
+    const src = read(file);
+    const productNav = src.split('<nav aria-label="Product"')[1]?.split('</nav>')[0] ?? '';
+    assert.ok(
+      !productNav.includes('href="/settings"'),
+      `${file} top product nav must not have a duplicate Settings link`,
+    );
+  }
+});
 
-  // Both must anchor Settings in the sidebar with flex-1 spacer
-  assert.ok(
-    browserSrc.includes('<div className="flex-1 min-h-6" />'),
-    'LibraryBrowser sidebar must have flexible space pushing Settings to bottom',
-  );
-  assert.ok(
-    staticSrc.includes('<div className="flex-1 min-h-6" />'),
-    'StaticProductPage sidebar must have flexible space pushing Settings to bottom',
-  );
+test('dialog shell provides centering, a scrollable body, and a footer slot', () => {
+  const dialogSrc = read('components/ui/dialog.tsx');
 
-  // Top header nav must NOT include Settings link
-  const browserHeaderNav = browserSrc.split('<nav aria-label="Product"')[1].split('</nav>')[0];
-  assert.ok(
-    !browserHeaderNav.includes('href="/settings"'),
-    'LibraryBrowser top product nav must not have duplicate Settings link',
-  );
+  assert.ok(dialogSrc.includes('fixed inset-0 z-50 flex items-center justify-center'));
+  assert.ok(dialogSrc.includes('relative w-full'), 'must override the user-agent dialog positioning');
+  assert.ok(dialogSrc.includes('m-0'), 'must reset margin to participate in flex centering');
+  assert.ok(dialogSrc.includes('max-h-[calc(100dvh-3.5rem)]'), 'must cap height in short viewports');
+  assert.ok(dialogSrc.includes('flex-1 overflow-y-auto'), 'body must scroll instead of overflowing');
+  assert.ok(dialogSrc.includes('footer'), 'dialog must expose a footer slot');
+  assert.ok(dialogSrc.includes('aria-modal="true"'));
+  assert.ok(dialogSrc.includes('aria-labelledby="dialog-title"'));
+});
 
-  const staticHeaderNav = staticSrc.split('<nav aria-label="Product"')[1].split('</nav>')[0];
+test('ItemDetail maximized mode restrains content width and keeps maximize controls', () => {
+  const detailSrc = read('components/item-detail.tsx');
+
+  assert.ok(detailSrc.includes('Restore split view'));
+  assert.ok(detailSrc.includes('Maximize workspace'));
+  assert.ok(detailSrc.includes('max-w-4xl'));
   assert.ok(
-    !staticHeaderNav.includes('href="/settings"'),
-    'StaticProductPage top product nav must not have duplicate Settings link',
+    detailSrc.includes('key={item.id}'),
+    'the Watch workspace must remount per title so no stale title state survives',
   );
 });
 
-test('ItemDetail maximized mode enforces restrained max-widths and avoids stretched card layouts', () => {
-  const detailSrc = readFileSync(resolve(appRoot, 'components/item-detail.tsx'), 'utf-8');
-
-  // Must include maximize/restore controls in header
-  assert.ok(detailSrc.includes('Restore split view'), 'ItemDetail must support restore split view control');
-  assert.ok(detailSrc.includes('Maximize workspace'), 'ItemDetail must support maximize workspace control');
-
-  // Maximized mode must restrain content width
-  assert.ok(detailSrc.includes('max-w-4xl'), 'ItemDetail must apply max-w-4xl container when maximized');
-});

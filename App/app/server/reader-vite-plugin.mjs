@@ -448,7 +448,12 @@ export function readerPlugin({
           if (parts.length === 1 && parts[0] === 'canvases' && request.method === 'GET') {
             const itemId = url.searchParams.get('itemId') || undefined;
             const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
-            return sendJson(response, 200, canvasStore.listCanvases({ itemId, includeDeleted }));
+            const excludeWatchOwned = url.searchParams.get('scope') === 'global';
+            return sendJson(
+              response,
+              200,
+              canvasStore.listCanvases({ itemId, includeDeleted, excludeWatchOwned })
+            );
           }
 
           // POST /api/reader/canvases — create canvas
@@ -497,12 +502,14 @@ export function readerPlugin({
           // GET /api/reader/canvases/:id — get canvas document
           if (parts.length === 2 && parts[0] === 'canvases' && request.method === 'GET') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             return sendJson(response, 200, canvasStore.getCanvas(canvasId));
           }
 
           // PUT /api/reader/canvases/:id — update canvas scene + links
           if (parts.length === 2 && parts[0] === 'canvases' && request.method === 'PUT') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             const body = await readJson(request);
             const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision;
             const updated = canvasStore.updateCanvas(canvasId, body, expectedRev);
@@ -512,6 +519,7 @@ export function readerPlugin({
           // PUT /api/reader/canvases/:id/metadata — rename canvas
           if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'metadata' && request.method === 'PUT') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             const body = await readJson(request);
             const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision;
             const renamed = canvasStore.renameCanvas(canvasId, body.title, expectedRev);
@@ -521,6 +529,7 @@ export function readerPlugin({
           // DELETE /api/reader/canvases/:id — soft delete
           if (parts.length === 2 && parts[0] === 'canvases' && request.method === 'DELETE') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             const body = await readJson(request);
             const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision;
             const result = canvasStore.deleteCanvas(canvasId, expectedRev);
@@ -530,6 +539,7 @@ export function readerPlugin({
           // PATCH /api/reader/canvases/:id/restore — restore soft deleted
           if (parts.length === 3 && parts[0] === 'canvases' && parts[2] === 'restore' && request.method === 'PATCH') {
             const canvasId = decodeURIComponent(parts[1]);
+            canvasStore.assertCanvasOwnership(canvasId, url.searchParams.get('itemId'));
             const body = await readJson(request);
             const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined;
             const restored = canvasStore.restoreCanvas(canvasId, expectedRev);

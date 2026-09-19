@@ -19,7 +19,7 @@
  *   - Optimistic concurrency save with conflict handling
  */
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -27,7 +27,6 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
-  addEdge,
   Panel,
   type Connection,
   type Edge,
@@ -54,6 +53,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConceptNode, type ConceptNodeData } from './concept-node';
 import { DeepLinkBadge } from './deep-link-badge';
+import { computeEdgeRouting } from '@/lib/knowledge/edge-routing';
 import type {
   KnowledgeGraphDocument,
   KnowledgeNode,
@@ -66,6 +66,8 @@ interface ConceptGraphCanvasProps {
   initialDocument: KnowledgeGraphDocument;
   collection?: 'read' | 'watch';
   onDocumentChange?: (doc: KnowledgeGraphDocument) => void;
+  /** Reports unsaved edits so the parent never discards work silently. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const WATCH_RELATIONSHIP_PRESETS = [
@@ -97,16 +99,69 @@ const ACADEMIC_RELATIONSHIP_PRESETS = [
   'relates-to',
 ];
 
+/**
+ * Relationship colour comes from the shared Read & Watch theme tokens so the
+ * graph matches the rest of the product in light, warm, and dark themes.
+ */
+export function knowledgeRelationshipColor(
+  edge: Pick<KnowledgeEdge, 'label' | 'relationshipType'>,
+  selected = false,
+): string {
+  if (selected) return 'var(--primary)';
+  const type = (edge.relationshipType || '').toLowerCase();
+  const label = (edge.label || '').toLowerCase();
+  const negative =
+    type === 'refutes' ||
+    type === 'contradicts' ||
+    label.includes('rival') ||
+    label.includes('enemy') ||
+    label.includes('betray') ||
+    label.includes('suspect');
+  if (negative) return 'var(--destructive)';
+  const positive =
+    type === 'supports' ||
+    label.includes('ally') ||
+    label.includes('friend') ||
+    label.includes('mentor') ||
+    label.includes('family') ||
+    label.includes('partner');
+  if (positive) return 'var(--success)';
+  const romantic = label.includes('love') || label.includes('date') || label.includes('likes');
+  if (romantic) return 'var(--warning)';
+  return 'var(--primary)';
+}
+
+/** Minimap swatch per block type, drawn from the shared theme tokens. */
+export function knowledgeNodeColor(nodeType: string | undefined): string {
+  switch (nodeType) {
+    case 'character':
+      return 'var(--success)';
+    case 'location':
+    case 'object':
+    case 'question':
+      return 'var(--warning)';
+    case 'event':
+      return 'var(--destructive)';
+    case 'group':
+    case 'episode':
+      return 'var(--muted-foreground)';
+    default:
+      return 'var(--primary)';
+  }
+}
+
 export function ConceptGraphCanvas({
   initialDocument,
   collection = 'watch',
   onDocumentChange,
+  onDirtyChange,
 }: ConceptGraphCanvasProps) {
   const [doc, setDoc] = useState<KnowledgeGraphDocument>(initialDocument);
   const [viewMode, setViewMode] = useState<'canvas' | 'table'>('canvas');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
 
   // Selection states
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -137,114 +192,175 @@ export function ConceptGraphCanvas({
   // Register custom node types
   const nodeTypes = useMemo(() => ({ concept: ConceptNode }), []);
 
-  // Open inspector for a node
+  /**
+   * Latest canonical document. Inspector lookups must never read a stale
+   * closure: a block created in this same tick (or a block rendered before the
+   * document changed) has to be editable immediately.
+   */
+  const docRef = useRef(doc);
+  useEffect(() => {
+    docRef.current = doc;
+  }, [doc]);
+
+  const markDirty = useCallback(() => {
+    setDirty(true);
+  }, []);
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  // Open inspector for a fully resolved node object
+  const openNodeInspectorFor = useCallback((targetNode: KnowledgeNode) => {
+    setSelectedNodeId(targetNode.id);
+    setSelectedEdgeId(null);
+    setEdgeInspectorOpen(false);
+
+    setEditLabel(targetNode.label);
+    setEditType(targetNode.nodeType);
+    setEditNotes(targetNode.notes || '');
+    if (targetNode.deepLink) {
+      setEditLinkType(targetNode.deepLink.type === 'item' ? 'item' : 'external');
+      setEditLinkTarget(targetNode.deepLink.target);
+    } else {
+      setEditLinkType('none');
+      setEditLinkTarget('');
+    }
+    setNodeInspectorOpen(true);
+  }, []);
+
+  // Open inspector by id using the latest document
   const openNodeInspector = useCallback(
     (nodeId: string) => {
-      const targetNode = doc.nodes.find((n) => n.id === nodeId);
-      if (targetNode) {
-        setSelectedNodeId(nodeId);
-        setSelectedEdgeId(null);
-        setEdgeInspectorOpen(false);
-
-        setEditLabel(targetNode.label);
-        setEditType(targetNode.nodeType);
-        setEditNotes(targetNode.notes || '');
-        if (targetNode.deepLink) {
-          setEditLinkType(
-            targetNode.deepLink.type === 'item' ? 'item' : 'external',
-          );
-          setEditLinkTarget(targetNode.deepLink.target);
-        } else {
-          setEditLinkType('none');
-          setEditLinkTarget('');
-        }
-        setNodeInspectorOpen(true);
-      }
+      const targetNode = docRef.current.nodes.find((n) => n.id === nodeId);
+      if (targetNode) openNodeInspectorFor(targetNode);
     },
-    [doc.nodes],
+    [openNodeInspectorFor],
   );
 
+  /**
+   * Stable dispatcher stored in React Flow node data. React Flow node state is
+   * created once and later re-rendered, so storing a fresh callback each render
+   * would leave stale lookups behind.
+   */
+  const openNodeInspectorRef = useRef(openNodeInspector);
+  useEffect(() => {
+    openNodeInspectorRef.current = openNodeInspector;
+  }, [openNodeInspector]);
+  const dispatchNodeEdit = useCallback((nodeId: string) => {
+    openNodeInspectorRef.current(nodeId);
+  }, []);
+
   // Map canonical nodes to React Flow projection nodes
-  const initialNodes = useMemo<Node[]>(() => {
-    return doc.nodes.map((n) => ({
-      id: n.id,
-      type: 'concept',
-      position: { x: n.position.x, y: n.position.y },
-      data: {
-        label: n.label,
-        nodeType: n.nodeType,
-        notes: n.notes,
-        deepLink: n.deepLink,
-        onEdit: (nodeId: string) => {
-          openNodeInspector(nodeId);
-        },
-      } satisfies ConceptNodeData,
-    }));
-  }, [doc.nodes, openNodeInspector]);
-
-  // Map canonical edges to React Flow projection edges
-  const initialEdges = useMemo<Edge[]>(() => {
-    return doc.edges.map((e) => {
-      const isSelected = selectedEdgeId === e.id;
-      const strokeColor = isSelected
-        ? '#4f46e5'
-        : e.relationshipType === 'refutes' || e.label === 'rivalry' || e.label === 'enemy of'
-          ? '#ef4444'
-          : e.relationshipType === 'supports' || e.label === 'allies with'
-            ? '#10b981'
-            : e.label === 'loves' || e.label === 'dated'
-              ? '#f43f5e'
-              : '#6366f1';
-
-      return {
-        id: e.id,
-        source: e.sourceNodeId,
-        target: e.targetNodeId,
-        type: 'smoothstep',
-        label: e.label || e.relationshipType || 'relates to',
-        labelStyle: {
-          fill: isSelected ? '#1e1b4b' : '#334155',
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: '0.01em',
-        },
-        labelBgStyle: {
-          fill: isSelected ? '#e0e7ff' : '#ffffff',
-          fillOpacity: 0.96,
-          stroke: isSelected ? '#4f46e5' : '#cbd5e1',
-          strokeWidth: isSelected ? 1.5 : 1,
-        },
-        labelBgPadding: [6, 4] as [number, number],
-        labelBgBorderRadius: 4,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 14,
-          height: 14,
-          color: strokeColor,
-        },
-        markerStart: e.bidirectional
-          ? {
-              type: MarkerType.ArrowClosed,
-              width: 14,
-              height: 14,
-              color: strokeColor,
-            }
-          : undefined,
-        style: {
-          strokeWidth: isSelected ? 2.5 : 1.5,
-          stroke: strokeColor,
-        },
+  const projectNodes = useCallback(
+    (source: KnowledgeGraphDocument): Node[] =>
+      source.nodes.map((n) => ({
+        id: n.id,
+        type: 'concept',
+        position: { x: n.position.x, y: n.position.y },
         data: {
-          relationshipType: e.relationshipType,
-          label: e.label,
-          bidirectional: e.bidirectional,
-        },
-      };
-    });
-  }, [doc.edges, selectedEdgeId]);
+          label: n.label,
+          nodeType: n.nodeType,
+          notes: n.notes,
+          deepLink: n.deepLink,
+          onEdit: dispatchNodeEdit,
+        } satisfies ConceptNodeData,
+      })),
+    [dispatchNodeEdit],
+  );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  // Map canonical edges to React Flow projection edges. Routing is derived from
+  // the edge set so parallel and opposite-direction relationships stay distinct.
+  const projectEdges = useCallback(
+    (source: KnowledgeGraphDocument, selectedId: string | null): Edge[] => {
+      const routing = computeEdgeRouting(
+        source.edges.map((e) => ({
+          id: e.id,
+          sourceNodeId: e.sourceNodeId,
+          targetNodeId: e.targetNodeId,
+        })),
+      );
+
+      return source.edges.map((e) => {
+        const geometry = routing.get(e.id) ?? {
+          sourceHandle: undefined,
+          targetHandle: undefined,
+          curvature: 0.25,
+        };
+        const isSelected = selectedId === e.id;
+        const strokeColor = knowledgeRelationshipColor(e, isSelected);
+
+        return {
+          id: e.id,
+          source: e.sourceNodeId,
+          target: e.targetNodeId,
+          sourceHandle: geometry.sourceHandle,
+          targetHandle: geometry.targetHandle,
+          type: 'default',
+          pathOptions: { curvature: geometry.curvature },
+          label: e.label || e.relationshipType || 'relates to',
+          labelStyle: {
+            fill: isSelected ? 'var(--primary)' : 'var(--foreground)',
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: '0.01em',
+          },
+          labelBgStyle: {
+            fill: 'var(--surface)',
+            fillOpacity: 0.96,
+            stroke: isSelected ? 'var(--primary)' : 'var(--border)',
+            strokeWidth: isSelected ? 1.5 : 1,
+          },
+          labelBgPadding: [6, 4] as [number, number],
+          labelBgBorderRadius: 4,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 14,
+            height: 14,
+            color: strokeColor,
+          },
+          markerStart: e.bidirectional
+            ? {
+                type: MarkerType.ArrowClosed,
+                width: 14,
+                height: 14,
+                color: strokeColor,
+              }
+            : undefined,
+          style: {
+            strokeWidth: isSelected ? 2.5 : 1.5,
+            stroke: strokeColor,
+          },
+          data: {
+            relationshipType: e.relationshipType,
+            label: e.label,
+            bidirectional: e.bidirectional,
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const projectedNodes = useMemo(() => projectNodes(doc), [doc, projectNodes]);
+  const projectedEdges = useMemo(
+    () => projectEdges(doc, selectedEdgeId),
+    [doc, projectEdges, selectedEdgeId],
+  );
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(projectedNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(projectedEdges);
+
+  // Re-derive the React Flow projection whenever the canonical document changes.
+  // React Flow keeps its own drag/selection state between document changes, so
+  // this never fights an in-progress drag.
+  useEffect(() => {
+    setNodes(projectedNodes);
+  }, [projectedNodes, setNodes]);
+
+  useEffect(() => {
+    setEdges(projectedEdges);
+  }, [projectedEdges, setEdges]);
 
   // Synchronize React Flow nodes back to canonical doc
   const handleNodesSync = useCallback(() => {
@@ -282,38 +398,11 @@ export function ConceptGraphCanvas({
         updatedAt: new Date().toISOString(),
       };
 
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...params,
-            id: newEdgeId,
-            type: 'smoothstep',
-            label: defaultLabel,
-            labelStyle: { fill: '#334155', fontSize: 11, fontWeight: 600 },
-            labelBgStyle: {
-              fill: '#ffffff',
-              fillOpacity: 0.96,
-              stroke: '#cbd5e1',
-              strokeWidth: 1,
-            },
-            labelBgPadding: [6, 4],
-            labelBgBorderRadius: 4,
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              width: 14,
-              height: 14,
-              color: '#6366f1',
-            },
-            style: { strokeWidth: 1.5, stroke: '#6366f1' },
-          },
-          eds,
-        ),
-      );
-
       setDoc((prev) => ({
         ...prev,
         edges: [...prev.edges, newCanonicalEdge],
       }));
+      markDirty();
 
       // Immediately select the new edge for instant labeling
       setSelectedEdgeId(newEdgeId);
@@ -325,7 +414,7 @@ export function ConceptGraphCanvas({
       setEdgeInspectorOpen(true);
       setNodeInspectorOpen(false);
     },
-    [collection, doc.id, setEdges],
+    [collection, doc.id, markDirty],
   );
 
 
@@ -383,24 +472,7 @@ export function ConceptGraphCanvas({
       });
       return { ...prev, nodes: updatedNodes };
     });
-
-    setNodes((nds) =>
-      nds.map((n) => {
-        if (n.id === selectedNodeId) {
-          return {
-            ...n,
-            data: {
-              ...n.data,
-              label: trimmedLabel,
-              nodeType: editType,
-              notes: editNotes.trim(),
-              deepLink,
-            },
-          };
-        }
-        return n;
-      }),
-    );
+    markDirty();
 
     setNodeInspectorOpen(false);
   };
@@ -428,28 +500,7 @@ export function ConceptGraphCanvas({
       });
       return { ...prev, edges: updatedEdges };
     });
-
-    setEdges((eds) =>
-      eds.map((e) => {
-        if (e.id === selectedEdgeId) {
-          return {
-            ...e,
-            source: editEdgeSourceId,
-            target: editEdgeTargetId,
-            label: trimmedLabel,
-            markerStart: editEdgeBidirectional
-              ? {
-                  type: MarkerType.ArrowClosed,
-                  width: 14,
-                  height: 14,
-                  color: '#6366f1',
-                }
-              : undefined,
-          };
-        }
-        return e;
-      }),
-    );
+    markDirty();
 
     setEdgeInspectorOpen(false);
   };
@@ -497,23 +548,11 @@ export function ConceptGraphCanvas({
       ...prev,
       nodes: [...prev.nodes, newNode],
     }));
+    markDirty();
 
-    setNodes((nds) => [
-      ...nds,
-      {
-        id: newNodeId,
-        type: 'concept',
-        position,
-        data: {
-          label: newNode.label,
-          nodeType: newNode.nodeType,
-          notes: '',
-          onEdit: openNodeInspector,
-        },
-      },
-    ]);
-
-    openNodeInspector(newNodeId);
+    // Open the inspector for the block that was just created, using the node
+    // object itself rather than a stale document lookup.
+    openNodeInspectorFor(newNode);
   };
 
   // Delete node
@@ -525,10 +564,7 @@ export function ConceptGraphCanvas({
         (e) => e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId,
       ),
     }));
-    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-    setEdges((eds) =>
-      eds.filter((e) => e.source !== nodeId && e.target !== nodeId),
-    );
+    markDirty();
     if (selectedNodeId === nodeId) {
       setNodeInspectorOpen(false);
       setSelectedNodeId(null);
@@ -541,7 +577,7 @@ export function ConceptGraphCanvas({
       ...prev,
       edges: prev.edges.filter((e) => e.id !== edgeId),
     }));
-    setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+    markDirty();
     if (selectedEdgeId === edgeId) {
       setEdgeInspectorOpen(false);
       setSelectedEdgeId(null);
@@ -567,7 +603,9 @@ export function ConceptGraphCanvas({
       });
 
       const res = await fetch(
-        `/api/knowledge/graphs/${encodeURIComponent(doc.id)}`,
+        doc.associatedItemId
+          ? `/api/knowledge/graphs/${encodeURIComponent(doc.id)}?itemId=${encodeURIComponent(doc.associatedItemId)}`
+          : `/api/knowledge/graphs/${encodeURIComponent(doc.id)}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -597,6 +635,7 @@ export function ConceptGraphCanvas({
 
       const updated = (await res.json()) as KnowledgeGraphDocument;
       setDoc(updated);
+      setDirty(false);
       setSaveSuccess(true);
       if (onDocumentChange) onDocumentChange(updated);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -654,6 +693,9 @@ export function ConceptGraphCanvas({
               >
                 r{doc.revision}
               </Badge>
+              {dirty && (
+                <span className="text-[10px] font-medium text-warning">Unsaved</span>
+              )}
             </div>
             <p className="text-[10px] text-muted-foreground truncate">
               {doc.nodes.length} blocks · {doc.edges.length} relationships
@@ -800,22 +842,20 @@ export function ConceptGraphCanvas({
                 };
 
                 setDoc((prev) => ({ ...prev, nodes: [...prev.nodes, newNode] }));
-                setNodes((nds) => [
-                  ...nds,
-                  {
-                    id: newNodeId,
-                    type: 'concept',
-                    position: { x, y },
-                    data: {
-                      label: newNode.label,
-                      nodeType: newNode.nodeType,
-                      notes: '',
-                      onEdit: openNodeInspector,
-                    },
-                  },
-                ]);
-                openNodeInspector(newNodeId);
+                markDirty();
+                openNodeInspectorFor(newNode);
               }
+            }}
+            onNodeDragStop={(_event, node) => {
+              setDoc((prev) => ({
+                ...prev,
+                nodes: prev.nodes.map((n) =>
+                  n.id === node.id
+                    ? { ...n, position: { x: node.position.x, y: node.position.y } }
+                    : n,
+                ),
+              }));
+              markDirty();
             }}
             nodeTypes={nodeTypes}
             fitView
@@ -829,19 +869,12 @@ export function ConceptGraphCanvas({
               className="!bg-surface/90 !border-border !rounded-lg"
               nodeColor={(n) => {
                 const data = n.data as unknown as ConceptNodeData;
-                if (data.nodeType === 'character') return '#10b981';
-                if (data.nodeType === 'location') return '#f59e0b';
-                if (data.nodeType === 'group') return '#8b5cf6';
-                if (data.nodeType === 'event') return '#f43f5e';
-                if (data.nodeType === 'object') return '#f97316';
-                if (data.nodeType === 'theme') return '#d946ef';
-                if (data.nodeType === 'theory') return '#06b6d4';
-                return '#6366f1';
+                return knowledgeNodeColor(data.nodeType as string | undefined);
               }}
             />
             <Panel
               position="top-right"
-              className="bg-surface/90 backdrop-blur-xs border border-border rounded-md px-2.5 py-1 text-[11px] text-muted-foreground shadow-xs pointer-events-none"
+              className="bg-surface border border-border rounded-md px-2.5 py-1 text-[11px] text-muted-foreground shadow-xs pointer-events-none"
             >
               Drag handles to connect · Click line to edit relation · Double click empty space to add block
             </Panel>

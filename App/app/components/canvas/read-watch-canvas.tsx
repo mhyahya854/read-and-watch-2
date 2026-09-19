@@ -106,6 +106,13 @@ export function ReadWatchCanvas({
   const excalidrawApiRef = useRef<ExcalidrawApi | null>(null);
   const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentRevisionRef = useRef<number>(1);
+
+  /**
+   * Item-scoped canvas access. Supplying the owning item makes the API refuse a
+   * canvas that belongs to another title; an unscoped caller (legacy reader
+   * flows and standalone canvases) keeps its existing behaviour.
+   */
+  const scopeQuery = propItemId ? `?itemId=${encodeURIComponent(propItemId)}` : '';
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 1. Configure local asset path and dynamically load Excalidraw in browser
@@ -125,7 +132,7 @@ export function ReadWatchCanvas({
 
   useEffect(() => {
     let active = true;
-    fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}`)
+    fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}${scopeQuery}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return (await res.json()) as ReadWatchCanvasDocument;
@@ -149,7 +156,7 @@ export function ReadWatchCanvas({
     return () => {
       active = false;
     };
-  }, [canvasId, reloadKey]);
+  }, [canvasId, reloadKey, scopeQuery]);
 
   // 3. Save canvas document
   const saveCanvas = useCallback(
@@ -187,7 +194,7 @@ export function ReadWatchCanvas({
 
       try {
         setSaveStatus('saving');
-        const res = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}`, {
+        const res = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}${scopeQuery}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -210,7 +217,7 @@ export function ReadWatchCanvas({
         setSaveStatus('error');
       }
     },
-    [doc, title, canvasId],
+    [doc, title, canvasId, scopeQuery],
   );
 
   // 4. Debounced autosave on scene changes
@@ -247,7 +254,7 @@ export function ReadWatchCanvas({
     setIsEditingTitle(false);
     if (!doc || title.trim() === doc.title) return;
     try {
-      const res = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}/metadata`, {
+      const res = await fetch(`/api/reader/canvases/${encodeURIComponent(canvasId)}/metadata${scopeQuery}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, expectedRevision: currentRevisionRef.current }),

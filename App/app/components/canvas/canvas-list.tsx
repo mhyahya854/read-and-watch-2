@@ -24,10 +24,26 @@ import type { CanvasMetadata } from '@/lib/canvas';
 interface CanvasListProps {
   itemId?: string | null;
   bookTitle?: string;
+  /**
+   * Global legacy listing. Watch-title canvases live inside their Watch
+   * workspace, so a library-wide listing must filter them out while keeping
+   * standalone and Read-linked canvases.
+   */
+  globalScope?: boolean;
   onSelectCanvas?: (canvasId: string) => void;
 }
 
-export function CanvasList({ itemId, bookTitle: _bookTitle, onSelectCanvas }: CanvasListProps) {
+function canvasesUrl(itemId: string | null | undefined, globalScope: boolean): string {
+  if (itemId) return `/api/reader/items/${encodeURIComponent(itemId)}/canvases`;
+  return globalScope ? '/api/reader/canvases?scope=global' : '/api/reader/canvases';
+}
+
+export function CanvasList({
+  itemId,
+  bookTitle: _bookTitle,
+  globalScope = false,
+  onSelectCanvas,
+}: CanvasListProps) {
   const [canvases, setCanvases] = useState<CanvasMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -36,9 +52,7 @@ export function CanvasList({ itemId, bookTitle: _bookTitle, onSelectCanvas }: Ca
 
   const fetchCanvases = useCallback(async () => {
     try {
-      const url = itemId
-        ? `/api/reader/items/${encodeURIComponent(itemId)}/canvases`
-        : '/api/reader/canvases';
+      const url = canvasesUrl(itemId, globalScope);
       const res = await fetch(url);
       if (res.ok) {
         const data = (await res.json()) as CanvasMetadata[];
@@ -49,13 +63,11 @@ export function CanvasList({ itemId, bookTitle: _bookTitle, onSelectCanvas }: Ca
     } finally {
       setLoading(false);
     }
-  }, [itemId]);
+  }, [itemId, globalScope]);
 
   useEffect(() => {
     let active = true;
-    const url = itemId
-      ? `/api/reader/items/${encodeURIComponent(itemId)}/canvases`
-      : '/api/reader/canvases';
+    const url = canvasesUrl(itemId, globalScope);
 
     fetch(url)
       .then(async (res) => {
@@ -78,14 +90,12 @@ export function CanvasList({ itemId, bookTitle: _bookTitle, onSelectCanvas }: Ca
     return () => {
       active = false;
     };
-  }, [itemId]);
+  }, [itemId, globalScope]);
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
     try {
-      const url = itemId
-        ? `/api/reader/items/${encodeURIComponent(itemId)}/canvases`
-        : '/api/reader/canvases';
+      const url = canvasesUrl(itemId, globalScope);
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
