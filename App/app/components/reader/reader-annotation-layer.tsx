@@ -24,18 +24,30 @@ const DEFAULT_MARK_COLORS: Record<string, string> = {
   strike: '#b45309',
 };
 
-/** Per-annotation colour, honouring the colour the user actually saved. */
+/**
+ * Presentation descriptor for a single annotation fragment.
+ *
+ * - highlight: background fill over the fragment bounds
+ * - underline: 2 px line at the BOTTOM edge of the fragment
+ * - strike:    2 px line through the VERTICAL CENTRE of the fragment
+ *
+ * The fragment element is always `position: absolute` with explicit left/top/
+ * width/height coming from the normalized rect, so we can place the strike bar
+ * as a child `<span>` absolutely positioned at `top: 50%`.
+ */
 function markPresentation(subKind: string, savedColor?: string) {
   const color = savedColor || DEFAULT_MARK_COLORS[subKind] || DEFAULT_MARK_COLORS.highlight;
   if (subKind === 'underline') {
-    return { background: 'transparent', borderBottom: `2px solid ${color}` };
+    return { background: 'transparent', borderBottom: `2px solid ${color}`, strikeColor: null };
   }
   if (subKind === 'strike') {
-    return { background: 'transparent', borderBottom: `2px solid ${color}` };
+    // No border on the container — the center line is painted by a child span.
+    return { background: 'transparent', borderBottom: undefined as string | undefined, strikeColor: color };
   }
   return {
     background: `color-mix(in oklab, ${color} 42%, transparent)`,
     borderBottom: undefined as string | undefined,
+    strikeColor: null,
   };
 }
 
@@ -195,7 +207,7 @@ export function ReaderAnnotationLayer() {
             {canonicalRects.map((canonicalRect, index) => {
               const rect = fromCanonicalRect(canonicalRect, rotation);
               return (
-                <button
+              <button
                   // One accessible element per annotation: the first fragment
                   // carries the label, the rest are presentation pieces.
                   key={`${annotation.id}-${index}`}
@@ -217,8 +229,28 @@ export function ReaderAnnotationLayer() {
                     background: style.background,
                     borderBottom: style.borderBottom,
                     mixBlendMode: 'multiply',
+                    position: 'absolute',
+                    overflow: 'visible',
                   }}
-                />
+                >
+                  {style.strikeColor && (
+                    <span
+                      aria-hidden
+                      data-strike-line
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: '50%',
+                        height: '2px',
+                        transform: 'translateY(-50%)',
+                        background: style.strikeColor,
+                        borderRadius: '1px',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  )}
+                </button>
               );
             })}
           </span>

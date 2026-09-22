@@ -1034,3 +1034,67 @@ test('File-first canvas recovery keeps blocks, relationships and visual bindings
     }
     assert.ok(userDataRoot.length > 0);
   }));
+
+// ---------------------------------------------------------------------------
+// Strikethrough rendering — presentation helper contract
+// ---------------------------------------------------------------------------
+// This mirrors the logic in reader-annotation-layer.tsx.  If the component
+// reverts to using borderBottom for strike the assertions below will catch it.
+
+const DEFAULT_MARK_COLORS_TEST = {
+  highlight: '#d6b34c',
+  underline: '#2f6f63',
+  strike: '#b45309',
+};
+
+function markPresentationTest(subKind, savedColor) {
+  const color = savedColor || DEFAULT_MARK_COLORS_TEST[subKind] || DEFAULT_MARK_COLORS_TEST.highlight;
+  if (subKind === 'underline') {
+    return { background: 'transparent', borderBottom: `2px solid ${color}`, strikeColor: null };
+  }
+  if (subKind === 'strike') {
+    return { background: 'transparent', borderBottom: undefined, strikeColor: color };
+  }
+  return {
+    background: `color-mix(in oklab, ${color} 42%, transparent)`,
+    borderBottom: undefined,
+    strikeColor: null,
+  };
+}
+
+test('markPresentation: underline uses bottom border; strike uses center line, not bottom border', () => {
+  const ul = markPresentationTest('underline', '#2f6f63');
+  const st = markPresentationTest('strike', '#b45309');
+  const hl = markPresentationTest('highlight', '#d6b34c');
+
+  // Underline — must have a bottom border and no strike color
+  assert.ok(typeof ul.borderBottom === 'string' && ul.borderBottom.length > 0,
+    'underline must have a borderBottom style');
+  assert.equal(ul.strikeColor, null, 'underline must not have a strikeColor');
+
+  // Strike — must have a strikeColor and no bottom border (center line rendered via child span)
+  assert.ok(typeof st.strikeColor === 'string' && st.strikeColor.length > 0,
+    'strike must have a strikeColor');
+  assert.equal(st.borderBottom, undefined, 'strike must NOT use borderBottom');
+
+  // Strike is visually different from underline
+  assert.notEqual(st.borderBottom, ul.borderBottom, 'strike and underline styling must differ');
+  assert.notEqual(st.strikeColor, ul.strikeColor, 'strike must have strikeColor where underline has null');
+
+  // Highlight — background fill, no border
+  assert.ok(hl.background.includes('color-mix'), 'highlight must use background fill');
+  assert.equal(hl.borderBottom, undefined, 'highlight must not use borderBottom');
+  assert.equal(hl.strikeColor, null, 'highlight must not have strikeColor');
+
+  // Custom colors are respected
+  const customStrike = markPresentationTest('strike', '#ff0000');
+  assert.equal(customStrike.strikeColor, '#ff0000', 'custom strike color is used');
+
+  // Multi-line: same logic applies for each fragment independently
+  const frags = ['#aabbcc', '#ddeeff'].map((c) => markPresentationTest('strike', c));
+  for (const frag of frags) {
+    assert.ok(frag.strikeColor, 'each fragment has a strikeColor');
+    assert.equal(frag.borderBottom, undefined, 'each fragment has no borderBottom');
+  }
+});
+

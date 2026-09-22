@@ -367,6 +367,22 @@ async function main() {
     await sleep(800);
     await shot('08-strikethrough.png', 'Strikethrough created from the selection', async () => {
       await expectText('strike annotation in the pane', 'Strike');
+      await expectPresent('strike line element', '[data-strike-line]');
+      const strikeDifferentFromUnderline = await cdp.evaluate(`
+        (() => {
+          const strikeBtn = document.querySelector('button[aria-label="strike annotation"]');
+          const underlineBtn = document.querySelector('button[aria-label="underline annotation"]');
+          if (!strikeBtn || !underlineBtn) return false;
+          const strikeHasLine = Boolean(strikeBtn.querySelector('[data-strike-line]'));
+          const underlineHasLine = Boolean(underlineBtn.querySelector('[data-strike-line]'));
+          const strikeBorder = strikeBtn.style.borderBottom;
+          const underlineBorder = underlineBtn.style.borderBottom;
+          return strikeHasLine && !underlineHasLine && !strikeBorder && Boolean(underlineBorder);
+        })()
+      `);
+      if (!strikeDifferentFromUnderline) {
+        throw new Error('strikethrough visual styling must differ from underline (center line vs bottom border)');
+      }
     });
 
     // Note editor on the newest annotation (the study pane focuses it).

@@ -335,14 +335,17 @@ export class CdpClient {
 export function createAssertions(cdp) {
   const captured = [];
 
-  const expectText = async (label, text) => {
-    const found = await cdp.evaluate(
-      `document.body.innerText.includes(${JSON.stringify(text)})`,
-    );
-    if (!found) {
-      const body = await cdp.evaluate('document.body.innerText.slice(0, 600)');
-      throw new Error(`Assertion failed (${label}): page does not contain "${text}".\n${body}`);
+  const expectText = async (label, text, timeoutMs = 15000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const found = await cdp.evaluate(
+        `document.body.innerText.includes(${JSON.stringify(text)})`,
+      );
+      if (found) return;
+      await sleep(250);
     }
+    const body = await cdp.evaluate('document.body.innerText.slice(0, 600)');
+    throw new Error(`Assertion failed (${label}): page does not contain "${text}".\n${body}`);
   };
 
   const expectAbsent = async (label, text) => {
@@ -363,11 +366,16 @@ export function createAssertions(cdp) {
     }
   };
 
-  const expectPresent = async (label, selector) => {
-    const present = await cdp.evaluate(
-      `Boolean(document.querySelector(${JSON.stringify(selector)}))`,
-    );
-    if (!present) throw new Error(`Assertion failed (${label}): missing "${selector}".`);
+  const expectPresent = async (label, selector, timeoutMs = 15000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const present = await cdp.evaluate(
+        `Boolean(document.querySelector(${JSON.stringify(selector)}))`,
+      );
+      if (present) return;
+      await sleep(250);
+    }
+    throw new Error(`Assertion failed (${label}): missing "${selector}".`);
   };
 
   const shot = async (filename, label, assertion) => {

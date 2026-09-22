@@ -665,33 +665,236 @@ export function createDesktopService({ appRoot, dataRootOverride = null }) {
         return sendJson(res, 200, buildStudySummary({ itemId, annotationStore, canvasStore }));
       }
 
+      // ---------------------------------------------------------------
+      // /api/reader/canvases/* — production canvas routes (Phase 10)
+      // These mirror the Vite reader plugin exactly so packaged Electron
+      // and the dev server behave identically. The React client ONLY uses
+      // these routes; /api/canvases/* is kept for legacy compatibility.
+      // ---------------------------------------------------------------
+
+      // GET  /api/reader/canvases           — list all canvases
+      // POST /api/reader/canvases           — create standalone canvas
+      if (sub === 'canvases' || sub === 'canvases/') {
+        if (method === 'GET') {
+          const itemId = url.searchParams.get('itemId') || undefined;
+          const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
+          const excludeWatchOwned = url.searchParams.get('scope') === 'global';
+          const scopeKind = url.searchParams.get('scopeKind');
+          const locationParam = url.searchParams.get('location');
+          if (itemId && locationParam) {
+            let location = null;
+            try { location = JSON.parse(locationParam); } catch {
+              return sendJson(res, 400, { error: 'location must be valid JSON' });
+            }
+            return sendJson(res, 200, canvasStore.listCanvasesForLocation(itemId, location));
+          }
+          return sendJson(res, 200, canvasStore.listCanvases({
+            itemId, includeDeleted, excludeWatchOwned,
+            scopeKind: scopeKind === 'book' || scopeKind === 'location' ? scopeKind : null,
+          }));
+        }
+        if (method === 'POST') {
+          const body = await readJsonBody(req);
+          return sendJson(res, 201, canvasStore.createCanvas(body));
+        }
+      }
+
+      // POST /api/reader/canvases/import — import / restore canvas package
+      if (sub === 'canvases/import' && method === 'POST') {
+        const body = await readJsonBody(req);
+        const pkg = body.package || body;
+        const newId = body.newId === true;
+        return sendJson(res, 201, canvasStore.importCanvas(pkg, { newId }));
+      }
+
+      // GET  /api/reader/canvases/:id              — get canvas doc
+      // PUT  /api/reader/canvases/:id              — update canvas
+      // DELETE /api/reader/canvases/:id            — soft delete
+      const readerCanvasBase = sub.match(/^canvases\/([^/]+)$/);
+      if (readerCanvasBase) {
+        const canvasId = decodeURIComponent(readerCanvasBase[1]);
+        const itemId = url.searchParams.get('itemId');
+        if (method === 'GET') {
+          canvasStore.assertCanvasOwnership(canvasId, itemId);
+          return sendJson(res, 200, canvasStore.getCanvas(canvasId));
+        }
+        if (method === 'PUT') {
+          canvasStore.assertCanvasOwnership(canvasId, itemId);
+          const body = await readJsonBody(req);
+          const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision;
+          return sendJson(res, 200, canvasStore.updateCanvas(canvasId, body, expectedRev));
+        }
+        if (method === 'DELETE') {
+          canvasStore.assertCanvasOwnership(canvasId, itemId);
+          const body = await readJsonBody(req);
+          const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision;
+          return sendJson(res, 200, canvasStore.deleteCanvas(canvasId, expectedRev));
+        }
+      }
+
+      // PUT   /api/reader/canvases/:id/metadata   — rename canvas
+      const readerCanvasMeta = sub.match(/^canvases\/([^/]+)\/metadata$/);
+      if (readerCanvasMeta && method === 'PUT') {
+        const canvasId = decodeURIComponent(readerCanvasMeta[1]);
+        const itemId = url.searchParams.get('itemId');
+        canvasStore.assertCanvasOwnership(canvasId, itemId);
+        const body = await readJsonBody(req);
+        const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision;
+        return sendJson(res, 200, canvasStore.renameCanvas(canvasId, body.title, expectedRev));
+      }
+
+      // PATCH /api/reader/canvases/:id/restore    — restore soft-deleted
+      const readerCanvasRestore = sub.match(/^canvases\/([^/]+)\/restore$/);
+      if (readerCanvasRestore && method === 'PATCH') {
+        const canvasId = decodeURIComponent(readerCanvasRestore[1]);
+        const itemId = url.searchParams.get('itemId');
+        canvasStore.assertCanvasOwnership(canvasId, itemId);
+        const body = await readJsonBody(req);
+        const expectedRev = typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined;
+        return sendJson(res, 200, canvasStore.restoreCanvas(canvasId, expectedRev));
+      }
+
+      // POST /api/reader/canvases/:id/recover     — recover from external
+      const readerCanvasRecover = sub.match(/^canvases\/([^/]+)\/recover$/);
+      if (readerCanvasRecover && method === 'POST') {
+        const canvasId = decodeURIComponent(readerCanvasRecover[1]);
+        const itemId = url.searchParams.get('itemId');
+        canvasStore.assertCanvasOwnership(canvasId, itemId);
+        return sendJson(res, 200, canvasStore.recoverCanvasFromExternal(canvasId));
+      }
+
+      // GET  /api/reader/canvases/:id/links       — list links
+      // POST /api/reader/canvases/:id/links       — add link
+      const readerCanvasLinks = sub.match(/^canvases\/([^/]+)\/links$/);
+      if (readerCanvasLinks) {
+        const canvasId = decodeURIComponent(readerCanvasLinks[1]);
+        const itemId = url.searchParams.get('itemId');
+        canvasStore.assertCanvasOwnership(canvasId, itemId);
+        if (method === 'GET') return sendJson(res, 200, canvasStore.getCanvasLinks(canvasId));
+        if (method === 'POST') {
+          const body = await readJsonBody(req);
+          return sendJson(res, 201, canvasStore.addCanvasLink(canvasId, body));
+        }
+      }
+
+      // DELETE /api/reader/canvases/:id/links/:linkId — remove link
+      const readerCanvasLinkDel = sub.match(/^canvases\/([^/]+)\/links\/([^/]+)$/);
+      if (readerCanvasLinkDel && method === 'DELETE') {
+        const canvasId = decodeURIComponent(readerCanvasLinkDel[1]);
+        const itemId = url.searchParams.get('itemId');
+        canvasStore.assertCanvasOwnership(canvasId, itemId);
+        const linkId = decodeURIComponent(readerCanvasLinkDel[2]);
+        return sendJson(res, 200, canvasStore.removeCanvasLink(linkId));
+      }
+
+      // POST /api/reader/canvases/:id/assets      — upload image asset
+      const readerCanvasAssetsPost = sub.match(/^canvases\/([^/]+)\/assets$/);
+      if (readerCanvasAssetsPost && method === 'POST') {
+        const canvasId = decodeURIComponent(readerCanvasAssetsPost[1]);
+        const itemId = url.searchParams.get('itemId');
+        canvasStore.assertCanvasOwnership(canvasId, itemId);
+        const body = await readJsonBody(req);
+        const buffer = Buffer.from(body.dataBase64, 'base64');
+        const asset = canvasStore.saveCanvasAsset(canvasId, {
+          originalName: body.originalName || 'image.png',
+          mimeType: body.mimeType || 'image/png',
+          buffer,
+        });
+        return sendJson(res, 201, asset);
+      }
+
+      // GET /api/reader/canvases/:id/assets/:assetId — serve asset
+      const readerCanvasAssetGet = sub.match(/^canvases\/([^/]+)\/assets\/([^/]+)$/);
+      if (readerCanvasAssetGet && method === 'GET') {
+        const canvasId = decodeURIComponent(readerCanvasAssetGet[1]);
+        const itemId = url.searchParams.get('itemId');
+        canvasStore.assertCanvasOwnership(canvasId, itemId);
+        const assetId = decodeURIComponent(readerCanvasAssetGet[2]);
+        const { meta, buffer } = canvasStore.getCanvasAsset(canvasId, assetId);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', meta.mimeType);
+        res.setHeader('Content-Length', meta.sizeBytes);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        return res.end(buffer);
+      }
+
+      // GET /api/reader/canvases/:id/export       — export canvas package
+      const readerCanvasExport = sub.match(/^canvases\/([^/]+)\/export$/);
+      if (readerCanvasExport && method === 'GET') {
+        const canvasId = decodeURIComponent(readerCanvasExport[1]);
+        const itemId = url.searchParams.get('itemId');
+        canvasStore.assertCanvasOwnership(canvasId, itemId);
+        return sendJson(res, 200, canvasStore.exportCanvas(canvasId));
+      }
+
+      // GET /api/reader/annotations/:id/canvas-links
+      const readerAnnotationLinks = sub.match(/^annotations\/([^/]+)\/canvas-links$/);
+      if (readerAnnotationLinks && method === 'GET') {
+        const annotationId = decodeURIComponent(readerAnnotationLinks[1]);
+        return sendJson(res, 200, canvasStore.getLinksForAnnotation(annotationId));
+      }
+
       return sendJson(res, 404, { error: 'Reader route not found' });
     }
 
     // -------------------------------------------------------------
-    // Annotation APIs: /api/annotations/*
+    // Annotation APIs: /api/annotations/*  (legacy — hardened)
+    // These routes existed before the item-scoped /api/reader/items/:id/annotations
+    // contract was introduced. They are kept for compatibility but MUST NOT
+    // allow an arbitrary annotation ID to bypass item ownership.
+    // itemId is now required for all single-resource operations.
     // -------------------------------------------------------------
     if (pathname.startsWith('/api/annotations')) {
       const sub = pathname.replace(/^\/api\/annotations\/?/, '');
+      // GET /api/annotations/items/:id — list (legacy compatibility)
       const itemMatch = sub.match(/^items\/([^/]+)$/);
       if (itemMatch && method === 'GET') {
         const itemId = decodeURIComponent(itemMatch[1]);
         return sendJson(res, 200, annotationStore.listAnnotations(itemId));
       }
-      if (method === 'POST') {
+      // POST /api/annotations — create (itemId must be in body, validated by store)
+      if (sub === '' && method === 'POST') {
         const body = await readJsonBody(req);
         return sendJson(res, 201, annotationStore.createAnnotation(body));
       }
+      // GET/PUT/DELETE /api/annotations/:id — hardened: itemId required
       const annMatch = sub.match(/^([^/]+)$/);
       if (annMatch) {
         const annId = decodeURIComponent(annMatch[1]);
-        if (method === 'GET') return sendJson(res, 200, annotationStore.getAnnotation(annId));
+        const itemId = url.searchParams.get('itemId') || undefined;
+        if (!itemId) {
+          return sendJson(res, 400, { error: 'itemId is required for legacy annotation access' });
+        }
+        if (method === 'GET') {
+          const ann = annotationStore.getAnnotation(annId, { itemId });
+          if (!ann) return sendJson(res, 404, { error: 'Annotation not found' });
+          return sendJson(res, 200, ann);
+        }
         if (method === 'PUT') {
           const body = await readJsonBody(req);
-          return sendJson(res, 200, annotationStore.updateAnnotation(annId, body));
+          return sendJson(
+            res,
+            200,
+            annotationStore.updateAnnotation(
+              annId,
+              body,
+              typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+              { itemId },
+            ),
+          );
         }
         if (method === 'DELETE') {
-          return sendJson(res, 200, annotationStore.deleteAnnotation(annId));
+          const body = await readJsonBody(req);
+          return sendJson(
+            res,
+            200,
+            annotationStore.deleteAnnotation(
+              annId,
+              typeof body.expectedRevision === 'number' ? body.expectedRevision : body.revision,
+              { itemId },
+            ),
+          );
         }
       }
       return sendJson(res, 404, { error: 'Annotation route not found' });
