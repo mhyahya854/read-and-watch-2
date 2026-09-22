@@ -112,6 +112,21 @@ pretrained archives for PP-OCRv5). Model-card terms must be reviewed before any
 redistribution of weights. Read & Watch does not redistribute either set of
 weights.
 
+### 2026-09-23 Phase 17 evidence-pass recheck
+
+Official upstream metadata was rechecked without downloading weights. The
+`baidu/Unlimited-OCR` repository declares MIT for code, and its separate
+Hugging Face model card currently declares MIT. `PaddlePaddle/PaddleOCR`
+declares Apache-2.0 for repository code; this check did not establish separate
+rights for the exact PP-OCRv5 detection and Arabic recognition weight archives.
+The Hugging Face API still reports specialist revision
+`a9ef072320b50014f6df7ed9db807810157a410e` and model-card licence
+Apache-2.0. The associated GitHub project API still reports `license: null`;
+its own source description lists UTRSet-Real with CC BY-NC-SA 4.0 terms.
+None of these declarations proves redistribution or commercial-use rights for
+the combined specialist weights and training inputs. Phase 17 formal acceptance
+requires a scope decision; no such decision is inferred here.
+
 ## Phase 16 Dependency & Vulnerability Audit (2026-09-15)
 
 Audit executed with `npm audit` on Node v24.18.0 / npm 11.6.0.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-23 - Phase 17 final evidence pass; closure remains blocked
+
+- Inspected only metadata and hashes in the application-resolved external OCR benchmark root. Sixteen registered formal candidates (4 English, 4 Arabic, 6 Urdu, 2 English/Arabic mixed) from 10 source hashes exist, but all truth remains DRAFT and none is locked or FINAL; no formal engine run or representative accuracy/performance result exists. All source and sample-image hashes match; source hashes remained unchanged after regression.
+- Verified this host has Intel Arc graphics and no NVIDIA CUDA device. The previously proven PP-OCRv5 CPU pin set and specialist short runtime-root repair remain current; the older CPU/MAX_PATH findings are historical. No provider substitution or model download occurred.
+- Reconciled current Phase 17 protocol/state wording and recorded the missing lawful-use declarations, representative coverage and acceptance decision rule without inventing thresholds or promoting draft truth. P17-T004, P17-T007, and P17-G002 remain open; Phase 17 is IN_PROGRESS and Phase 18 NOT_STARTED.
+- Regression: 627 total / 626 passing / 1 skipped / 0 failing; OCR-targeted 180/180; packaged Read parity 5/5; Read visual 30/30; Watch visual 28/28; typecheck, lint, build, hygiene, governance, and incremental Graphify pass. Ponytail read-only review found no justified code deletion.
+
 ## 2026-09-19 - Audit and harden Read study workspace
 
 - **Adversarial re-audit of the Read redesign commit** (`7bedf93`). Every headline claim was re-verified from source, runtime behaviour and persistence; confirmed defects were repaired rather than reported.

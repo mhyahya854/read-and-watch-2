@@ -881,3 +881,107 @@ Verified against live GitHub raw content and the GitHub API after the push
 
 No action in this run marked P17-T004 or P17-T007 complete, started Phase 18, or
 began a platform certification stage.
+
+---
+
+## 29. Final evidence pass — 2026-09-23 (current status; earlier sections are historical)
+
+Starting local and fetched `origin/master`: `7e6dd5e659c03358f439b27a51f20be12d2b03ac`.
+The repair commit `d1a910f83c26130ec6b16c75263642e2900f16da` remains in the
+baseline. This pass makes no Phase 18 or product-policy change.
+
+### Private corpus readiness (metadata only)
+
+The application-resolved external benchmark root exists. Its 16 registered
+formal candidate items come from 10 distinct source hashes: 4 English, 4 Arabic,
+6 Urdu, and 2 mixed English/Arabic. There are 14 PAGE, 0 REGION, and 2 LINE
+items. Required-provider sets match the declared languages: English requires
+Unlimited-OCR; Arabic requires PP-OCRv5; Urdu requires both PP-OCRv5 and
+`urdu-nastaliq-trocr`; the two mixed pages require Unlimited-OCR plus PP-OCRv5.
+No mixed Urdu/English candidate is registered. Sources are 11 born-digital
+rendered, 4 clean scans, and 1 photograph; quality labels are 11 clean, 4 mild
+noise, and 1 skewed. No low-contrast, compression, blur, or uneven-illumination
+candidate is registered. Arabic lacks fully vocalised/shadda/tanween/sukun
+feature labels; the current sample set has no REGION-level item. The protocol
+sets no numerical minimum for any category. These are coverage gaps, not
+invented sample quotas.
+
+The manifest schema and manifest hash validate. All 16 source paths exist and
+their current hashes match the registered source hashes. All 16 rendered sample
+hashes match, and the 16 draft files match their manifest drafts. Source hashes
+were rechecked after regression: 10/10 still match. No sample is locked; all
+16 ground truths are `DRAFT`, 0 `REVIEWED`, 0 `FINAL`. Seven drafts carry the
+origin label `BOOTSTRAPPED_FROM_NATIVE_TEXT` and require independent human
+verification; nine carry `MANUAL_TRANSCRIPTION_REQUIRED`. Candidate metadata
+does not include an explicit lawful-use declaration. The four run folders are
+empty. No private transcription, title, path, hash, image, or prediction is
+reproduced in this report.
+
+The committed 14-item synthetic starter remains plumbing evidence only. With
+zero FINAL and locked real candidates, no formal engine call or score was
+permitted, and no accuracy, CER, WER, layout-quality, or representative
+performance result is claimed.
+
+### P17-T004, P17-T007, and P17-G002
+
+| Item | Current evidence and blocker | Result |
+| --- | --- | --- |
+| P17-T004 | Real candidate corpus exists, but every truth is DRAFT, none is locked, lawful-use declarations are absent, and the coverage has material gaps. No formal provider run. | OPEN |
+| English | Unlimited-OCR cannot execute on this Intel Arc host without supported NVIDIA CUDA; no FINAL truth. | BLOCKED |
+| Arabic | PP-OCRv5 CPU capability was previously proven on the pinned runtime, but no FINAL representative truth or formal run exists. | BLOCKED |
+| Urdu | Both engines remain mandatory and independent; no FINAL truth or formal dual-engine run exists. The specialist is LINE-only. | BLOCKED |
+| Mixed | Two English/Arabic candidate pages exist, but neither is FINAL; Urdu/English is not represented. | BLOCKED / NOT REPRESENTED |
+| Layout | PAGE metadata and some region/line truth fields exist, but no FINAL representative PAGE/REGION comparison was possible; there is no REGION item. | BLOCKED |
+| Source preservation | Read-only source validation before and after all regressions found 10/10 source hashes unchanged. End-to-end real OCR source preservation remains untested. | VERIFIED for this pass; formal task OPEN |
+| P17-T007 | All required recognition and layout dimensions remain incomplete. | OPEN |
+| P17-G002 | No formal accuracy/performance evidence; no approved numerical threshold or sufficiently explicit qualitative acceptance authority; model/dataset rights cannot be inferred from code licences. | OPEN |
+
+The current host exposes Intel Arc graphics, no `nvidia-smi`, and no NVIDIA CUDA
+device. The application-resolved external OCR engine/model/runtime directories
+contain no activated provider. Current source pins the previously proven
+PP-OCRv5 CPU stack (`paddlepaddle 3.0.0`, `paddleocr 3.3.1`, `paddlex 3.3.13`,
+`numpy 1.26.4`, `scipy 1.13.1`, `scikit-learn 1.5.2`, `langchain<0.3`,
+`setuptools`); it does not revert to the failing PaddlePaddle 3.3.1 stack.
+The specialist remains pinned to
+`a9ef072320b50014f6df7ed9db807810157a410e`; the short external runtime
+root remains in source and its synthetic long-path regression passes. Earlier
+successful smoke evidence is capability evidence only. The older CPU/MAX_PATH
+failures in preceding dated sections are superseded, not erased.
+
+Current upstream metadata recheck: Unlimited-OCR code and model card declare
+MIT separately; PaddleOCR repository code declares Apache-2.0 while exact model
+weight rights require separate review; the specialist model card declares
+Apache-2.0 at the unchanged pinned revision, its project repository still has
+no declared licence file, and its stated training sources include UTRSet-Real
+(CC BY-NC-SA 4.0 per the project repository). No redistribution or commercial
+right is inferred. The accepted licence scope for P17-G002 requires an explicit
+decision. The protocol has no held-out/tuning split; the 16 candidates have not
+been used to tune recognition or layout.
+
+### Regression and project gates
+
+`npm test`: 627 total / 626 pass / 0 fail / 1 skip. OCR-targeted tests:
+180/180 pass. Electron packaged Read parity: 5/5 pass, including the production
+canvas create/open/save/rename/link/asset/export/restore path and cross-book
+ownership guards. Typecheck, lint, build, repository hygiene, and governance
+validation pass. The Read synthetic-root visual harness passed 30/30 asserted
+captures; the Watch synthetic-root harness passed 28/28. The first concurrent
+Read harness attempt exited before testing because the Watch dev server already
+owned Vinext; the standalone rerun passed.
+
+Graphify's real incremental `App/app` code update produced 2,627 nodes, 6,684
+edges, and 115 communities. The rebuilt graph diagnostic reports 0 unverified
+nodes, 0 missing/dangling endpoints, 0 self-loops, and 0 duplicate edges; OCR
+nodes remain mapped. Semantic extraction was not run because no supported LLM
+backend is configured. Generated graph files remain ignored. Ponytail's
+read-only review found no duplicate OCR provider lifecycle, fallback chain,
+duplicate preprocessing framework, dead benchmark layer, or Phase 18 addition.
+The thin provider bindings and provenance guards are justified; no deletion was
+made. Lean already. Ship.
+
+Phase 17 remains `IN_PROGRESS` with P17-T004, P17-T007, and P17-G002 open;
+Phase 18 remains `NOT_STARTED`. Required human actions: document lawful
+benchmark use, independently transcribe/verify and finalise the 16 drafts,
+lock exact source/image/truth hashes, add representative gaps where lawful,
+approve an acceptance decision rule and intended licence scope, and provide a
+supported NVIDIA CUDA host for unchanged Unlimited-OCR execution.

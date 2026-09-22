@@ -248,16 +248,18 @@ If a mandatory engine is unavailable, the honest outcomes are
 `PARTIAL_ENGINE_FAILURE` (at least one mandatory engine produced output) or
 `BLOCKED` (none did). Urdu is never reported as complete on one engine.
 
-Current integration status (this build):
+Current integration status (superseding the 2026-09-17 foundation snapshot):
 
 - `unlimited-ocr`: `INTEGRATED` (execution blocked by hardware — no CUDA device
   on this host; reported as a structured state, never faked).
-- `paddleocr`: `INTEGRATED` (execution blocked by the PaddlePaddle 3.3.1
-  PIR/oneDNN CPU failure on this host).
-- `urdu-nastaliq-trocr`: **`NOT_INTEGRATED`** — declared, provenance-verified, and
-  required for Urdu, but this build has no execution path for it yet. Urdu
-  recognition is therefore explicitly incomplete, and the benchmark schema says
-  so rather than pretending otherwise.
+- `paddleocr`: `INTEGRATED`; the pinned PaddlePaddle 3.0.0 / PaddleOCR 3.3.1 /
+  PaddleX 3.3.13 CPU combination passed a real synthetic inference on 2026-09-18.
+  The earlier PaddlePaddle 3.3.1 PIR/oneDNN failure remains historical evidence.
+- `urdu-nastaliq-trocr`: `INTEGRATED`, revision
+  `a9ef072320b50014f6df7ed9db807810157a410e`, LINE only. The shipped
+  driver passed a synthetic CPU smoke test. Its staged Python runtime now uses a
+  short external root to avoid the earlier MAX_PATH provisioning failure.
+  Neither smoke test is representative benchmark acceptance evidence.
 
 ---
 
@@ -532,14 +534,21 @@ separately from semantic text, whitespace/token boundaries, and RTL text.
 1. No engine has been benchmarked yet (P17-T004 outstanding). The schema and
    scoring exist; the measurements do not.
 2. Engine acceptance cannot rest on the synthetic corpus.
-3. Urdu recognition cannot be called complete while the Nastaliq specialist is
-   `NOT_INTEGRATED`; the schema enforces that honesty.
-4. English (no CUDA device) and Arabic/Urdu PP-OCRv5 (Paddle 3.3.1 PIR/oneDNN CPU
-   failure) remain blocked on this host; nothing is faked or substituted.
+3. Urdu recognition requires both PP-OCRv5 and the LINE-only specialist for every
+   applicable line. Both are integrated, but neither has formal scored evidence
+   against FINAL representative ground truth.
+4. English remains blocked on this host by the absence of NVIDIA CUDA hardware.
+   PP-OCRv5's earlier PaddlePaddle 3.3.1 CPU failure was superseded by the
+   proven pinned runtime; no provider is substituted.
 5. Specialist licence/dataset terms are unresolved for redistribution and
    commercial use.
-6. Reading-order measurement truth exists, but no reading-order algorithm does
-   (P17-T005).
+6. P17-T005 now implements deterministic reading order and line segmentation;
+   representative page/region truth has not yet verified their real-world quality.
+7. The 2026-09-23 private inventory has 16 DRAFT candidate items and zero FINAL
+   or locked items. The protocol defines coverage dimensions but no minimum
+   sample counts, numerical accuracy/performance thresholds, held-out split, or
+   explicit qualitative decision authority for P17-G002. These must be resolved
+   before a formal acceptance decision; no threshold may be invented.
 
 ---
 
