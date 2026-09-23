@@ -199,7 +199,10 @@ States: `DRAFT` → `REVIEWED` → `FINAL`.
 
 - `DRAFT` lives in `<root>/ground-truth/<sampleId>.draft.txt` and is editable by
   a human. It has no hash.
-- `REVIEWED` and `FINAL` require a hash of the exact text.
+- `REVIEWED` lives in `<sampleId>.reviewed.json` with the exact draft text,
+  hash, timestamp, and review label. `FINAL` lives in `<sampleId>.final.json`.
+  Both require a hash of the exact text. An assistant-created transcription is
+  still a DRAFT until a person checks it against the image.
 - **Only `FINAL` ground truth may be scored formally.** `scoreSample()` throws
   `GROUND_TRUTH_NOT_FINAL` otherwise, and a run record without a
   `groundTruthHash` fails validation.
@@ -210,6 +213,11 @@ review label.
 
 Locking a sample freezes `sourceHash`, `renderedSampleHash`, and
 `groundTruthHash` together in `<sampleId>.lock.json`.
+The corpus store now requires the recorded sequence DRAFT → REVIEWED → FINAL:
+finalisation rejects a missing or stale review, and the stored FINAL record is
+re-hashed on read. Locking requires the actual source file and a rendered image
+inside the private corpus; it re-hashes both and checks the FINAL truth hash
+before writing a lock. A locked image, truth, or lock cannot be overwritten.
 
 ### Exact text is never rewritten
 
@@ -549,6 +557,21 @@ separately from semantic text, whitespace/token boundaries, and RTL text.
    sample counts, numerical accuracy/performance thresholds, held-out split, or
    explicit qualitative decision authority for P17-G002. These must be resolved
    before a formal acceptance decision; no threshold may be invented.
+
+### 2026-09-23 continuation (current private corpus)
+
+The previous 16-item inventory above is a historical snapshot. An assistant
+visual pass inspected all 16 images and registered one useful English REGION
+crop from an existing local-library source, giving 17 DRAFT items (14 PAGE,
+2 LINE, 1 REGION). The new item remains subject to the same human truth and
+lawful-use checks. No item is REVIEWED, FINAL, or locked. The private review
+pack under `READ_WATCH_DATA_ROOT/ocr/benchmark/reports/` records each unresolved
+image and draft. No formal provider run or accuracy result exists.
+
+P17-G002 has a proposed decision rule in the Phase 17 report. It is not an
+approved gate: corpus adequacy, measured language-specific accuracy, practical
+runtime, and licence scope still require a user decision after lawful FINAL
+truth and real provider runs exist.
 
 ---
 

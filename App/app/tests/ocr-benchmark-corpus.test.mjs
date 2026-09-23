@@ -152,10 +152,48 @@ test('P17-T002 case 4: only FINAL ground truth may be scored formally', async ()
     () => store.readFinalGroundTruth('syn-ar-line-0001'),
     (error) => error instanceof BenchmarkProtocolError && error.code === 'GROUND_TRUTH_NOT_FINAL',
   );
-  const final = store.finalizeGroundTruth({ sampleId: 'syn-ar-line-0001', reviewedBy: 'test-run' });
+  assert.throws(
+    () => store.finalizeGroundTruth({ sampleId: 'syn-ar-line-0001' }),
+    (error) => error.code === 'GROUND_TRUTH_NOT_REVIEWED',
+  );
+  store.reviewGroundTruth({ sampleId: 'syn-ar-line-0001', reviewedBy: 'test-run' });
+  store.writeGroundTruthDraft({ sampleId: 'syn-ar-line-0001', exactText: 'نص جديد' });
+  assert.throws(
+    () => store.finalizeGroundTruth({ sampleId: 'syn-ar-line-0001' }),
+    (error) => error.code === 'REVIEW_STALE',
+  );
+  store.writeGroundTruthDraft({ sampleId: 'syn-ar-line-0001', exactText: 'نص مسودة' });
+  store.reviewGroundTruth({ sampleId: 'syn-ar-line-0001', reviewedBy: 'test-run' });
+  const final = store.finalizeGroundTruth({ sampleId: 'syn-ar-line-0001' });
   assert.equal(final.status, 'FINAL');
   assert.equal(final.hash, groundTruthHashForText('نص مسودة'));
   assert.equal(store.readFinalGroundTruth('syn-ar-line-0001').hash, final.hash);
+  const sourcePath = join(store.root, 'source.txt');
+  writeFileSync(sourcePath, 'source bytes');
+  const sourceHash = store.registerSampleSource({ sourcePath }).sourceHash;
+  const image = store.recordRenderedSample({ sampleId: 'syn-ar-line-0001', language: 'ar', bytes: Buffer.from('image bytes') });
+  assert.throws(
+    () => store.lockSample({ sampleId: 'syn-ar-line-0001', sourcePath, renderedSamplePath: image.path, sourceHash, renderedSampleHash: image.hash, groundTruthHash: '0'.repeat(64) }),
+    (error) => error.code === 'LOCK_HASH_MISMATCH',
+  );
+  const otherImage = store.recordRenderedSample({ sampleId: 'syn-ar-line-0002', language: 'ar', bytes: Buffer.from('other image') });
+  assert.throws(
+    () => store.lockSample({ sampleId: 'syn-ar-line-0001', sourcePath, renderedSamplePath: otherImage.path, sourceHash, renderedSampleHash: otherImage.hash, groundTruthHash: final.hash }),
+    (error) => error.code === 'LOCK_IMAGE_SAMPLE_MISMATCH',
+  );
+  store.lockSample({ sampleId: 'syn-ar-line-0001', sourcePath, renderedSamplePath: image.path, sourceHash, renderedSampleHash: image.hash, groundTruthHash: final.hash });
+  assert.throws(
+    () => store.lockSample({ sampleId: 'syn-ar-line-0001', sourcePath, renderedSamplePath: image.path, sourceHash, renderedSampleHash: image.hash, groundTruthHash: final.hash }),
+    (error) => error.code === 'SAMPLE_ALREADY_LOCKED',
+  );
+  assert.throws(
+    () => store.writeGroundTruthDraft({ sampleId: 'syn-ar-line-0001', exactText: 'wrong' }),
+    (error) => error.code === 'GROUND_TRUTH_FINAL',
+  );
+  assert.throws(
+    () => store.recordRenderedSample({ sampleId: 'syn-ar-line-0001', language: 'ar', bytes: Buffer.from('wrong') }),
+    (error) => error.code === 'SAMPLE_ALREADY_LOCKED',
+  );
 });
 
 test('P17-T002 case 17: mixed-language region metadata validates, broken metadata does not', async () => {
@@ -223,6 +261,9 @@ test('P17-T002 case 19: line-level Urdu ground truth validates and keeps exact t
   const mismatched = validateBenchmarkItem({ ...line, line: { ...line.line, exactText: 'مختلف متن' } });
   assert.equal(mismatched.ok, false);
   assert.ok(mismatched.problems.some((problem) => problem.includes('line.exactText')));
+  const missing = validateBenchmarkItem({ ...line, line: { ...line.line, exactText: undefined } });
+  assert.equal(missing.ok, false);
+  assert.ok(missing.problems.some((problem) => problem.includes('line.exactText')));
 });
 
 test('P17-T002 case 20: Urdu line parent page/region relationships are validated', async () => {

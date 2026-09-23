@@ -12,8 +12,8 @@
  * it, lock the sample.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { BenchmarkProtocolError, isSha256, sha256Hex } from './schema.mjs';
 import { groundTruthHashForText } from './manifest.mjs';
@@ -146,6 +146,9 @@ export function createBenchmarkCorpusStore({ dataRoot, repositoryRoot = null, cr
   /** Writes ONE rendered benchmark sample image into the private corpus. */
   function recordRenderedSample({ sampleId, language, bytes, extension = 'png' }) {
     assertSampleId(sampleId);
+    if (existsSync(groundTruthLockPath(sampleId))) {
+      throw new BenchmarkProtocolError('SAMPLE_ALREADY_LOCKED', 'a locked sample image cannot be overwritten');
+    }
     const suffix = String(extension).replace(/^\./, '');
     if (!/^[a-z0-9]{2,5}$/i.test(suffix)) {
       throw new BenchmarkProtocolError('INVALID_EXTENSION', `invalid sample extension: ${extension}`);
@@ -163,12 +166,23 @@ export function createBenchmarkCorpusStore({ dataRoot, repositoryRoot = null, cr
     return assertInsideBenchmark(join(directories.groundTruth, `${assertSampleId(sampleId)}.final.json`));
   }
 
+  function groundTruthReviewedPath(sampleId) {
+    return assertInsideBenchmark(join(directories.groundTruth, `${assertSampleId(sampleId)}.reviewed.json`));
+  }
+
+  function groundTruthLockPath(sampleId) {
+    return assertInsideBenchmark(join(directories.groundTruth, `${assertSampleId(sampleId)}.lock.json`));
+  }
+
   /** Creates the EDITABLE draft a human will correct against the image. */
   function writeGroundTruthDraft({ sampleId, exactText }) {
     if (typeof exactText !== 'string' || exactText.length === 0) {
       throw new BenchmarkProtocolError('GROUND_TRUTH_TEXT_REQUIRED', 'draft ground truth must not be empty');
     }
     const path = groundTruthDraftPath(sampleId);
+    if (existsSync(groundTruthFinalPath(sampleId)) || existsSync(groundTruthLockPath(sampleId))) {
+      throw new BenchmarkProtocolError('GROUND_TRUTH_FINAL', 'final or locked ground truth cannot be rewritten as a draft');
+    }
     writeFileSync(path, exactText, 'utf8');
     return { path, revision: 1, status: 'DRAFT', hash: null, exactText };
   }
@@ -177,19 +191,49 @@ export function createBenchmarkCorpusStore({ dataRoot, repositoryRoot = null, cr
     return readFileSync(groundTruthDraftPath(sampleId), 'utf8');
   }
 
+  function reviewGroundTruth({ sampleId, reviewedBy }) {
+    if (typeof reviewedBy !== 'string' || !reviewedBy.trim()) {
+      throw new BenchmarkProtocolError('REVIEWER_REQUIRED', 'a review label is required');
+    }
+    if (existsSync(groundTruthFinalPath(sampleId)) || existsSync(groundTruthLockPath(sampleId))) {
+      throw new BenchmarkProtocolError('GROUND_TRUTH_FINAL', 'final or locked ground truth cannot be reviewed again');
+    }
+    const exactText = readGroundTruthDraft(sampleId);
+    const record = {
+      sampleId: assertSampleId(sampleId),
+      status: 'REVIEWED',
+      exactText,
+      hash: groundTruthHashForText(exactText),
+      reviewedBy: reviewedBy.trim(),
+      reviewedAt: new Date().toISOString(),
+    };
+    writeFileSync(groundTruthReviewedPath(sampleId), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+    return record;
+  }
+
   /**
    * Finalises a reviewed draft. Only FINAL ground truth may be scored formally.
    */
-  function finalizeGroundTruth({ sampleId, exactText = null, reviewedBy = null, revision = 1 }) {
+  function finalizeGroundTruth({ sampleId, exactText = null, revision = 1 }) {
+    if (existsSync(groundTruthFinalPath(sampleId)) || existsSync(groundTruthLockPath(sampleId))) {
+      throw new BenchmarkProtocolError('GROUND_TRUTH_FINAL', 'final or locked ground truth cannot be overwritten');
+    }
+    if (!existsSync(groundTruthReviewedPath(sampleId))) {
+      throw new BenchmarkProtocolError('GROUND_TRUTH_NOT_REVIEWED', 'ground truth must be reviewed before finalisation');
+    }
+    const reviewed = JSON.parse(readFileSync(groundTruthReviewedPath(sampleId), 'utf8'));
     const text = exactText ?? readGroundTruthDraft(sampleId);
     const hash = groundTruthHashForText(text);
+    if (text !== readGroundTruthDraft(sampleId) || reviewed.sampleId !== sampleId || reviewed.status !== 'REVIEWED' || reviewed.exactText !== text || reviewed.hash !== hash) {
+      throw new BenchmarkProtocolError('REVIEW_STALE', 'draft changed since review; review the current exact text');
+    }
     const record = {
       sampleId: assertSampleId(sampleId),
       revision,
       status: 'FINAL',
       exactText: text,
       hash,
-      reviewedBy,
+      reviewedBy: reviewed.reviewedBy,
       finalizedAt: new Date().toISOString(),
     };
     writeFileSync(groundTruthFinalPath(sampleId), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
@@ -204,18 +248,37 @@ export function createBenchmarkCorpusStore({ dataRoot, repositoryRoot = null, cr
         `no FINAL ground truth exists for ${sampleId}; formal scoring is prohibited`,
       );
     }
-    return JSON.parse(readFileSync(path, 'utf8'));
+    const record = JSON.parse(readFileSync(path, 'utf8'));
+    if (record.sampleId !== sampleId || record.status !== 'FINAL' || record.hash !== groundTruthHashForText(record.exactText)) {
+      throw new BenchmarkProtocolError('FINAL_TRUTH_CORRUPT', `FINAL ground truth is not hash-valid for ${sampleId}`);
+    }
+    return record;
   }
 
   /** Locks a sample: source hash, rendered hash, and truth hash frozen together. */
-  function lockSample({ sampleId, sourceHash, renderedSampleHash, groundTruthHash }) {
+  function lockSample({ sampleId, sourcePath, renderedSamplePath, sourceHash, renderedSampleHash, groundTruthHash }) {
     assertSampleId(sampleId);
     for (const [label, hash] of Object.entries({ sourceHash, renderedSampleHash, groundTruthHash })) {
       if (!isSha256(hash)) {
         throw new BenchmarkProtocolError('HASH_REQUIRED', `${label} must be a sha256 before a sample is locked`);
       }
     }
-    const path = assertInsideBenchmark(join(directories.groundTruth, `${sampleId}.lock.json`));
+    if (!sourcePath || !renderedSamplePath || !existsSync(sourcePath) || !existsSync(renderedSamplePath)) {
+      throw new BenchmarkProtocolError('LOCK_FILES_REQUIRED', 'source and rendered sample files are required for locking');
+    }
+    if (!isInside(realpathSync(directories.corpus), realpathSync(renderedSamplePath))) {
+      throw new BenchmarkProtocolError('LOCK_IMAGE_OUTSIDE_CORPUS', 'the rendered sample must be inside the private corpus');
+    }
+    if (!basename(renderedSamplePath).startsWith(`${sampleId}.`)) {
+      throw new BenchmarkProtocolError('LOCK_IMAGE_SAMPLE_MISMATCH', 'the rendered image must belong to the sample being locked');
+    }
+    if (registerSampleSource({ sourcePath }).sourceHash !== sourceHash || sha256Hex(readFileSync(renderedSamplePath)) !== renderedSampleHash || readFinalGroundTruth(sampleId).hash !== groundTruthHash) {
+      throw new BenchmarkProtocolError('LOCK_HASH_MISMATCH', 'source, image, or FINAL truth hash does not match');
+    }
+    const path = groundTruthLockPath(sampleId);
+    if (existsSync(path)) {
+      throw new BenchmarkProtocolError('SAMPLE_ALREADY_LOCKED', 'a locked sample cannot be overwritten');
+    }
     const record = {
       sampleId,
       sourceHash,
@@ -260,6 +323,7 @@ export function createBenchmarkCorpusStore({ dataRoot, repositoryRoot = null, cr
     recordRenderedSample,
     writeGroundTruthDraft,
     readGroundTruthDraft,
+    reviewGroundTruth,
     finalizeGroundTruth,
     readFinalGroundTruth,
     lockSample,

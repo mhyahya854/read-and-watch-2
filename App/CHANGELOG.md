@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-23 - Phase 17 visual corpus and truth-lock continuation
+
+- Independently opened all 16 original private candidate images, verified current source and rendered-image hashes, manually transcribed five visual drafts (including a new English REGION crop), and corrected one visible punctuation defect. All 17 candidates remain DRAFT; zero FINAL, locks, or formal engine runs. One private human-review pack records the remaining exact text and lawful-use confirmations.
+- Added one useful REGION candidate from an existing local source page and corrected a visibly low-contrast Urdu sample label. Urdu/English mixed and stronger exact Arabic/Urdu truth coverage remain unresolved.
+- Closed a benchmark integrity gap: FINAL now requires a recorded, unchanged REVIEWED draft; FINAL reads recheck their hash; locks verify the actual source, private corpus image, and FINAL truth; locked images and truth cannot be overwritten. LINE import and schema validation now require `line.exactText`.
+- Rechecked current hardware, runtime pins, specialist model revision, and upstream code/model/dataset terms. A proposed P17-G002 decision rule and licence-scope options are recorded without approving the gate. Phase 17 remains IN_PROGRESS; P17-T004, P17-T007, and P17-G002 remain OPEN; Phase 18 remains NOT_STARTED.
+
 ## 2026-09-23 - Phase 17 final evidence pass; closure remains blocked
 
 - Inspected only metadata and hashes in the application-resolved external OCR benchmark root. Sixteen registered formal candidates (4 English, 4 Arabic, 6 Urdu, 2 English/Arabic mixed) from 10 source hashes exist, but all truth remains DRAFT and none is locked or FINAL; no formal engine run or representative accuracy/performance result exists. All source and sample-image hashes match; source hashes remained unchanged after regression.

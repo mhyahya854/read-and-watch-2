@@ -127,6 +127,36 @@ None of these declarations proves redistribution or commercial-use rights for
 the combined specialist weights and training inputs. Phase 17 formal acceptance
 requires a scope decision; no such decision is inferred here.
 
+### 2026-09-23 current-source rights audit and scope choices
+
+Rechecked the [Unlimited-OCR repository](https://github.com/baidu/Unlimited-OCR)
+and [model card](https://huggingface.co/baidu/Unlimited-OCR), the
+[PaddleOCR code licence](https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE)
+and [PP-OCRv5 model list](https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/pipeline_usage/OCR.en.md), the
+[specialist model card](https://huggingface.co/qandeelasim13/urdu-ocr-trocr-si26),
+its [project repository](https://github.com/qandeelasim13/URDU-OCR-PROJECT-CODE-SAVIOURS-SI-2026-QANDEEL-ASIM), and the
+[original UTRNet/UTRSet repository](https://github.com/abdur75648/UTRNet-High-Resolution-Urdu-Text-Recognition).
+The Hugging Face API still reports the exact specialist revision
+`a9ef072320b50014f6df7ed9db807810157a410e` and `apache-2.0`; the project
+GitHub API reports `license: null`.
+
+| Provider | Code licence | Model/weight declaration | Training-data term relevant here | Distribution and commercial conclusion |
+| --- | --- | --- | --- | --- |
+| Unlimited-OCR | MIT in code repository | Separate Hugging Face model repository declares MIT; no distinct weight-specific instrument was established in this audit | No complete training-data rights chain established here | User-managed local download is the current design. Bundling or commercial distribution needs a separate scope review. |
+| PP-OCRv5 Arabic | Apache-2.0 for PaddleOCR repository code | Exact detection and Arabic recognition weight-archive terms were not independently established; the upstream model list identifies the archives and published task metrics | No complete training-data rights chain established here | Keep weights external. Do not infer archive redistribution from the code licence. |
+| Urdu Nastaliq specialist | Associated project repository has no declared licence | Exact pinned Hugging Face model card declares Apache-2.0 | Model card names UTRSet-Real. Its original repository says the dataset, code, and models are for research use and declares CC BY-NC-SA 4.0 for noncommercial academic/research use; other listed screenshots also need their own rights review | The model-card declaration does not resolve rights in the project code or training inputs. Do not bundle or claim commercial clearance. |
+
+Scope options for a user/legal decision:
+
+1. **Private local research use:** keep the application and user-initiated model downloads local; confirm source-use rights for the selected benchmark pages.
+2. **Distribute the application without weights:** retain user-managed downloads and notices; separately review the right to distribute integrations and the intended audience.
+3. **Commercial application with user-managed downloads:** obtain a rights decision for the specialist's research/noncommercial training-data caveat and any model-specific obligations before claiming commercial acceptance.
+4. **Bundle selected weights:** do so only after the exact weight archive, model card, dataset, and notice obligations are independently cleared for the intended scope.
+5. **Exclude uncertain weights from distribution:** retain optional local integration only where lawful; Urdu cannot be called complete under the current dual-engine rule unless both mandatory engines actually run.
+
+No option is selected by this audit. P17-G002 remains OPEN pending the intended
+private/distributed/commercial scope and rights decision.
+
 ## Phase 16 Dependency & Vulnerability Audit (2026-09-15)
 
 Audit executed with `npm audit` on Node v24.18.0 / npm 11.6.0.

@@ -519,6 +519,9 @@ export function validateBenchmarkItem(item, options = {}) {
       if (typeof item.line.lineId !== 'string' || !ITEM_ID_PATTERN.test(item.line.lineId)) {
         problems.push('line.lineId must be a stable identifier');
       }
+      if (typeof item.line.exactText !== 'string' || item.line.exactText.length === 0) {
+        problems.push('line.exactText must be the exact Unicode line text');
+      }
       if (
         typeof item.line.exactText === 'string' &&
         isPlainObject(item.groundTruth) &&

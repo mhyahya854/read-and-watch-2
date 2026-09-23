@@ -985,3 +985,169 @@ benchmark use, independently transcribe/verify and finalise the 16 drafts,
 lock exact source/image/truth hashes, add representative gaps where lawful,
 approve an acceptance decision rule and intended licence scope, and provide a
 supported NVIDIA CUDA host for unchanged Unlimited-OCR execution.
+
+## 2026-09-23 continuation — visual corpus pass and closure preparation
+
+The preceding 16-item section is historical evidence. This continuation
+supersedes its *current-count* statements; it does not change the earlier run's
+test totals or make the older draft truth authoritative. Starting local,
+`origin/master`, and live remote HEAD were all
+`4a6e6c40a9df9d9be3849179031ea5e20165c31c`; the tree was clean.
+
+### Private corpus and truth
+
+The application's current resolver selected the external sibling data root.
+The private manifest and all 16 original rendered images were opened directly,
+not inferred from an earlier report. An additional English REGION crop of a
+paragraph in an existing source page was rendered, visually checked, and
+registered through the existing importer. The current manifest validates with
+**17** candidates: 5 English, 4 Arabic, 6 Urdu, 2 English/Arabic mixed;
+14 PAGE, 2 LINE, 1 REGION. The corpus still uses 10 distinct source hashes.
+Every registered source exists and matched its stored SHA-256 at the initial
+audit; every rendered image and draft existed and matched its manifest binding.
+The new REGION's source and image were also hash-bound and the updated manifest
+passes `verifyManifestIntegrity()`.
+The final independent byte-level recheck found 17/17 source hashes, 17/17 image
+hashes, and 17/17 draft files matching the current manifest. All 16 original
+sources and images still match the opening baseline; no original source byte
+changed. Text-mode newline translation initially made three edited drafts look
+different; comparing UTF-8 file bytes with the stored exact text resolved that
+false alarm. No FINAL truth or lock file appeared during this work.
+
+All 17 images received an assistant visual assessment. Of the original seven
+native-text drafts, **zero** was established as exact: two were replaced with
+visual drafts, one had a visible punctuation error corrected, and the others
+retain unresolved checks. Arabic PDF text extraction produced visibly wrong
+forms and stray Latin characters. Of the nine original placeholder-only manual
+cases, two now have manual visual drafts (a photographed English page and an
+Urdu line); seven still need transcription. The new REGION has a manual visual
+draft. Thus five drafts were manually transcribed from images and one other
+received a punctuation correction, but all **17 remain DRAFT**: 0 REVIEWED,
+0 FINAL, 0 locked. The
+private `HUMAN_REVIEW_PACK.md` lists every sample, image, current draft,
+uncertainty, and exact person-only confirmation. No OCR output was used as
+truth. These assistant drafts do not satisfy the protocol's human review step.
+
+No candidate or adjacent source sidecar supplied an explicit lawful private
+benchmark-use declaration. The review pack requests one, by sample ID and
+source category, without placing a private title, path, transcript, source
+hash, or image in Git. One low-contrast Urdu page was incorrectly labelled
+`clean`; its private metadata now says `low-contrast`. REGION coverage is now
+represented. Urdu/English mixed material, a clean fully vocalised Arabic
+truth case, richer Urdu line/paragraph truth, compression, blur, and uneven
+illumination remain gaps. A read-only inspection of two locally held poetry
+PDFs found English/transliteration on the sampled pages, not a useful
+Urdu-script/English page; no candidate was added merely to raise the count.
+The protocol sets no numeric sample quota. Corpus representativeness remains
+unapproved.
+
+The corpus store previously allowed a DRAFT to be finalised without a recorded
+REVIEWED state and allowed a lock to be written from syntactically valid but
+unverified hashes. It now requires DRAFT → REVIEWED → FINAL with an unchanged
+exact-text hash, rechecks a FINAL record on read, hashes the actual source and
+rendered image before locking, confines the image to the private corpus, and
+refuses overwrites of a locked image/truth/lock. The importer now includes
+`line.exactText`; validation rejects a missing value. Synthetic-root regression
+tests cover the stale-review, mismatched-hash, and locked-overwrite cases.
+The lock path additionally checks the image's resolved location and sample
+filename, preventing a different corpus image or a path through a junction
+from being bound to the sample.
+
+### Current runtime and formal run status
+
+This machine currently reports Intel Arc graphics; `nvidia-smi` is absent and
+no supported NVIDIA CUDA device was found. The selected external root contains
+no activated OCR engine, model, or Python runtime. The previously cited smoke
+evidence files were not present under that *currently resolved* evidence root
+when inspected; past smoke outcomes remain historical claims rather than new
+reproduced runs. Source still pins the accepted PP-OCRv5 CPU stack and the
+specialist's exact model revision and LINE-only capability. The Hugging Face
+API returned the same specialist revision and Apache-2.0 model-card label;
+the related GitHub project API returned no licence. No model was substituted.
+With zero lawful, FINAL, locked samples, the formal runner was **not invoked**
+and there are zero new real CER, WER, exact-match, Arabic mark, Urdu per-engine,
+layout, or timing results. No English substitute was run on this non-CUDA host.
+
+### PROPOSED P17-G002 acceptance rule — requires user approval
+
+This is a proposed hybrid rule for assisted, reviewable OCR, **not an approved
+gate**. Published upstream recognition averages and the specialist's own
+reported CER describe different data and cannot justify a threshold for this
+small private corpus.
+
+1. **Eligible evidence:** score only items with documented lawful use, a
+   person-reviewed exact transcript, FINAL status, a verified source/image/truth
+   lock, valid manifest, and unchanged source hashes before and after execution.
+   Synthetic fixtures and draft or OCR-generated truth fail eligibility.
+2. **Representative coverage:** approve a coverage matrix for English, Arabic,
+   Urdu, mixed pages, PAGE/REGION/LINE, reading order, and available quality
+   classes before using the corpus for acceptance. Record unavailable lawful
+   categories as explicit exclusions, not fabricated examples. An unexplained
+   gap in a required use case fails the gate.
+3. **Accuracy evidence:** publish CER, WER, exact match, and per-line/block
+   preservation for each sample and language. Publish Arabic huroof, tashkeel,
+   and fully vocalised metrics separately. Publish independent PP-OCRv5 and
+   specialist Urdu metrics and raw outputs. A person examines every error and
+   labels it `ACCEPTABLE_WITH_REVIEW` or `BLOCKING` with a reason. Any
+   unreviewable omission, wrong-script result, unflagged meaning-changing
+   error, or inaccessible source association is `BLOCKING`. No average can
+   cancel a blocking case. Numerical metrics are reported as evidence; a
+   numeric pass threshold must be approved and frozen before any future
+   held-out validation if unattended accuracy is ever claimed.
+4. **Catastrophic limits:** zero changed source bytes, zero OCR on a usable
+   native-text page, zero provider substitution, zero OCR prediction promoted
+   to ground truth, and zero silent dropped/duplicated lines or regions. Any
+   occurrence fails P17-G002 regardless of mean CER/WER.
+5. **Layout and source links:** a human compares region/line boxes and reading
+   order with the page image. Every mismatch must be visible, traceable to its
+   source location, and correctable in review; an unflagged material mismatch
+   fails. Derived text must remain separately labelled and recoverable.
+6. **Practical runtime:** record real cold/warm duration, hardware, memory,
+   model revision, and failure state on supported target hardware. The user
+   must accept the observed waiting time and resource cost for the intended
+   workload; no fabricated latency number or transfer of upstream timing is
+   allowed.
+7. **Urdu semantics:** both mandatory providers must run for each applicable
+   line. Preserve both outputs, per-engine scores, and disagreement evidence;
+   no winner or fallback. A missing engine is BLOCKED or
+   PARTIAL_ENGINE_FAILURE, never a pass. Material disagreement remains
+   REVIEW_REQUIRED until a person resolves the text.
+8. **Decision record:** pass only when every eligible required case has no
+   `BLOCKING` finding, every review-required case has an explicit review path,
+   coverage and runtime are approved for the intended scope, and exact code,
+   weight, dataset, redistribution, and commercial-use obligations are
+   resolved for that scope. Otherwise remain OPEN with itemised reasons.
+
+The user must approve or revise this rule, including the intended private,
+distributed, or commercial scope. It cannot pass until representative real
+measurements, a supported CUDA host for English, and the rights decision exist.
+Current primary-source licence evidence and scope options are in the updated
+upstream ledger.
+
+### Final graph and simplification audit
+
+The code-only Graphify update of `App/app` produced 2,630 nodes, 6,709 edges,
+and 110 communities. Its multigraph diagnostic reported zero unverified nodes,
+missing or dangling endpoints, self-loops, or exact duplicate edges. This is
+navigation evidence, not a claim that semantics were LLM-verified; no supported
+semantic backend was configured. Graph output remains Git-ignored.
+
+Ponytail's read-only pass inspected the three provider bindings, shared managed
+provider lifecycle, Urdu dual-engine orchestration, and benchmark lifecycle
+repair. No duplicate provider lifecycle, substitute/fallback engine chain, new
+dependency, or accidental Phase 18 work was found in the reviewed scope. The
+new review and lock guards enforce the required evidence boundary; no deletion
+was justified.
+
+### Final regression and hygiene results
+
+After the last benchmark lock repair, `npm test` passed 626/627 with one
+existing skip and no failures; the OCR-targeted suite passed 180/180 and the
+packaged Read parity suite passed 5/5. `npx tsc --noEmit`, `npm run lint`, and
+`npm run build` all exited successfully. The Read visual harness passed 30/30
+asserted captures and the Watch harness passed 28/28 earlier in this
+continuation, including actual strikethrough rendering and Read/Watch
+isolation. The late code edit only changed the private benchmark lock path and
+its synthetic-root test; no UI code changed thereafter. Repository hygiene
+passed on 452 tracked paths and project governance validation passed 21 phases
+and 231 task/gate IDs. No real provider benchmark was run.

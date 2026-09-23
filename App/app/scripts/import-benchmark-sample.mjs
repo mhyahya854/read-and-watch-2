@@ -147,6 +147,7 @@ function main() {
       lineId: sampleId,
       index: Number.parseInt(String(args['line-index'] ?? '0'), 10),
       box: parseBox(args.box, { x: 0, y: 0, width: size.width, height: size.height }),
+      exactText,
     };
   }
   if (unitType === 'REGION') {

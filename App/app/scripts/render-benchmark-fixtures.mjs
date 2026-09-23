@@ -184,11 +184,15 @@ async function main() {
     if (stored.hash !== sha256Hex(sample.bytes)) {
       throw new Error(`${sample.benchmarkItemId}: stored image hash does not match the rendered bytes`);
     }
-    store.finalizeGroundTruth({
+    store.writeGroundTruthDraft({
       sampleId: sample.benchmarkItemId,
       exactText: sampleById.get(sample.benchmarkItemId).groundTruth.exactText,
+    });
+    store.reviewGroundTruth({
+      sampleId: sample.benchmarkItemId,
       reviewedBy: 'synthetic-authored-text',
     });
+    store.finalizeGroundTruth({ sampleId: sample.benchmarkItemId });
   }
 
   const manifestFile = store.writeManifest(manifest);
